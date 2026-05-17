@@ -31,7 +31,7 @@ protocol RiotEsportsServiceProtocol: Sendable {
 final class RiotEsportsService: RiotEsportsServiceProtocol {
 
     private let baseURL = "https://esports-api.lolesports.com/persisted/gw"
-    private let apiKey  = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
+    private let apiKey  = APIKeys.riotApiKey
 
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()

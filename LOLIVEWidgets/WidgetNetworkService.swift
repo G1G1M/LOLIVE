@@ -18,7 +18,7 @@ enum WidgetNetworkService {
     }
 
     private static let baseURL = "https://esports-api.lolesports.com/persisted/gw"
-    private static let apiKey  = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
+    private static let apiKey  = APIKeys.riotApiKey
 
     static func fetchNextMatch(leagueId: String, teamCode: String) async -> NextMatchInfo? {
         var components = URLComponents(string: baseURL + "/getSchedule")
