@@ -1,0 +1,52 @@
+# ── Xcode ────────────────────────────────────────────────
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# ── Swift Package Manager ────────────────────────────────
+.build/
+.swiftpm/
+
+# ── CocoaPods ────────────────────────────────────────────
+Pods/
+
+# ── Certificates & Provisioning (절대 커밋 금지) ─────────
+*.p8
+*.p12
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+ExportOptions.plist
+
+# ── Secrets / API Keys (절대 커밋 금지) ──────────────────
+.env
+.env.*
+secrets.xcconfig
+APIKeys.swift
+APIKeys.plist
+GoogleService-Info.plist
+
+# ── macOS ─────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon\r
+._*
+.Spotlight-V100
+.Trashes
+
+# ── 프로젝트 내부 기획 문서 ──────────────────────────────
+*.pdf
+
+# ── Claude ───────────────────────────────────────────────
+CLAUDE.md
