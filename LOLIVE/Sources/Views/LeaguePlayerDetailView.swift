@@ -28,6 +28,8 @@ struct LeaguePlayerDetailView: View {
                 VStack(spacing: 16) {
                     profileCard
 
+                    SeasonStatsView(player: player, league: league)
+
                     if viewModel.isLoadingStats {
                         HStack(spacing: 8) {
                             ProgressView()
@@ -127,7 +129,9 @@ struct LeaguePlayerDetailView: View {
     // MARK: - Champion Stats Card
 
     private var championCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let maxGames = viewModel.championStats.map(\.games).max() ?? 1
+
+        return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("많이 사용한 챔피언")
                     .font(.headline)
@@ -140,19 +144,34 @@ struct LeaguePlayerDetailView: View {
             Divider().padding(.horizontal, 16)
 
             ForEach(Array(viewModel.championStats.enumerated()), id: \.element.id) { idx, stat in
-                HStack(spacing: 12) {
-                    Text("\(idx + 1)")
-                        .font(.caption).fontWeight(.bold)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 12) {
+                        Text("\(idx + 1)")
+                            .font(.caption).fontWeight(.bold)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 16)
 
-                    Text(stat.championId)
-                        .font(.subheadline).fontWeight(.medium)
+                        Text(stat.championId)
+                            .font(.subheadline).fontWeight(.medium)
 
-                    Spacer()
+                        Spacer()
 
-                    Text("\(stat.games)게임")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        Text("\(stat.games)게임")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+
+                    // 사용 빈도 바
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color(.tertiarySystemFill))
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.blue.opacity(0.45))
+                                .frame(width: geo.size.width * CGFloat(stat.games) / CGFloat(maxGames))
+                        }
+                    }
+                    .frame(height: 4)
+                    .padding(.leading, 28)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
 

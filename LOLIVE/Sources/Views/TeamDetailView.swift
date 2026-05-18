@@ -130,7 +130,12 @@ struct TeamDetailView: View {
             Divider().padding(.horizontal, 16)
 
             ForEach(viewModel.players) { player in
-                playerRow(player)
+                NavigationLink {
+                    LeaguePlayerDetailView(player: player, league: league)
+                } label: {
+                    playerRow(player)
+                }
+                .buttonStyle(.plain)
                 if player.id != viewModel.players.last?.id {
                     Divider().padding(.leading, 68)
                 }

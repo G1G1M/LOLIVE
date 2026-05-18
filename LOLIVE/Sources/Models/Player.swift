@@ -15,3 +15,13 @@ struct Player: Identifiable, Hashable {
     let teamId: String
     let teamCode: String
 }
+
+struct PlayerSeasonStats: Codable {
+    let games: Int
+    let winRate: Double
+    let avgKills: Double
+    let avgDeaths: Double
+    let avgAssists: Double
+    let kdaRatio: Double
+    let avgCSPerMin: Double
+}

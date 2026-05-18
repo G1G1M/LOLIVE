@@ -150,7 +150,8 @@ final class TodayViewModel {
         return live.map { lm in
             guard let imageURL = map[lm.match.league.id] else { return lm }
             let enrichedLeague = League(
-                id: lm.match.league.id, name: lm.match.league.name,
+                id: lm.match.league.id, slug: lm.match.league.slug,
+                name: lm.match.league.name,
                 region: lm.match.league.region, imageURL: imageURL
             )
             let enrichedMatch = Match(

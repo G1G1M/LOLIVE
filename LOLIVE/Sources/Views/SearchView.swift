@@ -117,62 +117,66 @@ struct SearchView: View {
 
     private func teamRow(_ team: Team, league: League) -> some View {
         let isFav = favoriteTeams.contains { $0.teamId == team.id }
-        return HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                .frame(width: 36, height: 36)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(team.name)
-                    .font(.subheadline).fontWeight(.semibold)
-                Text(league.name)
-                    .font(.caption).foregroundStyle(.secondary)
+        return NavigationLink(destination: TeamDetailView(team: team, league: league)) {
+            HStack(spacing: 12) {
+                CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
+                    .frame(width: 36, height: 36)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(team.name)
+                        .font(.subheadline).fontWeight(.semibold)
+                    Text(league.name)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("팀")
+                    .font(.caption2).fontWeight(.semibold)
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Color.green.opacity(0.2))
+                    .foregroundStyle(.green)
+                    .clipShape(Capsule())
+                Button {
+                    toggleFavoriteTeam(team, league: league, isFav: isFav)
+                } label: {
+                    Image(systemName: isFav ? "star.fill" : "star")
+                        .foregroundStyle(isFav ? Color.yellow : Color.secondary)
+                }
+                .buttonStyle(.plain)
             }
-            Spacer()
-            Text("팀")
-                .font(.caption2).fontWeight(.semibold)
-                .padding(.horizontal, 7).padding(.vertical, 3)
-                .background(Color.green.opacity(0.2))
-                .foregroundStyle(.green)
-                .clipShape(Capsule())
-            Button {
-                toggleFavoriteTeam(team, league: league, isFav: isFav)
-            } label: {
-                Image(systemName: isFav ? "star.fill" : "star")
-                    .foregroundStyle(isFav ? Color.yellow : Color.secondary)
-            }
-            .buttonStyle(.plain)
+            .padding(.vertical, 2)
         }
-        .padding(.vertical, 2)
     }
 
     // MARK: - Player Row
 
     private func playerRow(_ player: Player, league: League) -> some View {
         let isFav = favoritePlayers.contains { $0.playerId == player.id }
-        return HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: player.imageURL ?? ""))
-                .frame(width: 36, height: 36)
-                .clipShape(Circle())
-            VStack(alignment: .leading, spacing: 3) {
-                Text(player.summonerName)
-                    .font(.subheadline).fontWeight(.semibold)
-                HStack(spacing: 4) {
-                    Text(player.teamCode)
-                    Text("·")
-                    Text(league.name)
+        return NavigationLink(destination: LeaguePlayerDetailView(player: player, league: league)) {
+            HStack(spacing: 12) {
+                CachedAsyncImage(url: URL(string: player.imageURL ?? ""))
+                    .frame(width: 36, height: 36)
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(player.summonerName)
+                        .font(.subheadline).fontWeight(.semibold)
+                    HStack(spacing: 4) {
+                        Text(player.teamCode)
+                        Text("·")
+                        Text(league.name)
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
                 }
-                .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                roleTag(player.role)
+                Button {
+                    toggleFavoritePlayer(player, league: league, isFav: isFav)
+                } label: {
+                    Image(systemName: isFav ? "star.fill" : "star")
+                        .foregroundStyle(isFav ? Color.yellow : Color.secondary)
+                }
+                .buttonStyle(.plain)
             }
-            Spacer()
-            roleTag(player.role)
-            Button {
-                toggleFavoritePlayer(player, league: league, isFav: isFav)
-            } label: {
-                Image(systemName: isFav ? "star.fill" : "star")
-                    .foregroundStyle(isFav ? Color.yellow : Color.secondary)
-            }
-            .buttonStyle(.plain)
+            .padding(.vertical, 2)
         }
-        .padding(.vertical, 2)
     }
 
     // MARK: - Helpers

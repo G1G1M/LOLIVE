@@ -418,7 +418,7 @@ struct MatchDetailView: View {
 }
 
 #Preview {
-    let league = League(id: "1", name: "LCK", region: "Korea", imageURL: nil)
+    let league = League(id: "1", slug: "lck", name: "LCK", region: "Korea", imageURL: nil)
     let t1  = Team(id: "t1",  name: "T1",    code: "T1",  imageURL: nil)
     let gen = Team(id: "gen", name: "Gen.G", code: "GEN", imageURL: nil)
     let match = Match(id: "m1", league: league, teamA: t1, teamB: gen,

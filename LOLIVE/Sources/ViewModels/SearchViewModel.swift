@@ -117,9 +117,21 @@ final class SearchViewModel {
         }
 
         var seenPlayers = Set<String>()
-        for (player, league) in allPlayerPairs.sorted(by: { !isInternational($0.1) && isInternational($1.1) }) {
+        for (player, league) in allPlayerPairs.sorted(by: {
+            let scoreA = isInternational($0.1) ? 2 : (isSecondaryLeague($0.1) ? 1 : 0)
+            let scoreB = isInternational($1.1) ? 2 : (isSecondaryLeague($1.1) ? 1 : 0)
+            return scoreA < scoreB
+        }) {
             if seenPlayers.insert(player.id).inserted {
                 allPlayers.append((player: player, league: league))
+            }
+        }
+
+        // 선수 목록 완료 후 1군 리그 스탯 백그라운드 프리로드
+        let primaryLeagues = leagues.filter { isPrimary($0) }
+        Task.detached(priority: .background) {
+            for league in primaryLeagues {
+                await LeaguepediaService.shared.preloadLeagueStats(for: league)
             }
         }
     }
@@ -134,6 +146,42 @@ final class SearchViewModel {
             return now >= s && now <= e
         }
         return active ?? tournaments.last
+    }
+
+    private let primaryLeagueIDs: Set<String> = [
+        "98767991310872058",  // LCK
+        "98767991314006698",  // LPL
+        "98767991302996019",  // LEC
+        "98767991299243165",  // LCS
+        "104366947889790212", // PCS
+        "107213827295848783", // VCS
+        "98767991332355509",  // CBLOL
+        "98767991349978712",  // LJL
+        "105709090213554609", // LCO
+        "101382741235120470", // LLA
+        "113476371197627891", // LCP
+    ]
+
+    private func isPrimary(_ league: League) -> Bool {
+        if primaryLeagueIDs.contains(league.id) { return true }
+        let slug = league.slug.lowercased().trimmingCharacters(in: .whitespaces)
+        let name = league.name.lowercased().trimmingCharacters(in: .whitespaces)
+        let knownSlugs: Set<String> = ["lck","lpl","lec","lcs","pcs","vcs","lco","lla","lcp"]
+        let knownNames: Set<String> = ["lck","lpl","lec","lcs","pcs","vcs","cblol","ljl","lco","lla","lcp"]
+        if !slug.isEmpty && knownSlugs.contains(slug) { return true }
+        if knownNames.contains(name) { return true }
+        if name.contains("챌린저스") || slug.contains("챌린저스")        { return false }
+        if name.contains("challengers") || slug.contains("challengers")   { return false }
+        if name.contains("academy")     || slug.contains("academy")       { return false }
+        if name.contains("development") || slug.contains("development")   { return false }
+        if slug.contains("challengers_league")                            { return false }
+        if name.hasSuffix(" cl") || name.contains(" cl ")                { return false }
+        if name == "ldl" || slug == "ldl"                                { return false }
+        return false
+    }
+
+    private func isSecondaryLeague(_ league: League) -> Bool {
+        !isInternational(league) && !isPrimary(league)
     }
 
     private func isInternational(_ league: League) -> Bool {

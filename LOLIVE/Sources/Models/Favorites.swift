@@ -35,7 +35,7 @@ final class FavoriteTeam {
     }
 
     var asLeague: League {
-        League(id: leagueId, name: leagueName, region: leagueRegion, imageURL: leagueImageURL)
+        League(id: leagueId, slug: "", name: leagueName, region: leagueRegion, imageURL: leagueImageURL)
     }
 }
 
@@ -85,6 +85,6 @@ final class FavoritePlayer {
     }
 
     var asLeague: League {
-        League(id: leagueId, name: leagueName, region: leagueRegion, imageURL: leagueImageURL)
+        League(id: leagueId, slug: "", name: leagueName, region: leagueRegion, imageURL: leagueImageURL)
     }
 }

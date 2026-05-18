@@ -71,12 +71,14 @@ final class PlayersViewModel {
         let fetchedLeagues = (try? await svc.fetchLeagues()) ?? []
         let loadableLeagues = fetchedLeagues.filter { !excludedRegions.contains($0.region) }
 
-        // 필터 칩: 1군 + 2군(챌린저스) 모두 표시하되 지역 순서로 정렬
+        // 필터 칩: 1군 리그만 지역 순서로 표시
         leagues = loadableLeagues
+            .filter { isPrimary($0) }
             .sorted { regionOrder($0.region) < regionOrder($1.region) }
 
-        // 2. 모든 리그(1군+2군) 병렬 로드
-        let leaguepedia = LeaguepediaService.shared
+        // 2. 1군+2군 모두 병렬 로드
+        //    slug 매칭 실패로 1군이 빠지는 경우에도 선수 누락을 방지하기 위해
+        //    모든 리그에서 로스터를 불러온 뒤 3단계에서 1군 우선 dedup 처리
         var entries: [PlayerEntry] = []
         await withTaskGroup(of: [PlayerEntry].self) { group in
             for league in loadableLeagues {
@@ -87,29 +89,11 @@ final class PlayersViewModel {
                     let standings = (try? await svc.fetchStandings(tournamentId: tournament.id)) ?? []
                     guard !standings.isEmpty else { return [] }
 
-                    // Leaguepedia에서 이 리그의 공식 선수 목록 조회 (Riot API와 병렬 진행)
-                    let validNames = await leaguepedia.playerNames(league: league)
-
                     return await withTaskGroup(of: [PlayerEntry].self) { rosterGroup in
                         for standing in standings {
                             rosterGroup.addTask {
                                 let players = (try? await svc.fetchTeamRoster(teamId: standing.team.id)) ?? []
-                                let filtered: [Player]
-                                if let validNames {
-                                    // Leaguepedia 공식 명단에 있는 선수만 포함
-                                    filtered = players.filter {
-                                        validNames.contains($0.summonerName.lowercased())
-                                    }
-                                } else {
-                                    // Fallback: 포지션별 1명 (Riot API 조직 전체 반환 대응)
-                                    var seenRole = Set<String>()
-                                    filtered = players.filter { p in
-                                        let role = p.role.lowercased()
-                                        guard !role.isEmpty else { return false }
-                                        return seenRole.insert(role).inserted
-                                    }
-                                }
-                                return filtered.map {
+                                return players.filter { !$0.role.isEmpty }.map {
                                     PlayersViewModel.PlayerEntry(
                                         player: $0,
                                         league: league,
@@ -129,38 +113,85 @@ final class PlayersViewModel {
             }
         }
 
-        // 3. 1군/2군 분리 후 중복 제거
-        // - 1군 선수를 먼저 확정
-        // - 2군에서는 1군에 없는 선수만 추가 (Riot API가 조직 전체 명단을 반환하므로 대부분 중복)
-        let tier1Entries = entries.filter { !isSecondaryLeague($0.league) }
-        let tier2Entries = entries.filter {  isSecondaryLeague($0.league) }
+        // 3. 1군 우선 중복 제거
+        //    동일 선수(player.id)가 1군(LCK)과 2군(LCK CL) 양쪽에 있으면
+        //    1군 항목을 먼저 추가하고 2군 항목은 건너뜀 → T1A 대신 T1으로 표시
+        let primaryEntries   = entries.filter {  isPrimary($0.league) }
+        let secondaryEntries = entries.filter { !isPrimary($0.league) }
 
         var seenPlayerIds = Set<String>()
         var deduped: [PlayerEntry] = []
 
-        for entry in tier1Entries where seenPlayerIds.insert(entry.player.id).inserted {
+        for entry in primaryEntries where seenPlayerIds.insert(entry.player.id).inserted {
             deduped.append(entry)
         }
-        for entry in tier2Entries where seenPlayerIds.insert(entry.player.id).inserted {
+        for entry in secondaryEntries where seenPlayerIds.insert(entry.player.id).inserted {
             deduped.append(entry)
         }
 
         allPlayers = deduped.sorted {
             $0.player.summonerName.lowercased() < $1.player.summonerName.lowercased()
         }
+
+        // 선수 목록 로드 완료 후 1군 리그 스탯을 백그라운드에서 순서대로 프리로드.
+        // 디스크 캐시가 유효하면 즉시 반환되므로 24시간 이내 재실행 시 API 호출 없음.
+        let primaryLeagues = leagues
+        Task.detached(priority: .background) {
+            for league in primaryLeagues {
+                await LeaguepediaService.shared.preloadLeagueStats(for: league)
+            }
+        }
+    }
+
+    // MARK: - Primary League Classification
+
+    // 1군 리그 ID (Riot API 고정값 — 리그 이름·slug가 바뀌어도 ID는 불변)
+    // API 실측값 기준 (2026-05 확인)
+    private let primaryLeagueIDs: Set<String> = [
+        "98767991310872058",  // LCK
+        "98767991314006698",  // LPL
+        "98767991302996019",  // LEC
+        "98767991299243165",  // LCS
+        "104366947889790212", // PCS  (홍콩·마카오·대만)
+        "107213827295848783", // VCS  (베트남)
+        "98767991332355509",  // CBLOL (브라질)  slug: cblol-brazil
+        "98767991349978712",  // LJL  (일본)     slug: ljl-japan
+        "105709090213554609", // LCO  (오세아니아)
+        "101382741235120470", // LLA  (라틴아메리카)
+        "113476371197627891", // LCP  (퍼시픽 신규 — 2025 이후)
+    ]
+
+    /// 리그가 1군인지 판별
+    /// 1순위: ID 매칭 (가장 신뢰할 수 있는 기준, Riot이 절대 바꾸지 않음)
+    /// 2순위: slug/name 매칭 (ID 목록에 없는 신규 리그 대비 fallback)
+    private func isPrimary(_ league: League) -> Bool {
+        // 1. ID 직접 매칭 — 가장 확실
+        if primaryLeagueIDs.contains(league.id) { return true }
+
+        // 2. slug / name fallback (ID 목록이 갱신되지 않은 신규 리그 대비)
+        let slug = league.slug.lowercased().trimmingCharacters(in: .whitespaces)
+        let name = league.name.lowercased().trimmingCharacters(in: .whitespaces)
+
+        let knownSlugs: Set<String> = ["lck","lpl","lec","lcs","pcs","vcs","lco","lla","lcp"]
+        let knownNames: Set<String> = ["lck","lpl","lec","lcs","pcs","vcs","cblol","ljl","lco","lla","lcp"]
+
+        if !slug.isEmpty && knownSlugs.contains(slug) { return true }
+        if knownNames.contains(name) { return true }
+
+        // 3. 2군 패턴이면 false
+        if name.contains("챌린저스") || slug.contains("챌린저스")   { return false }
+        if name.contains("challengers") || slug.contains("challengers") { return false }
+        if name.contains("academy")     || slug.contains("academy")     { return false }
+        if name.contains("development") || slug.contains("development") { return false }
+        if slug.contains("challengers_league")                          { return false }
+        if name.hasSuffix(" cl") || name.contains(" cl ")              { return false }
+        if name == "ldl" || slug == "ldl"                              { return false }
+
+        // 4. 판단 불가 → 2군 처리 (알 수 없는 리그가 1군 선수 자리 빼앗지 않도록)
+        return false
     }
 
     // MARK: - Helpers
-
-    // 2군/챌린저스/아카데미 리그 판별
-    // Riot API는 조직 전체 선수를 반환하므로 1군과 중복 → 필터 칩에서 제외, 1군 우선 분류
-    private func isSecondaryLeague(_ league: League) -> Bool {
-        let name = league.name.lowercased()
-        return name.contains("챌린저스") ||
-               name.contains("challengers") ||
-               name.contains("academy") ||
-               name == "circuito desafiante"
-    }
 
     private func regionOrder(_ region: String) -> Int {
         switch region {

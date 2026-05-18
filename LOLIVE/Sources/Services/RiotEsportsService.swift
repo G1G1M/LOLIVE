@@ -46,7 +46,7 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         let data = try await request(path: "/getLeagues", queryItems: [])
         let response = try decode(LeaguesResponse.self, from: data)
         return response.data.leagues.map {
-            League(id: $0.id, name: $0.name, region: $0.region, imageURL: https($0.image))
+            League(id: $0.id, slug: $0.slug ?? "", name: $0.name, region: $0.region, imageURL: https($0.image))
         }
     }
 
@@ -73,6 +73,7 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         guard let matchDTO = event.match, matchDTO.teams.count >= 2 else { return nil }
         let league = League(
             id: event.league.id ?? event.league.slug,
+            slug: event.league.slug,
             name: event.league.name,
             region: fallbackLeague?.region ?? "",
             imageURL: fallbackLeague?.imageURL

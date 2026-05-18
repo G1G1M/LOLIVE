@@ -7,6 +7,7 @@ import Foundation
 
 struct League: Codable, Identifiable, Hashable {
     let id: String
+    let slug: String
     let name: String
     let region: String
     let imageURL: String?

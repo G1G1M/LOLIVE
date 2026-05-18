@@ -1,0 +1,126 @@
+//
+//  SeasonStatsView.swift
+//  LOLIVE
+//
+
+import SwiftUI
+
+struct SeasonStatsView: View {
+    let player: Player
+    let league: League
+
+    @State private var stats: PlayerSeasonStats?
+    @State private var isLoading = true
+
+    var body: some View {
+        Group {
+            if isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("시즌 스탯 불러오는 중...")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            } else if let stats {
+                statsCard(stats)
+            }
+        }
+        .task {
+            stats = await LeaguepediaService.shared.playerSeasonStats(
+                summonerName: player.summonerName,
+                league: league
+            )
+            isLoading = false
+        }
+    }
+
+    // MARK: - Stats Card
+
+    private func statsCard(_ stats: PlayerSeasonStats) -> some View {
+        let winPct  = Int((stats.winRate * 100).rounded())
+        let wins    = Int((stats.winRate * Double(stats.games)).rounded())
+        let losses  = stats.games - wins
+        let winColor: Color = stats.winRate >= 0.6 ? .blue
+                            : stats.winRate >= 0.5 ? .green : .orange
+        let kdaColor: Color = stats.kdaRatio >= 4.0 ? .blue
+                            : stats.kdaRatio >= 2.0 ? .primary : .red
+
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("시즌 스탯")
+                    .font(.headline)
+                Spacer()
+                Text("\(stats.games)경기")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 4) {
+                    Text("\(winPct)%")
+                        .font(.caption).fontWeight(.bold)
+                        .foregroundStyle(winColor)
+                    Text("승률")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(wins)승 \(losses)패")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color(.tertiarySystemFill))
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(winColor.opacity(0.7))
+                            .frame(width: max(6, geo.size.width * stats.winRate))
+                    }
+                }
+                .frame(height: 6)
+            }
+            .padding(.horizontal, 16).padding(.bottom, 12)
+
+            Divider().padding(.horizontal, 16)
+
+            HStack(spacing: 0) {
+                statColumn(value: String(format: "%.2f", stats.kdaRatio),
+                           label: "KDA", color: kdaColor)
+                Divider().frame(height: 44)
+                statColumn(value: "\(winPct)%", label: "승률")
+                Divider().frame(height: 44)
+                statColumn(value: String(format: "%.1f", stats.avgCSPerMin),
+                           label: "CS/분")
+            }
+            .padding(.vertical, 10)
+
+            Divider().padding(.horizontal, 16)
+
+            HStack(spacing: 0) {
+                statColumn(value: String(format: "%.1f", stats.avgKills),   label: "킬")
+                Divider().frame(height: 44)
+                statColumn(value: String(format: "%.1f", stats.avgDeaths),  label: "데스")
+                Divider().frame(height: 44)
+                statColumn(value: String(format: "%.1f", stats.avgAssists), label: "어시스트")
+            }
+            .padding(.vertical, 10)
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func statColumn(value: String, label: String,
+                            color: Color = .primary) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(.body, design: .rounded)).fontWeight(.bold)
+                .foregroundStyle(color)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+            Text(label)
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}

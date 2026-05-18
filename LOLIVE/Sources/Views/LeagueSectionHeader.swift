@@ -26,6 +26,6 @@ struct LeagueSectionHeader: View {
 }
 
 #Preview {
-    LeagueSectionHeader(league: League(id: "1", name: "LCK", region: "Korea", imageURL: nil))
+    LeagueSectionHeader(league: League(id: "1", slug: "lck", name: "LCK", region: "Korea", imageURL: nil))
         .preferredColorScheme(.dark)
 }

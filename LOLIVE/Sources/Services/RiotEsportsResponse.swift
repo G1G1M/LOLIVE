@@ -16,6 +16,7 @@ struct LeaguesResponse: Decodable {
 
 struct LeagueDTO: Decodable {
     let id: String
+    let slug: String?   // API 버전에 따라 없을 수 있으므로 optional
     let name: String
     let region: String
     let image: String?
