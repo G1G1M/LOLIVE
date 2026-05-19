@@ -27,7 +27,10 @@ final class MatchDetailViewModel {
         if let selectedGameId {
             return detail.games.first { $0.gameId == selectedGameId }
         }
-        return detail.games.first { $0.state.isPlayable }
+        // 인게임 → 드래프트 중(unstarted) → 완료 순으로 기본 선택
+        return detail.games.first { $0.state == .inProgress }
+            ?? detail.games.first { $0.state == .unstarted }
+            ?? detail.games.first { $0.state == .completed }
     }
 
     var selectedGameWindow: GameWindow? {
@@ -156,25 +159,40 @@ final class MatchDetailViewModel {
     }
 
     func startPolling() {
-        guard match.state == .inProgress else { return }
+        // 경기가 예정/진행 중일 때만 폴링 (완료 경기는 폴링 불필요)
+        guard match.state != .completed else { return }
         stopPolling()
         let esports = esportsService
         let liveStats = liveStatsService
         let matchId = match.id
         pollingTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
+                try? await Task.sleep(for: .seconds(5))
                 guard !Task.isCancelled else { break }
 
+                // eventDetail 폴링: 드래프트 밴픽 + 게임 상태 변화 감지
                 if let freshDetail = try? await esports.fetchEventDetails(matchId: matchId) {
                     let prevLiveGameId = eventDetail?.games.first(where: { $0.state == .inProgress })?.gameId
                     let newLiveGame = freshDetail.games.first(where: { $0.state == .inProgress })
+
+                    // 새 게임 시작 감지 → 자동 전환
                     if let newGame = newLiveGame, newGame.gameId != prevLiveGameId {
                         selectedGameId = newGame.gameId
                     }
+
+                    // 드래프트 밴픽 감지: unstarted 게임에 밴 데이터가 생기면 자동 선택
+                    if newLiveGame == nil,
+                       let draftGame = freshDetail.games.first(where: {
+                           $0.state == .unstarted && (!$0.blueBans.isEmpty || !$0.redBans.isEmpty)
+                       }),
+                       selectedGameId != draftGame.gameId {
+                        selectedGameId = draftGame.gameId
+                    }
+
                     eventDetail = freshDetail
                 }
 
+                // 인게임 스탯: inProgress 게임만 window 요청
                 guard let game = eventDetail?.games.first(where: { $0.state == .inProgress }) else { continue }
                 if let window = try? await liveStats.fetchGameWindow(gameId: game.gameId, startingTime: nil) {
                     gameWindows[game.gameId] = window

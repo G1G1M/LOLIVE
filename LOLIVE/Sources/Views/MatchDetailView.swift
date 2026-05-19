@@ -38,6 +38,8 @@ struct MatchDetailView: View {
                             let bans = viewModel.correctedBans(for: game)
                             if !bans.blue.isEmpty || !bans.red.isEmpty {
                                 banCard(game: game, blueBans: bans.blue, redBans: bans.red)
+                            } else if game.state == .unstarted {
+                                draftWaitingCard
                             }
                         }
 
@@ -398,6 +400,22 @@ struct MatchDetailView: View {
             .padding(.horizontal, 16).padding(.vertical, 8)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Draft Waiting Card
+
+    private var draftWaitingCard: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .scaleEffect(0.8)
+            Text("드래프트 대기 중...")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - No Stats Card
