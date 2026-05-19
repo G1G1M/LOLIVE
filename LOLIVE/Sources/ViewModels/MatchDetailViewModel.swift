@@ -14,7 +14,7 @@ final class MatchDetailViewModel {
 
     var eventDetail: EventDetailInfo? = nil
     var gameWindows: [String: GameWindow] = [:]
-    var leaguepediaBans: [String: (team1: [String], team2: [String])] = [:]
+    var leaguepediaBans: [String: (team1Bans: [String], team2Bans: [String])] = [:]
     var isLoading: Bool = false
     var errorMessage: String? = nil
     var selectedGameId: String? = nil
@@ -44,9 +44,9 @@ final class MatchDetailViewModel {
         guard let lp = leaguepediaBans[game.gameId],
               let detail = eventDetail else { return ([], []) }
         if game.blueTeamId == detail.teamAEsportsId {
-            return (lp.team1, lp.team2)
+            return (lp.team1Bans, lp.team2Bans)
         } else {
-            return (lp.team2, lp.team1)
+            return (lp.team2Bans, lp.team1Bans)
         }
     }
 
@@ -137,7 +137,7 @@ final class MatchDetailViewModel {
             // Riot API에 밴 데이터가 없으면 Leaguepedia에서 보완
             let lpService = leaguepediaService
             let completedGames = playableGames.filter { $0.state == .completed }
-            await withTaskGroup(of: (String, (team1: [String], team2: [String])?).self) { group in
+            await withTaskGroup(of: (String, (team1Bans: [String], team2Bans: [String])?).self) { group in
                 for game in completedGames {
                     guard game.blueBans.isEmpty && game.redBans.isEmpty else { continue }
                     let gameId = game.gameId
