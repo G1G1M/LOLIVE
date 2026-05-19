@@ -12,6 +12,7 @@ struct FavoritesView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(TodayViewModel.self) private var todayViewModel
     @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
+    @AppStorage("notificationMinutesBefore") private var notificationMinutes: Int = 60
     @State private var showingTeamSearch = false
 
     private var hasFavorites: Bool { !favoriteTeams.isEmpty || !favoritePlayers.isEmpty }
@@ -122,11 +123,27 @@ struct FavoritesView: View {
                         }
                     }
                 }
+                // ── 알림 설정 섹션 ─────────────────────────────────
+                Section("알림 설정") {
+                    Picker("알림 시간", selection: $notificationMinutes) {
+                        Text("1시간 전").tag(60)
+                        Text("30분 전").tag(30)
+                        Text("15분 전").tag(15)
+                        Text("5분 전").tag(5)
+                    }
+
+                    NavigationLink(destination: NotificationCenterView()) {
+                        Label("예정 알림 보기", systemImage: "bell.badge")
+                    }
+                }
             }
             .listStyle(.insetGrouped)
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingTeamSearch) {
                 TeamSearchView()
+            }
+            .onChange(of: notificationMinutes) { _, _ in
+                Task { await MatchNotificationService.shared.reschedule(for: favoriteTeams) }
             }
         }
     }

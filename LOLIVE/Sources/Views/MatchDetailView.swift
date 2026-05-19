@@ -48,6 +48,12 @@ struct MatchDetailView: View {
                                 playerListCard(window: window)
                                 noStatsCard
                             }
+
+                            if let gameId = viewModel.selectedGame?.gameId,
+                               let timeline = viewModel.killTimelines[gameId],
+                               !timeline.isEmpty {
+                                killTimelineCard(events: timeline, window: window)
+                            }
                         }
                     }
 
@@ -396,6 +402,71 @@ struct MatchDetailView: View {
             .padding(.horizontal, 16).padding(.vertical, 8)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Kill Timeline Card
+
+    private func killTimelineCard(events: [KillEvent], window: GameWindow) -> some View {
+        let allPlayers = window.bluePlayers + window.redPlayers
+        let playerMap = Dictionary(uniqueKeysWithValues: allPlayers.map { ($0.participantId, $0) })
+        let blueIds = Set(window.bluePlayers.map { $0.participantId })
+
+        return VStack(alignment: .leading, spacing: 0) {
+            Text("킬 로그")
+                .font(.headline)
+                .padding(.horizontal, 16).padding(.vertical, 12)
+
+            Divider().padding(.horizontal, 16)
+
+            ForEach(events) { event in
+                let killer = playerMap[event.killerParticipantId]
+                let victim = playerMap[event.victimParticipantId]
+                let isBlueKill = blueIds.contains(event.killerParticipantId)
+
+                HStack(spacing: 8) {
+                    Text(event.formattedTime)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 38, alignment: .leading)
+
+                    Circle()
+                        .fill(isBlueKill ? Color.blue : Color.red)
+                        .frame(width: 4, height: 4)
+
+                    if let killer {
+                        ChampionImageView(championId: killer.championId, size: 22)
+                        Text(killer.summonerName)
+                            .font(.caption).fontWeight(.semibold)
+                            .lineLimit(1)
+                    }
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+
+                    if let victim {
+                        ChampionImageView(championId: victim.championId, size: 22)
+                        Text(victim.summonerName)
+                            .font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    if !event.assistParticipantIds.isEmpty {
+                        Text("+\(event.assistParticipantIds.count)")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 6)
+
+                if event.id != events.last?.id {
+                    Divider().padding(.leading, 60)
+                }
+            }
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - No Stats Card

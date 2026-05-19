@@ -38,11 +38,22 @@ final class MatchNotificationService: Sendable {
 
     // MARK: - Private
 
+    private var minutesBefore: Int {
+        let stored = UserDefaults.standard.integer(forKey: "notificationMinutesBefore")
+        return stored > 0 ? stored : 60
+    }
+
+    private func notificationTitle(teamName: String, minutes: Int) -> String {
+        minutes >= 60 ? "\(teamName) 경기 \(minutes / 60)시간 전" : "\(teamName) 경기 \(minutes)분 전"
+    }
+
     private func schedule(for fav: FavoriteTeam) async {
         guard let matches = try? await service.fetchSchedule(league: fav.asLeague) else { return }
 
         let now = Date()
         let center = UNUserNotificationCenter.current()
+        let minutes = minutesBefore
+        let isoFormatter = ISO8601DateFormatter()
 
         let upcoming = matches.filter {
             $0.state == .unstarted &&
@@ -52,16 +63,34 @@ final class MatchNotificationService: Sendable {
         }
 
         for match in upcoming {
-            let opponent = match.teamA.code.lowercased() == fav.teamCode.lowercased()
-                ? match.teamB : match.teamA
+            let isTeamA = match.teamA.code.lowercased() == fav.teamCode.lowercased()
+            let opponent = isTeamA ? match.teamB : match.teamA
 
-            let fireDate = match.startTime.addingTimeInterval(-3600)
+            // Deep link용 userInfo
+            let userInfo: [String: Any] = [
+                "matchId": match.id,
+                "leagueId": fav.leagueId,
+                "leagueName": fav.leagueName,
+                "leagueRegion": fav.leagueRegion,
+                "favTeamCode": fav.teamCode,
+                "teamAId": match.teamA.id,
+                "teamACode": match.teamA.code,
+                "teamAName": match.teamA.name,
+                "teamAImage": match.teamA.imageURL ?? "",
+                "teamBId": match.teamB.id,
+                "teamBCode": match.teamB.code,
+                "teamBName": match.teamB.name,
+                "teamBImage": match.teamB.imageURL ?? "",
+                "startTimeISO": isoFormatter.string(from: match.startTime)
+            ]
+
+            let fireDate = match.startTime.addingTimeInterval(-TimeInterval(minutes * 60))
             if fireDate > now {
-                // 정상: 경기 1시간 전 예약 알림
                 let content = UNMutableNotificationContent()
-                content.title = "\(fav.teamName) 경기 1시간 전"
+                content.title = notificationTitle(teamName: fav.teamName, minutes: minutes)
                 content.body = "vs \(opponent.name) · \(fav.leagueName)"
                 content.sound = .default
+                content.userInfo = userInfo
 
                 var dc = Calendar.current.dateComponents(
                     [.year, .month, .day, .hour, .minute],
@@ -76,11 +105,12 @@ final class MatchNotificationService: Sendable {
                 )
                 try? await center.add(request)
             } else if match.startTime > now {
-                // 즐겨찾기 추가 시점에 이미 1시간 이내 → 즉시 알림
+                // 즐겨찾기 추가 시점에 이미 알림 시간 이내 → 즉시 알림
                 let content = UNMutableNotificationContent()
                 content.title = "\(fav.teamName) 경기가 곧 시작됩니다!"
                 content.body = "vs \(opponent.name) · \(fav.leagueName)"
                 content.sound = .default
+                content.userInfo = userInfo
                 let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
                 let request = UNNotificationRequest(
                     identifier: "lolive_match_\(match.id)_\(fav.teamId)_soon",

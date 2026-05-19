@@ -10,6 +10,7 @@ import Foundation
 protocol LiveStatsServiceProtocol: Sendable {
     func fetchGameWindow(gameId: String, startingTime: Date?) async throws -> GameWindow
     func fetchGameDetails(gameId: String) async throws -> Int?   // 인게임 경과 시간(초) 반환
+    func fetchKillTimeline(gameId: String) async throws -> [KillEvent]
 }
 
 // MARK: - Service
@@ -68,6 +69,46 @@ final class LiveStatsService: LiveStatsServiceProtocol {
             return nil
         }
         return gameTimeMs / 1000
+    }
+
+    func fetchKillTimeline(gameId: String) async throws -> [KillEvent] {
+        guard let url = URL(string: "\(baseURL)/details/\(gameId)") else { return [] }
+        guard let (data, response) = try? await URLSession.shared.data(from: url),
+              let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else { return [] }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let frames = json["frames"] as? [[String: Any]] else { return [] }
+
+        var events: [KillEvent] = []
+        for frame in frames {
+            let frameEvents = (frame["events"] as? [[String: Any]]) ?? []
+            for event in frameEvents {
+                let type = (event["EventType"] as? String
+                    ?? event["eventType"] as? String ?? "").lowercased()
+                guard type.contains("kill") else { continue }
+
+                let ts = event["Timestamp"] as? Int ?? event["timestamp"] as? Int
+                let killerId = event["KillerParticipantID"] as? Int
+                    ?? event["killerParticipantId"] as? Int
+                let victimId = event["VictimParticipantID"] as? Int
+                    ?? event["victimParticipantId"] as? Int
+                let assists = event["AssistingParticipantIDs"] as? [Int]
+                    ?? event["assistingParticipantIds"] as? [Int] ?? []
+                let killerTeam = event["KillerTeamID"] as? String
+                    ?? event["killerTeamId"] as? String ?? ""
+
+                guard let ts, let killerId, let victimId else { continue }
+                events.append(KillEvent(
+                    gameTimeMs: ts,
+                    killerParticipantId: killerId,
+                    victimParticipantId: victimId,
+                    assistParticipantIds: assists,
+                    killerTeamId: killerTeam
+                ))
+            }
+        }
+        return events.sorted { $0.gameTimeMs < $1.gameTimeMs }
     }
 
     // MARK: - Window DTOs

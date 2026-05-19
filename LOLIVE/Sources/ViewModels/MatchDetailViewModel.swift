@@ -14,6 +14,7 @@ final class MatchDetailViewModel {
 
     var eventDetail: EventDetailInfo? = nil
     var gameWindows: [String: GameWindow] = [:]
+    var killTimelines: [String: [KillEvent]] = [:]
     var isLoading: Bool = false
     var errorMessage: String? = nil
     var selectedGameId: String? = nil
@@ -124,6 +125,21 @@ final class MatchDetailViewModel {
             // 가장 최근 플레이된 게임을 기본 선택
             if let lastPlayable = detail.games.last(where: { $0.state.isPlayable }) {
                 selectedGameId = lastPlayable.gameId
+            }
+
+            // 완료 게임의 킬 타임라인 로드
+            let liveStatsSvc2 = liveStatsService
+            let completedIds = playableGames.filter { $0.state == .completed }.map { $0.gameId }
+            await withTaskGroup(of: (String, [KillEvent]).self) { group in
+                for gameId in completedIds {
+                    group.addTask {
+                        let events = (try? await liveStatsSvc2.fetchKillTimeline(gameId: gameId)) ?? []
+                        return (gameId, events)
+                    }
+                }
+                for await (gameId, events) in group {
+                    if !events.isEmpty { killTimelines[gameId] = events }
+                }
             }
         } catch {
             errorMessage = error.localizedDescription

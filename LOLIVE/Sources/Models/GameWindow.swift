@@ -96,3 +96,29 @@ extension PlayerStats {
         totalGold > 0 || kills > 0 || deaths > 0 || assists > 0
     }
 }
+
+// MARK: - Kill Event
+
+struct KillEvent: Identifiable {
+    let id: UUID
+    let gameTimeMs: Int
+    let killerParticipantId: Int
+    let victimParticipantId: Int
+    let assistParticipantIds: [Int]
+    let killerTeamId: String
+
+    init(gameTimeMs: Int, killerParticipantId: Int, victimParticipantId: Int,
+         assistParticipantIds: [Int] = [], killerTeamId: String = "") {
+        self.id = UUID()
+        self.gameTimeMs = gameTimeMs
+        self.killerParticipantId = killerParticipantId
+        self.victimParticipantId = victimParticipantId
+        self.assistParticipantIds = assistParticipantIds
+        self.killerTeamId = killerTeamId
+    }
+
+    var formattedTime: String {
+        let s = gameTimeMs / 1000
+        return String(format: "%d:%02d", s / 60, s % 60)
+    }
+}
