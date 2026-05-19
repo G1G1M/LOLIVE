@@ -56,29 +56,44 @@
 
 ### 팀 상세
 - 로스터 (포지션 순 정렬, 선수 탭 → 선수 상세 이동)
-- 최근 경기 결과
+- 최근 경기 결과 탭 → 경기 상세 이동
 
 ### 선수 상세
 - 시즌 스탯: 승률, KDA, CS/분, 평균 킬/데스/어시스트
-- most픽 챔피언 (최근 5경기 기준)
-- 최근 경기 결과
+- most픽 챔피언 (최근 5경기 기준) + 챔피언 이미지
+- 최근 경기 결과 탭 → 경기 상세 이동
 
 ### 경기 상세
 - 실시간 팀 스탯 (킬 / 골드 / 타워 / 드래곤 / 바론)
-- 게임별 선수 KDA, 골드, CS
+- 게임별 선수 KDA, 골드, CS + 챔피언 이미지
+- 밴 카드: 게임별 blue/red 사이드 밴 챔피언 표시 (Riot API 데이터)
 - 팀 로고 탭 → 팀 상세 페이지 이동
 
 ### Favorites
 - SwiftData 기반 팀 / 선수 즐겨찾기
 - 즐겨찾기한 팀의 LIVE 경기 실시간 뱃지 + 스코어
 - 경기 시작 1시간 전 로컬 알림 자동 스케줄링
+- 즐겨찾기 추가 시점이 경기 1시간 이내이면 즉시 알림 발송
+- **대표 팀 설정**: 팀 행 길게 누르면 대표 팀 지정 → 앱 전체 Tint 색상 적용
 - Live Activity: 잠금화면 실시간 스코어 + Dynamic Island
 
 ### 홈 화면 위젯 (LOLIVEWidgets)
 - 즐겨찾기한 팀의 다음 경기 일정 표시
-- Small / Medium 사이즈 지원
+- Small / Medium / **Large** 사이즈 지원
+- Large: 즐겨찾기 팀 전체 목록 (최대 5팀) 한눈에 표시
+- 경기 1시간 이내 시 카운트다운 타이머 표시
 - 여러 팀 캐러셀 (App Intents)
 - 위젯 탭 → 팀 상세 딥링크 (`lolive://team/<id>`)
+- 다크/라이트 모드 자동 대응
+
+## 앱 플로우
+
+```
+앱 실행
+    └─ SplashView (1.5초)
+           ├─ 온보딩 미완료 → OnboardingView → ContentView
+           └─ 온보딩 완료  → ContentView
+```
 
 ## 시즌 스탯 아키텍처
 
@@ -102,6 +117,20 @@ Leaguepedia의 rate limit 이슈를 해결하기 위해 아래 구조를 적용�
 - 리그 전체 스탯을 한 번의 배치 요청으로 수집 → API 호출 최소화
 - 디스크 캐시(24시간 TTL)로 재실행 시 API 호출 없음
 - `SeasonStatsView`가 자체 `.task`로 로딩 → ViewModel 의존성 없음, SwiftUI lifecycle 자동 취소
+
+## GameWindow 캐시 아키텍처
+
+완료된 게임의 윈도우 데이터는 변하지 않으므로 디스크에 영구 캐시합니다.
+
+```
+경기 상세 진입
+    └─ MatchDetailViewModel.load()
+           └─ 각 게임별 TaskGroup 병렬 로드
+                  ├─ completed 게임 → GameWindowCache 우선 조회
+                  │      ├─ 캐시 히트 → 즉시 반환
+                  │      └─ 캐시 미스 → LiveStats API → 디스크 저장
+                  └─ inProgress 게임 → LiveStats API (캐시 없음)
+```
 
 ## 앱 구조
 

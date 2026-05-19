@@ -26,10 +26,22 @@ struct NavigateTeamIntent: AppIntent {
     }
 }
 
+// MARK: - Team Row Info (Large 위젯용)
+
+struct TeamRowInfo: Sendable {
+    let teamCode: String
+    let teamName: String
+    let leagueName: String
+    let teamImageData: Data?
+    let nextMatch: WidgetNetworkService.NextMatchInfo?
+    let opponentImageData: Data?
+}
+
 // MARK: - Entry
 
 struct FavoriteTeamEntry: TimelineEntry {
     let date: Date
+    // 현재 선택 팀 (Small / Medium)
     let teamId: String
     let teamName: String
     let teamCode: String
@@ -40,11 +52,14 @@ struct FavoriteTeamEntry: TimelineEntry {
     let currentIndex: Int
     let totalTeams: Int
     let isConfigured: Bool
+    // 전체 팀 목록 (Large)
+    let allTeams: [TeamRowInfo]
 
     static let placeholder = FavoriteTeamEntry(
         date: .now, teamId: "", teamName: "T1", teamCode: "T1",
         teamImageData: nil, leagueName: "LCK", nextMatch: nil,
-        opponentImageData: nil, currentIndex: 0, totalTeams: 1, isConfigured: true
+        opponentImageData: nil, currentIndex: 0, totalTeams: 1, isConfigured: true,
+        allTeams: []
     )
 }
 
@@ -63,8 +78,14 @@ struct FavoriteTeamProvider: TimelineProvider {
             let entry = await buildEntry()
             let nextUpdate: Date
             if let match = entry.nextMatch, !match.isLive {
-                let oneHourBefore = match.startTime.addingTimeInterval(-3600)
-                nextUpdate = oneHourBefore > .now ? oneHourBefore : .now.addingTimeInterval(3600)
+                let timeToMatch = match.startTime.timeIntervalSinceNow
+                if timeToMatch > 3600 {
+                    nextUpdate = match.startTime.addingTimeInterval(-3600)
+                } else if timeToMatch > 0 {
+                    nextUpdate = .now.addingTimeInterval(300)   // 1시간 이내: 5분마다
+                } else {
+                    nextUpdate = .now.addingTimeInterval(900)   // 경기 시작 후: 15분마다
+                }
             } else {
                 nextUpdate = .now.addingTimeInterval(3600)
             }
@@ -80,10 +101,12 @@ struct FavoriteTeamProvider: TimelineProvider {
             return FavoriteTeamEntry(
                 date: .now, teamId: "", teamName: "", teamCode: "",
                 teamImageData: nil, leagueName: "", nextMatch: nil,
-                opponentImageData: nil, currentIndex: 0, totalTeams: 0, isConfigured: false
+                opponentImageData: nil, currentIndex: 0, totalTeams: 0, isConfigured: false,
+                allTeams: []
             )
         }
 
+        // 현재 선택 팀 (Small / Medium)
         var idx = SharedDataService.loadCurrentTeamIndex()
         idx = max(0, min(idx, teams.count - 1))
         let fav = teams[idx]
@@ -91,7 +114,12 @@ struct FavoriteTeamProvider: TimelineProvider {
         async let matchTask   = WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
         async let teamImgTask = fetchImageData(fav.teamImageURL)
         let (match, teamImg)  = await (matchTask, teamImgTask)
-        let oppImg            = await fetchImageData(match?.opponentImageURL)
+        // 상대팀 이미지: 네트워크 fetch 실패 시 App Group 캐시에서 폴백
+        let oppImg = await fetchImageData(match?.opponentImageURL)
+                   ?? SharedDataService.loadTeamImageData(teamCode: match?.opponentCode ?? "")
+
+        // 전체 팀 (Large 위젯)
+        let allTeamsData = await loadAllTeams(teams)
 
         return FavoriteTeamEntry(
             date: .now,
@@ -104,8 +132,34 @@ struct FavoriteTeamProvider: TimelineProvider {
             opponentImageData: oppImg,
             currentIndex: idx,
             totalTeams: teams.count,
-            isConfigured: true
+            isConfigured: true,
+            allTeams: allTeamsData
         )
+    }
+
+    private func loadAllTeams(_ teams: [SharedFavoriteTeam]) async -> [TeamRowInfo] {
+        await withTaskGroup(of: (Int, TeamRowInfo).self) { group in
+            for (i, fav) in teams.enumerated() {
+                group.addTask {
+                    async let m   = WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
+                    async let img = fetchImageData(fav.teamImageURL)
+                    let (match, teamImg) = await (m, img)
+                    let oppImg = await fetchImageData(match?.opponentImageURL)
+                               ?? SharedDataService.loadTeamImageData(teamCode: match?.opponentCode ?? "")
+                    return (i, TeamRowInfo(
+                        teamCode: fav.teamCode,
+                        teamName: fav.teamName,
+                        leagueName: fav.leagueName,
+                        teamImageData: teamImg,
+                        nextMatch: match,
+                        opponentImageData: oppImg
+                    ))
+                }
+            }
+            var results: [(Int, TeamRowInfo)] = []
+            for await result in group { results.append(result) }
+            return results.sorted { $0.0 < $1.0 }.map { $0.1 }
+        }
     }
 
     private func fetchImageData(_ urlString: String?) async -> Data? {
@@ -122,11 +176,11 @@ struct FavoriteTeamWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: FavoriteTeamProvider()) { entry in
             FavoriteTeamWidgetView(entry: entry)
-                .containerBackground(.black, for: .widget)
+                .containerBackground(.fill, for: .widget)
         }
         .configurationDisplayName("즐겨찾기 팀")
         .description("즐겨찾기한 팀의 다음 경기 일정을 표시합니다.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
@@ -135,11 +189,14 @@ struct FavoriteTeamWidget: Widget {
 struct FavoriteTeamWidgetView: View {
     let entry: FavoriteTeamEntry
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Group {
             if !entry.isConfigured {
                 unconfiguredView
+            } else if family == .systemLarge {
+                largeView
             } else if family == .systemMedium {
                 mediumView
             } else {
@@ -162,15 +219,14 @@ struct FavoriteTeamWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Small (FotMob style)
+    // MARK: - Small
 
     private var smallView: some View {
         VStack(spacing: 0) {
-            // 팀 로고 + 이름
             VStack(spacing: 5) {
                 teamLogo(data: entry.teamImageData, size: 48)
                 Text(entry.teamCode)
-                    .font(.subheadline).fontWeight(.bold).foregroundStyle(.white)
+                    .font(.subheadline).fontWeight(.bold).foregroundStyle(.primary)
                 Text(entry.leagueName)
                     .font(.caption2).foregroundStyle(.secondary)
             }
@@ -178,23 +234,20 @@ struct FavoriteTeamWidgetView: View {
 
             Spacer(minLength: 10)
 
-            // 다음 경기 정보
             if let match = entry.nextMatch {
                 VStack(spacing: 5) {
                     if match.isLive {
                         liveBadge
                     } else {
-                        Text("다음 경기")
-                            .font(.caption2).foregroundStyle(.secondary)
+                        Text("다음 경기").font(.caption2).foregroundStyle(.secondary)
                     }
                     HStack(spacing: 5) {
                         teamLogo(data: entry.opponentImageData, size: 18)
                         Text("vs \(match.opponentCode)")
-                            .font(.subheadline).fontWeight(.semibold).foregroundStyle(.white)
+                            .font(.subheadline).fontWeight(.semibold).foregroundStyle(.primary)
                             .lineLimit(1)
                     }
-                    Text(timeText(match.startTime, isLive: match.isLive))
-                        .font(.caption2).foregroundStyle(.secondary)
+                    matchTimeView(match: match, compact: true)
                 }
                 .frame(maxWidth: .infinity)
             } else {
@@ -211,55 +264,47 @@ struct FavoriteTeamWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Medium (FotMob match card style)
+    // MARK: - Medium
 
     private var mediumView: some View {
         VStack(spacing: 0) {
             if let match = entry.nextMatch {
-                // FotMob 스타일: 팀A — 정보 — 팀B 3열 레이아웃
                 HStack(spacing: 0) {
-                    // 팀 A
                     VStack(spacing: 5) {
                         teamLogo(data: entry.teamImageData, size: 44)
                         Text(entry.teamCode)
-                            .font(.subheadline).fontWeight(.bold).foregroundStyle(.white)
+                            .font(.subheadline).fontWeight(.bold).foregroundStyle(.primary)
                     }
                     .frame(maxWidth: .infinity)
 
-                    // 중앙 정보
                     VStack(spacing: 4) {
                         if match.isLive {
                             liveBadge
                             Text("경기 진행 중")
                                 .font(.caption2).foregroundStyle(.secondary)
                         } else {
-                            Text(timeOnly(match.startTime))
-                                .font(.title3).fontWeight(.bold).foregroundStyle(.white)
-                            Text(dateText(match.startTime))
-                                .font(.caption2).foregroundStyle(.secondary)
+                            matchTimeView(match: match, compact: false)
                         }
                         Text(entry.leagueName)
-                            .font(.caption2).foregroundStyle(Color.white.opacity(0.4))
+                            .font(.caption2).foregroundStyle(.secondary)
                             .padding(.top, 2)
                     }
-                    .frame(width: 100)
+                    .frame(width: 110)
 
-                    // 팀 B (상대)
                     VStack(spacing: 5) {
                         teamLogo(data: entry.opponentImageData, size: 44)
                         Text(match.opponentCode)
-                            .font(.subheadline).fontWeight(.bold).foregroundStyle(.white)
+                            .font(.subheadline).fontWeight(.bold).foregroundStyle(.primary)
                     }
                     .frame(maxWidth: .infinity)
                 }
                 .frame(maxWidth: .infinity)
             } else {
-                // 예정 경기 없음
                 HStack(spacing: 14) {
                     teamLogo(data: entry.teamImageData, size: 44)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(entry.teamCode)
-                            .font(.title3).fontWeight(.bold).foregroundStyle(.white)
+                            .font(.title3).fontWeight(.bold).foregroundStyle(.primary)
                         Text(entry.leagueName)
                             .font(.caption2).foregroundStyle(.secondary)
                         Text("예정된 경기 없음")
@@ -280,13 +325,115 @@ struct FavoriteTeamWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Large (모든 팀 목록)
+
+    private var largeView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("즐겨찾기")
+                    .font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
+                Spacer()
+                Text("즐겨찾기 팀")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
+
+            ForEach(Array(entry.allTeams.prefix(5).enumerated()), id: \.offset) { i, info in
+                if i > 0 {
+                    Divider().padding(.leading, 60)
+                }
+                largeTeamRow(info)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func largeTeamRow(_ info: TeamRowInfo) -> some View {
+        HStack(spacing: 12) {
+            teamLogo(data: info.teamImageData, size: 36)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(info.teamCode)
+                    .font(.subheadline).fontWeight(.semibold).foregroundStyle(.primary)
+                Text(info.leagueName)
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if let match = info.nextMatch {
+                if match.isLive {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        liveBadge
+                        Text("vs \(match.opponentCode)")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                } else {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("vs \(match.opponentCode)")
+                            .font(.caption2).fontWeight(.medium).foregroundStyle(.primary)
+                        largeMatchTimeView(match: match)
+                    }
+                }
+                teamLogo(data: info.opponentImageData, size: 28)
+            } else {
+                Text("경기 없음")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+    }
+
+    // MARK: - Time Views
+
+    @ViewBuilder
+    private func matchTimeView(match: WidgetNetworkService.NextMatchInfo, compact: Bool) -> some View {
+        let timeToMatch = match.startTime.timeIntervalSinceNow
+        if !match.isLive, timeToMatch > 0, timeToMatch <= 3600 {
+            // 1시간 이내: 라이브 카운트다운
+            VStack(spacing: 1) {
+                Text(match.startTime, style: .timer)
+                    .font(compact ? .caption2 : .title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.orange)
+                    .monospacedDigit()
+                Text("후 시작").font(.system(size: 9)).foregroundStyle(.secondary)
+            }
+        } else if compact {
+            Text(timeText(match.startTime, isLive: match.isLive))
+                .font(.caption2).foregroundStyle(.secondary)
+        } else {
+            VStack(spacing: 2) {
+                Text(timeOnly(match.startTime))
+                    .font(.title3).fontWeight(.bold).foregroundStyle(.primary)
+                Text(dateText(match.startTime))
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func largeMatchTimeView(match: WidgetNetworkService.NextMatchInfo) -> some View {
+        let timeToMatch = match.startTime.timeIntervalSinceNow
+        if timeToMatch > 0, timeToMatch <= 3600 {
+            Text(match.startTime, style: .timer)
+                .font(.caption2).fontWeight(.semibold).foregroundStyle(.orange)
+                .monospacedDigit()
+        } else {
+            Text(timeText(match.startTime, isLive: match.isLive))
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+
     // MARK: - Carousel
 
     private var carouselDots: some View {
         HStack(spacing: 4) {
             ForEach(0..<entry.totalTeams, id: \.self) { i in
                 Circle()
-                    .fill(i == entry.currentIndex ? Color.white : Color.white.opacity(0.3))
+                    .fill(i == entry.currentIndex ? Color.primary : Color.primary.opacity(0.25))
                     .frame(width: 5, height: 5)
             }
         }
@@ -300,21 +447,19 @@ struct FavoriteTeamWidgetView: View {
             Button(intent: NavigateTeamIntent(newIndex: prev)) {
                 Image(systemName: "chevron.left")
                     .font(.caption).fontWeight(.semibold)
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
                     .frame(width: 28, height: 16)
             }
             .buttonStyle(.plain)
 
             Spacer()
-
             carouselDots
-
             Spacer()
 
             Button(intent: NavigateTeamIntent(newIndex: next)) {
                 Image(systemName: "chevron.right")
                     .font(.caption).fontWeight(.semibold)
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
                     .frame(width: 28, height: 16)
             }
             .buttonStyle(.plain)
@@ -340,11 +485,11 @@ struct FavoriteTeamWidgetView: View {
                 Image(uiImage: uiImage).resizable().scaledToFit()
             } else {
                 Circle()
-                    .fill(Color.white.opacity(0.08))
+                    .fill(Color.secondary.opacity(0.15))
                     .overlay(
                         Image(systemName: "shield.fill")
                             .font(.system(size: size * 0.4))
-                            .foregroundStyle(.white.opacity(0.2))
+                            .foregroundStyle(.secondary.opacity(0.4))
                     )
             }
         }

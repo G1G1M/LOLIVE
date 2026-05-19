@@ -190,33 +190,36 @@ struct TeamDetailView: View {
                 let opponent = isTeamA ? match.teamB : match.teamA
                 let won = myScore > oppScore
 
-                HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(won ? Color.blue : Color.red)
-                        .frame(width: 3, height: 32)
+                NavigationLink(destination: MatchDetailView(match: match)) {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(won ? Color.blue : Color.red)
+                            .frame(width: 3, height: 32)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("vs \(opponent.name)")
-                            .font(.subheadline).fontWeight(.medium)
-                            .lineLimit(1)
-                        Text(match.startTime, style: .date)
-                            .font(.caption).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("vs \(opponent.name)")
+                                .font(.subheadline).fontWeight(.medium)
+                                .lineLimit(1)
+                            Text(match.startTime, style: .date)
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text("\(myScore)-\(oppScore)")
+                            .font(.subheadline).fontWeight(.semibold)
+                            .foregroundStyle(won ? .primary : .secondary)
+
+                        Text(won ? "승" : "패")
+                            .font(.caption2).fontWeight(.bold)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background((won ? Color.blue : Color.red).opacity(0.15))
+                            .foregroundStyle(won ? .blue : .red)
+                            .clipShape(Capsule())
                     }
-
-                    Spacer()
-
-                    Text("\(myScore)-\(oppScore)")
-                        .font(.subheadline).fontWeight(.semibold)
-                        .foregroundStyle(won ? .primary : .secondary)
-
-                    Text(won ? "승" : "패")
-                        .font(.caption2).fontWeight(.bold)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background((won ? Color.blue : Color.red).opacity(0.15))
-                        .foregroundStyle(won ? .blue : .red)
-                        .clipShape(Capsule())
+                    .padding(.horizontal, 16).padding(.vertical, 10)
                 }
-                .padding(.horizontal, 16).padding(.vertical, 10)
+                .buttonStyle(.plain)
 
                 if match.id != viewModel.recentMatches.last?.id {
                     Divider().padding(.leading, 16)

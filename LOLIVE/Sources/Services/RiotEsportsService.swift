@@ -72,7 +72,7 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
     private func mapEventToMatch(_ event: EventDTO, fallbackLeague: League? = nil) -> Match? {
         guard let matchDTO = event.match, matchDTO.teams.count >= 2 else { return nil }
         let league = League(
-            id: event.league.id ?? event.league.slug,
+            id: fallbackLeague?.id ?? event.league.id ?? event.league.slug,
             slug: event.league.slug,
             name: event.league.name,
             region: fallbackLeague?.region ?? "",
@@ -184,14 +184,24 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         let matchDTO = response.data.event.match
 
         let games = matchDTO.games.map { game -> GameInfo in
-            let blueTeamId = game.teams.first { $0.side == "blue" }?.id ?? ""
-            let redTeamId  = game.teams.first { $0.side == "red"  }?.id ?? ""
+            let blueTeamDTO = game.teams.first { $0.side == "blue" }
+            let redTeamDTO  = game.teams.first { $0.side == "red"  }
             let state = GameInfoState(rawValue: game.state) ?? .unstarted
-            return GameInfo(number: game.number, gameId: game.id, state: state,
-                            blueTeamId: blueTeamId, redTeamId: redTeamId)
+            return GameInfo(
+                number: game.number, gameId: game.id, state: state,
+                blueTeamId: blueTeamDTO?.id ?? "",
+                redTeamId:  redTeamDTO?.id  ?? "",
+                blueBans: blueTeamDTO?.bans?.map { $0.championId } ?? [],
+                redBans:  redTeamDTO?.bans?.map  { $0.championId } ?? []
+            )
         }
 
-        return EventDetailInfo(strategyCount: matchDTO.strategy.count, games: games)
+        // MatchDetailDTO.teams 순서가 match.teamA, match.teamB 순서와 동일
+        let teamAEsportsId = matchDTO.teams.first?.id ?? ""
+        let teamBEsportsId = matchDTO.teams.dropFirst().first?.id ?? ""
+
+        return EventDetailInfo(strategyCount: matchDTO.strategy.count, games: games,
+                               teamAEsportsId: teamAEsportsId, teamBEsportsId: teamBEsportsId)
     }
 
     private func https(_ url: String?) -> String? {

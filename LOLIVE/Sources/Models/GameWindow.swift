@@ -10,6 +10,8 @@ import Foundation
 struct EventDetailInfo {
     let strategyCount: Int
     let games: [GameInfo]
+    let teamAEsportsId: String  // match.teamA에 대응하는 실제 esports 팀 ID
+    let teamBEsportsId: String  // match.teamB에 대응하는 실제 esports 팀 ID
 }
 
 struct GameInfo: Identifiable {
@@ -19,6 +21,8 @@ struct GameInfo: Identifiable {
     let state: GameInfoState
     let blueTeamId: String
     let redTeamId: String
+    let blueBans: [String]
+    let redBans: [String]
 }
 
 enum GameInfoState: String {
@@ -34,7 +38,7 @@ enum GameInfoState: String {
 
 // MARK: - Game Window
 
-struct GameWindow: Identifiable {
+struct GameWindow: Identifiable, Codable {
     var id: String { gameId }
     let gameId: String
     let gameState: String
@@ -45,9 +49,14 @@ struct GameWindow: Identifiable {
     let blueTeamStats: TeamGameStats
     let redTeamStats: TeamGameStats
     let gameTime: Int?   // 인게임 경과 시간 (초), window/details API에서 수신
+
+    enum CodingKeys: String, CodingKey {
+        case gameId, gameState, blueTeamId, redTeamId
+        case bluePlayers, redPlayers, blueTeamStats, redTeamStats, gameTime
+    }
 }
 
-struct PlayerStats: Identifiable, Hashable {
+struct PlayerStats: Identifiable, Hashable, Codable {
     var id: Int { participantId }
     let participantId: Int
     let summonerName: String
@@ -59,9 +68,14 @@ struct PlayerStats: Identifiable, Hashable {
     let totalGold: Int
     let creepScore: Int
     let level: Int
+
+    enum CodingKeys: String, CodingKey {
+        case participantId, summonerName, championId, role
+        case kills, deaths, assists, totalGold, creepScore, level
+    }
 }
 
-struct TeamGameStats {
+struct TeamGameStats: Codable {
     let totalGold: Int
     let towers: Int
     let barons: Int

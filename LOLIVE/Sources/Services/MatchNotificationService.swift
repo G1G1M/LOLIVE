@@ -52,29 +52,43 @@ final class MatchNotificationService: Sendable {
         }
 
         for match in upcoming {
-            let fireDate = match.startTime.addingTimeInterval(-3600)
-            guard fireDate > now else { continue }
-
             let opponent = match.teamA.code.lowercased() == fav.teamCode.lowercased()
                 ? match.teamB : match.teamA
 
-            let content = UNMutableNotificationContent()
-            content.title = "\(fav.teamName) 경기 1시간 전"
-            content.body = "vs \(opponent.name) · \(fav.leagueName)"
-            content.sound = .default
+            let fireDate = match.startTime.addingTimeInterval(-3600)
+            if fireDate > now {
+                // 정상: 경기 1시간 전 예약 알림
+                let content = UNMutableNotificationContent()
+                content.title = "\(fav.teamName) 경기 1시간 전"
+                content.body = "vs \(opponent.name) · \(fav.leagueName)"
+                content.sound = .default
 
-            var dc = Calendar.current.dateComponents(
-                [.year, .month, .day, .hour, .minute],
-                from: fireDate
-            )
-            dc.second = 0
-            let trigger = UNCalendarNotificationTrigger(dateMatching: dc, repeats: false)
-            let request = UNNotificationRequest(
-                identifier: "lolive_match_\(match.id)_\(fav.teamId)",
-                content: content,
-                trigger: trigger
-            )
-            try? await center.add(request)
+                var dc = Calendar.current.dateComponents(
+                    [.year, .month, .day, .hour, .minute],
+                    from: fireDate
+                )
+                dc.second = 0
+                let trigger = UNCalendarNotificationTrigger(dateMatching: dc, repeats: false)
+                let request = UNNotificationRequest(
+                    identifier: "lolive_match_\(match.id)_\(fav.teamId)",
+                    content: content,
+                    trigger: trigger
+                )
+                try? await center.add(request)
+            } else if match.startTime > now {
+                // 즐겨찾기 추가 시점에 이미 1시간 이내 → 즉시 알림
+                let content = UNMutableNotificationContent()
+                content.title = "\(fav.teamName) 경기가 곧 시작됩니다!"
+                content.body = "vs \(opponent.name) · \(fav.leagueName)"
+                content.sound = .default
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+                let request = UNNotificationRequest(
+                    identifier: "lolive_match_\(match.id)_\(fav.teamId)_soon",
+                    content: content,
+                    trigger: trigger
+                )
+                try? await center.add(request)
+            }
         }
     }
 }

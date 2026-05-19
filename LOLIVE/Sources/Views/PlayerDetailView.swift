@@ -111,10 +111,13 @@ struct PlayerDetailView: View {
                     Text("Game \(stat.gameNumber)")
                         .font(.caption).fontWeight(.medium)
                         .frame(width: 52, alignment: .leading)
-                    Text(stat.championId)
-                        .font(.caption).fontWeight(.semibold)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 6) {
+                        ChampionImageView(championId: stat.championId, size: 24)
+                        Text(stat.championId)
+                            .font(.caption).fontWeight(.semibold)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     Text("\(stat.kills)/\(stat.deaths)/\(stat.assists)")
                         .font(.caption).fontWeight(.medium)
                         .foregroundStyle(stat.deaths == 0 ? .primary : .secondary)

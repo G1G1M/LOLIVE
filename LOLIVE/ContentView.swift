@@ -12,6 +12,11 @@ import WidgetKit
 struct ContentView: View {
     @Query private var favoriteTeams: [FavoriteTeam]
     @Environment(TodayViewModel.self) private var todayViewModel
+    @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
+
+    private var themeColor: Color {
+        primaryTeamCode.isEmpty ? Color.accentColor : TeamTheme.color(for: primaryTeamCode)
+    }
 
     var body: some View {
         TabView {
@@ -30,7 +35,7 @@ struct ContentView: View {
             FavoritesView()
                 .tabItem { Label("Favorites", systemImage: "star.fill") }
         }
-        .preferredColorScheme(.dark)
+        .tint(themeColor)
         .task {
             // await 이전에 동기로 저장 — task가 취소(백그라운드 전환 등)되어도 반드시 실행됨
             syncFavoritedTeamIds()

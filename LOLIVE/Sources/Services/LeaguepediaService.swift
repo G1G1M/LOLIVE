@@ -59,6 +59,47 @@ struct LeaguepediaService: Sendable {
         return nil
     }
 
+    /// 게임 벤 데이터 반환. team1Bans = Team1(첫 번째 팀), team2Bans = Team2(두 번째 팀).
+    func fetchBans(riotGameId: String) async -> (team1Bans: [String], team2Bans: [String])? {
+        var c = URLComponents(string: baseURL)!
+        c.queryItems = [
+            .init(name: "action", value: "cargoquery"),
+            .init(name: "tables", value: "ScoreboardGames"),
+            .init(name: "fields", value: "Team1Bans,Team2Bans"),
+            .init(name: "where",  value: "GameId='LOLESPRT_\(riotGameId)'"),
+            .init(name: "limit",  value: "1"),
+            .init(name: "format", value: "json"),
+        ]
+        guard let url = c.url,
+              let data = await cargoData(url: url),
+              let resp = try? JSONDecoder().decode(CargoResp.self, from: data),
+              let row = resp.cargoquery.first?.title else { return nil }
+        let t1 = parseBans(row["Team1Bans"] ?? "")
+        let t2 = parseBans(row["Team2Bans"] ?? "")
+        guard !t1.isEmpty || !t2.isEmpty else { return nil }
+        return (team1Bans: t1, team2Bans: t2)
+    }
+
+    /// 소환사명으로 Leaguepedia Players 테이블에서 선수 프로필 이미지 URL 반환.
+    func fetchPlayerImageURL(summonerName: String) async -> URL? {
+        var c = URLComponents(string: baseURL)!
+        c.queryItems = [
+            .init(name: "action", value: "cargoquery"),
+            .init(name: "tables", value: "Players"),
+            .init(name: "fields", value: "Players.Photo"),
+            .init(name: "where",  value: "Players.ID='\(escapeSql(summonerName))'"),
+            .init(name: "limit",  value: "1"),
+            .init(name: "format", value: "json"),
+        ]
+        guard let url = c.url,
+              let data = await cargoData(url: url),
+              let resp = try? JSONDecoder().decode(CargoResp.self, from: data),
+              let photo = resp.cargoquery.first?.title["Photo"], !photo.isEmpty else { return nil }
+        let encoded = photo.replacingOccurrences(of: " ", with: "_")
+            .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? photo
+        return URL(string: "https://lol.fandom.com/wiki/Special:FilePath/\(encoded)")
+    }
+
     func playerNames(league: League) async -> Set<String>? {
         guard let leagueName = leaguepediaName(for: league) else { return nil }
         if let cached = await LeaguepediaCache.shared.playerNames(for: leagueName) { return cached }
@@ -307,6 +348,12 @@ struct LeaguepediaService: Sendable {
 
     private func escapeSql(_ value: String) -> String {
         value.replacingOccurrences(of: "'", with: "\\'")
+    }
+
+    private func parseBans(_ str: String) -> [String] {
+        str.split(separator: ",")
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 }
 

@@ -34,13 +34,18 @@ struct MatchDetailView: View {
                             gameSeriesPicker(detail: detail)
                         }
 
+                        if let game = viewModel.selectedGame,
+                           (!game.blueBans.isEmpty || !game.redBans.isEmpty) {
+                            banCard(game: game)
+                        }
+
                         if let window = viewModel.selectedGameWindow {
                             let gameIsLive = viewModel.selectedGame?.state == .inProgress
                             if window.hasLiveStats || gameIsLive {
-                                teamStatsCard(window: window, match: match)
-                                playerListCard(window: window, match: match)
+                                teamStatsCard(window: window)
+                                playerListCard(window: window)
                             } else {
-                                playerListCard(window: window, match: match)
+                                playerListCard(window: window)
                                 noStatsCard
                             }
                         }
@@ -53,17 +58,6 @@ struct MatchDetailView: View {
         }
         .navigationTitle(match.league.name)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: PlayerStats.self) { player in
-            PlayerDetailView(
-                summonerName: player.summonerName,
-                games: viewModel.eventDetail?.games.filter { $0.state.isPlayable } ?? [],
-                gameWindows: viewModel.gameWindows,
-                match: match
-            )
-        }
-        .navigationDestination(for: Team.self) { team in
-            TeamDetailView(team: team, league: match.league)
-        }
         .task {
             await viewModel.load()
             viewModel.startPolling()
@@ -80,9 +74,9 @@ struct MatchDetailView: View {
             statusBadge
 
             HStack(spacing: 0) {
-                teamColumn(team: match.teamA, isWinner: match.scoreA > match.scoreB)
+                teamColumn(team: resolvedTeam(match.teamA), isWinner: match.scoreA > match.scoreB)
                 scoreColumn
-                teamColumn(team: match.teamB, isWinner: match.scoreB > match.scoreA)
+                teamColumn(team: resolvedTeam(match.teamB), isWinner: match.scoreB > match.scoreA)
             }
         }
         .padding(.vertical, 24)
@@ -91,7 +85,9 @@ struct MatchDetailView: View {
     }
 
     private func teamColumn(team: Team, isWinner: Bool) -> some View {
-        NavigationLink(value: team) {
+        NavigationLink {
+            TeamDetailView(team: team, league: match.league)
+        } label: {
             VStack(spacing: 8) {
                 CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
                     .frame(width: 64, height: 64)
@@ -211,11 +207,65 @@ struct MatchDetailView: View {
         }
     }
 
+    // MARK: - Ban Card
+
+    private func banCard(game: GameInfo) -> some View {
+        let blueTeam = teamFor(windowTeamId: game.blueTeamId)
+        let redTeam  = teamFor(windowTeamId: game.redTeamId)
+
+        return VStack(spacing: 0) {
+            HStack {
+                Text("밴")
+                    .font(.headline)
+                Spacer()
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+
+            Divider().padding(.horizontal, 16)
+
+            banRow(team: blueTeam, bans: game.blueBans, color: .blue)
+            Divider().padding(.horizontal, 16)
+            banRow(team: redTeam, bans: game.redBans, color: .red)
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func banRow(team: Team?, bans: [String], color: Color) -> some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 4) {
+                Circle().fill(color).frame(width: 6, height: 6)
+                CachedAsyncImage(url: URL(string: team?.imageURL ?? ""))
+                    .frame(width: 18, height: 18)
+                Text(team?.code ?? "—")
+                    .font(.caption2).fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, alignment: .leading)
+            }
+
+            HStack(spacing: 6) {
+                ForEach(bans, id: \.self) { champion in
+                    ZStack(alignment: .topTrailing) {
+                        ChampionImageView(championId: champion, size: 30)
+                            .opacity(0.45)
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.red)
+                            .offset(x: 3, y: -3)
+                    }
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+    }
+
     // MARK: - Team Stats Card
 
-    private func teamStatsCard(window: GameWindow, match: Match) -> some View {
-        let blueTeam = teamFor(id: window.blueTeamId, match: match)
-        let redTeam  = teamFor(id: window.redTeamId,  match: match)
+    private func teamStatsCard(window: GameWindow) -> some View {
+        let blueTeam = teamFor(windowTeamId: window.blueTeamId)
+        let redTeam  = teamFor(windowTeamId: window.redTeamId)
 
         return VStack(spacing: 0) {
             HStack {
@@ -267,32 +317,24 @@ struct MatchDetailView: View {
 
     // MARK: - Player List Card
 
-    private func playerListCard(window: GameWindow, match: Match) -> some View {
-        let blueTeam = teamFor(id: window.blueTeamId, match: match)
-        let redTeam  = teamFor(id: window.redTeamId,  match: match)
+    private func playerListCard(window: GameWindow) -> some View {
+        let blueTeam = teamFor(windowTeamId: window.blueTeamId)
+        let redTeam  = teamFor(windowTeamId: window.redTeamId)
 
         return VStack(spacing: 0) {
-            playerSection(
-                title: blueTeam?.code ?? "Blue Side",
-                players: window.bluePlayers,
-                color: .blue
-            )
+            playerSection(team: blueTeam, sideLabel: "Blue", players: window.bluePlayers, color: .blue)
             Divider().padding(.horizontal, 16)
-            playerSection(
-                title: redTeam?.code ?? "Red Side",
-                players: window.redPlayers,
-                color: .red
-            )
+            playerSection(team: redTeam, sideLabel: "Red", players: window.redPlayers, color: .red)
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    private func playerSection(title: String, players: [PlayerStats], color: Color) -> some View {
+    private func playerSection(team: Team?, sideLabel: String, players: [PlayerStats], color: Color) -> some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 6) {
                 Circle().fill(color).frame(width: 6, height: 6)
-                Text(title)
+                Text(team?.code ?? sideLabel)
                     .font(.subheadline).fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -308,12 +350,21 @@ struct MatchDetailView: View {
     }
 
     private func playerRow(_ player: PlayerStats) -> some View {
-        NavigationLink(value: player) {
+        NavigationLink {
+            PlayerDetailView(
+                summonerName: player.summonerName,
+                games: viewModel.eventDetail?.games.filter { $0.state.isPlayable } ?? [],
+                gameWindows: viewModel.gameWindows,
+                match: match
+            )
+        } label: {
             HStack(spacing: 8) {
                 Text(roleLabel(player.role))
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
                     .frame(width: 28)
+
+                ChampionImageView(championId: player.championId, size: 28)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(player.championId)
@@ -395,10 +446,26 @@ struct MatchDetailView: View {
 
     // MARK: - Helpers
 
-    private func teamFor(id: String, match: Match) -> Team? {
-        if match.teamA.id == id { return match.teamA }
-        if match.teamB.id == id { return match.teamB }
+    /// window의 esports 팀 ID로 match 팀을 반환.
+    /// eventDetail의 esports ID → match 팀 코드 순으로 매칭.
+    private func teamFor(windowTeamId: String) -> Team? {
+        guard !windowTeamId.isEmpty else { return nil }
+        if let detail = viewModel.eventDetail {
+            if detail.teamAEsportsId == windowTeamId { return match.teamA }
+            if detail.teamBEsportsId == windowTeamId { return match.teamB }
+        }
+        if match.teamA.id == windowTeamId || match.teamA.code == windowTeamId { return match.teamA }
+        if match.teamB.id == windowTeamId || match.teamB.code == windowTeamId { return match.teamB }
         return nil
+    }
+
+    /// getSchedule에서 누락된 esports 팀 ID를 eventDetail 값으로 보완한 Team 반환.
+    /// TeamDetailView.load()에서 fetchTeamRoster가 올바른 ID로 호출되도록 보장.
+    private func resolvedTeam(_ team: Team) -> Team {
+        guard let detail = viewModel.eventDetail else { return team }
+        let esportsId = (team.code == match.teamA.code) ? detail.teamAEsportsId : detail.teamBEsportsId
+        guard !esportsId.isEmpty, esportsId != team.id else { return team }
+        return Team(id: esportsId, name: team.name, code: team.code, imageURL: team.imageURL)
     }
 
     private func roleLabel(_ role: String) -> String {

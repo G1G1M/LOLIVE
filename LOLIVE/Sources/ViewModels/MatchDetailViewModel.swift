@@ -68,15 +68,22 @@ final class MatchDetailViewModel {
             let matchStartTime = match.startTime
             let playableGames = detail.games.filter { $0.state.isPlayable }
 
+            let cache = GameWindowCache.shared
             await withTaskGroup(of: (String, GameWindow?).self) { group in
                 for game in playableGames {
                     let gameId = game.gameId
                     let gameNumber = game.number
                     let isCompleted = game.state == .completed
                     group.addTask {
+                        // 완료 게임은 디스크 캐시 우선 조회
+                        if isCompleted, let cached = await cache.window(for: gameId) {
+                            return (gameId, cached)
+                        }
+
                         // 먼저 startingTime 없이 시도
                         if let window = try? await liveStats.fetchGameWindow(gameId: gameId, startingTime: nil),
                            !isCompleted || window.hasLiveStats {
+                            if isCompleted { await cache.save(window) }
                             return (gameId, window)
                         }
                         guard isCompleted else { return (gameId, nil) }
@@ -102,6 +109,7 @@ final class MatchDetailViewModel {
                                     best = (key, window)
                                 }
                             }
+                            if let w = best?.1 { await cache.save(w) }
                             return (gameId, best?.1)
                         }
                     }
@@ -163,4 +171,5 @@ final class MatchDetailViewModel {
         pollingTask?.cancel()
         pollingTask = nil
     }
+
 }

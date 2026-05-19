@@ -128,6 +128,11 @@ struct GameDetailDTO: Decodable {
 struct GameTeamSideDTO: Decodable {
     let id: String
     let side: String
+    let bans: [BanDTO]?
+}
+
+struct BanDTO: Decodable {
+    let championId: String
 }
 
 // MARK: - Tournaments

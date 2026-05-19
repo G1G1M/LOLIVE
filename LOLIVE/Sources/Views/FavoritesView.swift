@@ -11,6 +11,7 @@ struct FavoritesView: View {
     @Query(sort: \FavoritePlayer.addedAt, order: .reverse) private var favoritePlayers: [FavoritePlayer]
     @Environment(\.modelContext) private var modelContext
     @Environment(TodayViewModel.self) private var todayViewModel
+    @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
     @State private var showingTeamSearch = false
 
     private var hasFavorites: Bool { !favoriteTeams.isEmpty || !favoritePlayers.isEmpty }
@@ -82,9 +83,26 @@ struct FavoritesView: View {
                             } label: {
                                 teamRow(fav)
                             }
+                            .contextMenu {
+                                let isPrimary = fav.teamCode.uppercased() == primaryTeamCode.uppercased()
+                                Button {
+                                    primaryTeamCode = isPrimary ? "" : fav.teamCode
+                                } label: {
+                                    Label(
+                                        isPrimary ? "대표 팀 해제" : "대표 팀으로 설정",
+                                        systemImage: isPrimary ? "paintpalette" : "paintpalette.fill"
+                                    )
+                                }
+                            }
                         }
                         .onDelete { indexSet in
-                            indexSet.forEach { modelContext.delete(favoriteTeams[$0]) }
+                            indexSet.forEach {
+                                let team = favoriteTeams[$0]
+                                if team.teamCode.uppercased() == primaryTeamCode.uppercased() {
+                                    primaryTeamCode = ""
+                                }
+                                modelContext.delete(team)
+                            }
                         }
                     }
                 }
@@ -128,6 +146,13 @@ struct FavoritesView: View {
             }
 
             Spacer()
+
+            if fav.teamCode.uppercased() == primaryTeamCode.uppercased() {
+                Image(systemName: "paintpalette.fill")
+                    .font(.caption)
+                    .foregroundStyle(TeamTheme.color(for: fav.teamCode))
+                    .padding(.trailing, 4)
+            }
 
             if let live = liveInfo(for: fav) {
                 VStack(alignment: .trailing, spacing: 3) {

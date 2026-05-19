@@ -20,6 +20,7 @@ final class LeaguePlayerDetailViewModel {
 
     struct MatchResult: Identifiable {
         let id: String
+        let match: Match
         let opponent: Team
         let won: Bool
         let myScore: Int
@@ -76,7 +77,7 @@ final class LeaguePlayerDetailViewModel {
             let opponent = isTeamA ? match.teamB : match.teamA
             let my  = isTeamA ? match.scoreA : match.scoreB
             let opp = isTeamA ? match.scoreB : match.scoreA
-            return MatchResult(id: match.id, opponent: opponent, won: my > opp,
+            return MatchResult(id: match.id, match: match, opponent: opponent, won: my > opp,
                                myScore: my, oppScore: opp, date: match.startTime)
         }
 

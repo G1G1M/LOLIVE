@@ -151,6 +151,8 @@ struct LeaguePlayerDetailView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 16)
 
+                        ChampionImageView(championId: stat.championId, size: 32)
+
                         Text(stat.championId)
                             .font(.subheadline).fontWeight(.medium)
 
@@ -195,33 +197,36 @@ struct LeaguePlayerDetailView: View {
             Divider().padding(.horizontal, 16)
 
             ForEach(viewModel.recentResults) { result in
-                HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(result.won ? Color.blue : Color.red)
-                        .frame(width: 3, height: 32)
+                NavigationLink(destination: MatchDetailView(match: result.match)) {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(result.won ? Color.blue : Color.red)
+                            .frame(width: 3, height: 32)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("vs \(result.opponent.name)")
-                            .font(.subheadline).fontWeight(.medium)
-                            .lineLimit(1)
-                        Text(result.date, style: .date)
-                            .font(.caption).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("vs \(result.opponent.name)")
+                                .font(.subheadline).fontWeight(.medium)
+                                .lineLimit(1)
+                            Text(result.date, style: .date)
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text("\(result.myScore)-\(result.oppScore)")
+                            .font(.subheadline).fontWeight(.semibold)
+                            .foregroundStyle(result.won ? .primary : .secondary)
+
+                        Text(result.won ? "승" : "패")
+                            .font(.caption2).fontWeight(.bold)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background((result.won ? Color.blue : Color.red).opacity(0.15))
+                            .foregroundStyle(result.won ? .blue : .red)
+                            .clipShape(Capsule())
                     }
-
-                    Spacer()
-
-                    Text("\(result.myScore)-\(result.oppScore)")
-                        .font(.subheadline).fontWeight(.semibold)
-                        .foregroundStyle(result.won ? .primary : .secondary)
-
-                    Text(result.won ? "승" : "패")
-                        .font(.caption2).fontWeight(.bold)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background((result.won ? Color.blue : Color.red).opacity(0.15))
-                        .foregroundStyle(result.won ? .blue : .red)
-                        .clipShape(Capsule())
+                    .padding(.horizontal, 16).padding(.vertical, 10)
                 }
-                .padding(.horizontal, 16).padding(.vertical, 10)
+                .buttonStyle(.plain)
 
                 if result.id != viewModel.recentResults.last?.id {
                     Divider().padding(.leading, 16)
