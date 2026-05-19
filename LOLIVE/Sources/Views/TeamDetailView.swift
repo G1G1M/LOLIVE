@@ -36,6 +36,9 @@ struct TeamDetailView: View {
                         if !viewModel.players.isEmpty {
                             rosterCard
                         }
+                        if !viewModel.h2hRecords.isEmpty {
+                            h2hCard
+                        }
                         if !viewModel.recentMatches.isEmpty {
                             recentMatchesCard
                         }
@@ -171,6 +174,47 @@ struct TeamDetailView: View {
                 .clipShape(Capsule())
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
+    }
+
+    // MARK: - H2H Card
+
+    private var h2hCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("맞대결 전적")
+                .font(.headline)
+                .padding(.horizontal, 16).padding(.vertical, 12)
+
+            Divider().padding(.horizontal, 16)
+
+            ForEach(viewModel.h2hRecords) { record in
+                HStack(spacing: 12) {
+                    CachedAsyncImage(url: URL(string: record.opponent.imageURL ?? ""))
+                        .frame(width: 32, height: 32)
+
+                    Text(record.opponent.name)
+                        .font(.subheadline)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text("\(record.wins)승 \(record.losses)패")
+                        .font(.subheadline).fontWeight(.medium)
+                        .foregroundStyle(record.wins > record.losses ? .primary : .secondary)
+
+                    Text(String(format: "%.0f%%", record.winRate * 100))
+                        .font(.caption).fontWeight(.bold)
+                        .frame(width: 38, alignment: .trailing)
+                        .foregroundStyle(record.winRate >= 0.5 ? .blue : .red)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+
+                if record.id != viewModel.h2hRecords.last?.id {
+                    Divider().padding(.leading, 56)
+                }
+            }
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Recent Matches Card
