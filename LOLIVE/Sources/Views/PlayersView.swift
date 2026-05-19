@@ -15,20 +15,32 @@ struct PlayersView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                // 고정 타이틀 헤더
+                HStack {
+                    Text("선수")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Color(.label))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 6)
+                .background(Color(.systemGroupedBackground))
 
-                if viewModel.isLoading {
-                    ProgressView("선수 목록 불러오는 중...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    playerContent
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+
+                    if viewModel.isLoading {
+                        ProgressView("선수 목록 불러오는 중...")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        playerContent
+                    }
                 }
             }
-            .navigationTitle("선수")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(Color(.systemGroupedBackground), for: .navigationBar)
-            .searchable(text: $viewModel.searchText, prompt: "선수 검색")
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
         }
         .task { await viewModel.load() }
     }
@@ -52,6 +64,27 @@ struct PlayersView: View {
 
     private var filterHeader: some View {
         VStack(spacing: 0) {
+            // 검색 바
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("선수 검색", text: $viewModel.searchText)
+                    .font(.subheadline)
+                if !viewModel.searchText.isEmpty {
+                    Button { viewModel.searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     filterChip("전체", isSelected: viewModel.selectedRole == nil) {

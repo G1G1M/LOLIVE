@@ -10,19 +10,31 @@ struct StandingsView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                // 고정 타이틀
+                HStack {
+                    Text("순위")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Color(.label))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 6)
+                .background(Color(.systemGroupedBackground))
 
-                if viewModel.isLoadingLeagues {
-                    ProgressView("리그 목록 불러오는 중...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    standingsContent
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+                    if viewModel.isLoadingLeagues {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        standingsContent
+                    }
                 }
             }
-            .navigationTitle("순위")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(Color(.systemGroupedBackground), for: .navigationBar)
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
         }
         .task { await viewModel.loadLeagues() }
     }
@@ -38,7 +50,7 @@ struct StandingsView: View {
                     leagueSelector
                 }
             }
-            .padding(.bottom, 16)
+            .padding(.bottom, 20)
         }
     }
 
@@ -52,7 +64,8 @@ struct StandingsView: View {
                         leagueChip(league)
                     }
                 }
-                .padding(.horizontal, 16).padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
             Divider()
         }
@@ -64,15 +77,15 @@ struct StandingsView: View {
         return Button {
             Task { await viewModel.selectLeague(league) }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 CachedAsyncImage(url: URL(string: league.imageURL ?? ""))
-                    .frame(width: 18, height: 18)
+                    .frame(width: 16, height: 16)
                 Text(league.name)
-                    .font(.subheadline)
-                    .fontWeight(isSelected ? .semibold : .regular)
-                    .foregroundStyle(isSelected ? .white : .primary)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
             }
-            .padding(.horizontal, 14).padding(.vertical, 7)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
             .background(isSelected ? Color.accentColor : Color(.secondarySystemGroupedBackground))
             .clipShape(Capsule())
         }
@@ -93,12 +106,12 @@ struct StandingsView: View {
         }
     }
 
-    // MARK: - Standings Table
+    // MARK: - Table
 
     private var standingsTable: some View {
         VStack(spacing: 0) {
             tableHeader
-            Divider()
+            Divider().padding(.horizontal, 16)
             ForEach(Array(viewModel.standings.enumerated()), id: \.offset) { index, standing in
                 NavigationLink {
                     TeamDetailView(
@@ -107,12 +120,12 @@ struct StandingsView: View {
                         standing: standing
                     )
                 } label: {
-                    standingRow(standing, index: index)
+                    standingRow(standing)
                 }
                 .buttonStyle(.plain)
 
                 if standing.id != viewModel.standings.last?.id {
-                    Divider().padding(.leading, 60)
+                    Divider().padding(.leading, 64)
                 }
             }
         }
@@ -124,69 +137,77 @@ struct StandingsView: View {
     private var tableHeader: some View {
         HStack {
             Text("#")
-                .frame(width: 28, alignment: .center)
+                .frame(width: 32, alignment: .center)
             Text("팀")
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text("승")
-                .frame(width: 36, alignment: .center)
-            Text("패")
-                .frame(width: 36, alignment: .center)
-            Text("승률")
-                .frame(width: 52, alignment: .trailing)
+            Text("W")
+                .frame(width: 34, alignment: .center)
+            Text("L")
+                .frame(width: 34, alignment: .center)
+            Text("Win%")
+                .frame(width: 50, alignment: .trailing)
         }
-        .font(.caption)
-        .fontWeight(.semibold)
+        .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
     }
 
-    private func standingRow(_ standing: Standing, index: Int) -> some View {
-        HStack {
+    private func standingRow(_ standing: Standing) -> some View {
+        HStack(spacing: 0) {
+            // 순위
             Text("\(standing.rank)")
-                .font(.subheadline)
-                .fontWeight(standing.rank <= 3 ? .bold : .regular)
+                .font(.system(size: 14, weight: standing.rank <= 3 ? .bold : .regular))
                 .foregroundStyle(rankColor(standing.rank))
-                .frame(width: 28, alignment: .center)
+                .frame(width: 32, alignment: .center)
 
-            HStack(spacing: 8) {
+            // 팀 정보
+            HStack(spacing: 10) {
                 CachedAsyncImage(url: URL(string: standing.team.imageURL ?? ""))
                     .frame(width: 28, height: 28)
-
                 VStack(alignment: .leading, spacing: 1) {
                     Text(standing.team.name)
-                        .font(.subheadline).fontWeight(.medium)
+                        .font(.system(size: 14, weight: .medium))
                         .lineLimit(1)
                     Text(standing.team.code)
-                        .font(.caption2).foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            // 승
             Text("\(standing.wins)")
-                .font(.subheadline)
-                .foregroundStyle(.blue)
-                .frame(width: 36, alignment: .center)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color(.label))
+                .frame(width: 34, alignment: .center)
 
+            // 패
             Text("\(standing.losses)")
-                .font(.subheadline)
-                .foregroundStyle(.red)
-                .frame(width: 36, alignment: .center)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .frame(width: 34, alignment: .center)
 
+            // 승률
             Text(String(format: "%.0f%%", standing.winRate * 100))
-                .font(.subheadline).fontWeight(.medium)
-                .frame(width: 52, alignment: .trailing)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(winRateColor(standing.winRate))
+                .frame(width: 50, alignment: .trailing)
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
     }
 
-    // MARK: - Empty State
+    // MARK: - Empty
 
     private var emptyState: some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 10) {
             Image(systemName: "chart.bar.xaxis")
-                .foregroundStyle(.secondary)
+                .font(.system(size: 32))
+                .foregroundStyle(.quaternary)
             Text("순위 데이터를 불러올 수 없습니다")
-                .font(.subheadline).foregroundStyle(.secondary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
@@ -196,11 +217,17 @@ struct StandingsView: View {
 
     private func rankColor(_ rank: Int) -> Color {
         switch rank {
-        case 1: return .yellow
+        case 1: return Color(red: 1.0, green: 0.8, blue: 0.0)   // gold
         case 2: return Color(.systemGray)
-        case 3: return .orange
-        default: return .primary
+        case 3: return Color(red: 0.8, green: 0.5, blue: 0.2)   // bronze
+        default: return Color(.label)
         }
+    }
+
+    private func winRateColor(_ rate: Double) -> Color {
+        if rate >= 0.6 { return .blue }
+        if rate < 0.4  { return .secondary }
+        return Color(.label)
     }
 }
 

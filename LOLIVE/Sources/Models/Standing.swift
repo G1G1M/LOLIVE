@@ -12,4 +12,7 @@ struct Standing: Codable, Identifiable, Hashable {
     let losses: Int
     let rank: Int
     let winRate: Double
+    var gameWins: Int = 0
+    var gameLosses: Int = 0
+    var gameDiff: Int { gameWins - gameLosses }
 }

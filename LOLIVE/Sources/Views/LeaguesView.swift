@@ -28,18 +28,52 @@ struct LeaguesView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                // 고정 타이틀 헤더
+                HStack {
+                    Text("리그")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Color(.label))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 6)
+                .background(Color(.systemGroupedBackground))
 
-                if isLoading && leagues.isEmpty {
-                    ProgressView("불러오는 중...")
-                } else {
-                    leagueList
+                // 검색 바
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("리그 검색", text: $searchText)
+                        .font(.subheadline)
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color(.systemGroupedBackground))
+
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+
+                    if isLoading && leagues.isEmpty {
+                        ProgressView("불러오는 중...")
+                    } else {
+                        leagueList
+                    }
                 }
             }
-            .navigationTitle("리그")
-            .navigationBarTitleDisplayMode(.large)
-            .searchable(text: $searchText, prompt: "리그 검색")
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: League.self) { league in
                 LeagueDetailView(league: league)
             }

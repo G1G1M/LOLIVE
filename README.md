@@ -32,14 +32,17 @@
 ## 주요 기능
 
 ### Today
-- 오늘의 경기 실시간 조회
-- LIVE 경기 자동 감지 및 폴링
-- 예정 / 진행중 / 완료 경기 섹션 구분
-- 날짜별 · 리그별 그룹화
-- 즐겨찾기 팀 경기만 필터링
+- FotMob 스타일 날짜 선택 스트립 (오늘 기준 ±5일, 시작 시 오늘 날짜 자동 중앙 정렬)
+- 선택 날짜 기준 리그별 그룹화 경기 목록
+- LIVE 경기 자동 감지 및 폴링 (오늘 날짜에서만 표시)
+- 즐겨찾기 팀 경기만 필터링 (전체 / ★ 즐겨찾기 토글)
+- 타이틀 · 날짜 스트립 · 필터 고정, 경기 목록만 스크롤
 
 ### Standings
-- 전 세계 리그 순위표
+- 전 세계 리그 순위표 (W / L / Win% 컬럼)
+- 승률 색상 코딩: 60% 이상 파랑, 40% 미만 흐리게
+- 순위 색상: 1위 금색, 2위 은색, 3위 동색
+- 내부 정렬 기준: 순위 → 승수 → 세트 득실 → 팀명
 - 리그 선택 칩 (lazy 로딩 + 캐싱)
 - 팀 탭 → 팀 상세 페이지 이동
 
@@ -72,10 +75,13 @@
 ### Favorites
 - SwiftData 기반 팀 / 선수 즐겨찾기
 - 즐겨찾기한 팀의 LIVE 경기 실시간 뱃지 + 스코어
-- 경기 시작 1시간 전 로컬 알림 자동 스케줄링
-- 즐겨찾기 추가 시점이 경기 1시간 이내이면 즉시 알림 발송
 - **대표 팀 설정**: 팀 행 길게 누르면 대표 팀 지정 → 앱 전체 Tint 색상 적용
 - Live Activity: 잠금화면 실시간 스코어 + Dynamic Island
+
+### 앱 메뉴 (AppMenu)
+- 경기 알림 시간 설정 (Picker: 1분 / 5분 / 10분 / 30분 / 1시간 전)
+- 알림 변경 시 즐겨찾기 팀 전체 알림 자동 재스케줄링
+- 앱 설정 페이지 이동 (이용약관, 개인정보처리방침, 앱 사용 설명서, 버전 정보)
 
 ### 홈 화면 위젯 (LOLIVEWidgets)
 - 즐겨찾기한 팀의 다음 경기 일정 표시
@@ -161,10 +167,11 @@ LOLIVE/
 │   └── Views/
 │       ├── TodayView, StandingsView, PlayersView
 │       ├── SearchView, FavoritesView
+│       ├── AppMenuView, AppSettingsView
 │       ├── LeagueDetailView, TeamDetailView
 │       ├── LeaguePlayerDetailView, SeasonStatsView
 │       ├── MatchDetailView, PlayerDetailView
-│       └── MatchCardView, CachedAsyncImage, ...
+│       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, ...
 ├── ContentView.swift        — TabView 진입점 + 딥링크 처리
 ├── LOLIVEApp.swift          — 앱 진입점
 └── LOLIVEWidgets/           — Widget Extension

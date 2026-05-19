@@ -7,22 +7,37 @@ import SwiftUI
 
 struct TodayView: View {
     @Environment(TodayViewModel.self) private var viewModel
+    @State private var showMenu = false
+    @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
+
+    private let cal = Calendar.current
+
+    // 오늘 기준 ±5일 (총 11일)
+    private var dateRange: [Date] {
+        let today = cal.startOfDay(for: Date())
+        return (-5...5).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
+    }
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                titleHeader
+                dateStrip
+                if viewModel.hasFavoriteTeams { favoritesToggle }
 
-                if viewModel.isLoading && viewModel.todayMatches.isEmpty {
-                    ProgressView("불러오는 중...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    matchList
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+                    if viewModel.isLoading && viewModel.todayMatches.isEmpty {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        matchList
+                    }
                 }
             }
-            .navigationTitle("오늘의 경기")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(Color(.systemGroupedBackground), for: .navigationBar)
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showMenu) { AppMenuView() }
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(
                     match: match,
@@ -42,57 +57,170 @@ struct TodayView: View {
             await viewModel.loadTodayMatches()
             viewModel.startLivePolling()
         }
-        .onDisappear {
-            viewModel.stopPolling()
-        }
+        .onDisappear { viewModel.stopPolling() }
     }
 
-    // MARK: - Date Grouping Helpers
+    // MARK: - Fixed: Title
 
-    private struct LeagueGroup: Identifiable {
-        var id: String { leagueId }
-        let leagueId: String
-        let league: League?
-        let matches: [Match]
-    }
-
-    private struct DateGroup: Identifiable {
-        let id: String
-        let date: Date
-        let leagueGroups: [LeagueGroup]
-    }
-
-    private func groupByDate(_ matches: [Match], ascending: Bool) -> [DateGroup] {
-        let cal = Calendar.current
-        let byDay = Dictionary(grouping: matches) { cal.startOfDay(for: $0.startTime) }
-        let sortedDays = byDay.keys.sorted { ascending ? $0 < $1 : $0 > $1 }
-        return sortedDays.map { day in
-            let dayMatches = byDay[day]!.sorted { $0.startTime < $1.startTime }
-            let byLeague = Dictionary(grouping: dayMatches) { $0.league.id }
-            let leagueGroups = byLeague.keys.sorted().map { lid in
-                LeagueGroup(leagueId: lid,
-                            league: byLeague[lid]?.first?.league,
-                            matches: byLeague[lid]!)
-            }
-            return DateGroup(id: "\(day.timeIntervalSince1970)", date: day, leagueGroups: leagueGroups)
-        }
-    }
-
-    private func dateLabel(_ date: Date) -> String {
-        let cal = Calendar.current
-        if cal.isDateInToday(date)     { return "오늘" }
-        if cal.isDateInYesterday(date) { return "어제" }
-        if cal.isDateInTomorrow(date)  { return "내일" }
-        return date.formatted(.dateTime.month().day().weekday().locale(Locale(identifier: "ko_KR")))
-    }
-
-    private func dateSubHeader(_ date: Date) -> some View {
+    private var titleHeader: some View {
         HStack {
-            Text(dateLabel(date))
-                .font(.subheadline).fontWeight(.semibold)
+            Text("오늘의 경기")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Color(.label))
+            Spacer()
+            Button { showMenu = true } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Color(.label))
+                    .frame(width: 36, height: 36)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    // MARK: - Fixed: Date Strip
+
+    private var dateStrip: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(dateRange, id: \.self) { date in
+                        dateChip(date).id(date)
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
+            .background(Color(.systemGroupedBackground))
+            .onAppear {
+                proxy.scrollTo(cal.startOfDay(for: Date()), anchor: .center)
+            }
+        }
+    }
+
+    private func dateChip(_ date: Date) -> some View {
+        let isSelected = cal.isDate(date, inSameDayAs: selectedDate)
+        let isToday    = cal.isDateInToday(date)
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) { selectedDate = date }
+        } label: {
+            VStack(spacing: 6) {
+                // 요일
+                Text(weekdayStr(date))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+
+                // 날짜 숫자 — 선택 시 숫자 뒤에만 원형 accent
+                ZStack {
+                    Circle()
+                        .fill(
+                            isSelected ? Color.accentColor
+                            : isToday  ? Color.accentColor.opacity(0.12)
+                            : Color.clear
+                        )
+                        .frame(width: 36, height: 36)
+
+                    Text(dayStr(date))
+                        .font(.system(size: 17, weight: (isSelected || isToday) ? .bold : .regular))
+                        .foregroundStyle(
+                            isSelected ? Color.white
+                            : isToday  ? Color.accentColor
+                            : Color(.label)
+                        )
+                }
+            }
+            .frame(width: 52)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func weekdayStr(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "EEE"
+        return f.string(from: date).replacingOccurrences(of: ".", with: "")
+    }
+
+    private func dayStr(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "d"
+        return f.string(from: date)
+    }
+
+    // MARK: - Fixed: Favorites Toggle
+
+    private var favoritesToggle: some View {
+        HStack(spacing: 8) {
+            filterPill(title: "전체", isSelected: !viewModel.showFavoritesOnly) {
+                viewModel.showFavoritesOnly = false
+            }
+            filterPill(title: "★ 즐겨찾기", isSelected: viewModel.showFavoritesOnly) {
+                viewModel.showFavoritesOnly = true
+            }
             Spacer()
         }
-        .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 2)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
+        .animation(.easeInOut(duration: 0.15), value: viewModel.showFavoritesOnly)
+    }
+
+    private func filterPill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline).fontWeight(.semibold)
+                .padding(.horizontal, 14).padding(.vertical, 6)
+                .background(isSelected ? Color.accentColor : Color(.secondarySystemGroupedBackground))
+                .foregroundStyle(isSelected ? Color.white : Color.secondary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Data Structures
+
+    private struct LeagueMatchGroup: Identifiable {
+        var id: String { league.id }
+        let league: League
+        let matches: [(match: Match, isLive: Bool)]
+    }
+
+    private var groupsForSelectedDate: [LeagueMatchGroup] {
+        let isToday = cal.isDateInToday(selectedDate)
+        var byLeague: [String: (League, [(Match, Bool)])] = [:]
+
+        func add(_ match: Match, isLive: Bool) {
+            let lid = match.league.id
+            if byLeague[lid] == nil { byLeague[lid] = (match.league, []) }
+            byLeague[lid]!.1.append((match, isLive))
+        }
+
+        if isToday {
+            for lm in viewModel.filteredLiveMatches { add(lm.match, isLive: true) }
+        }
+        for m in viewModel.filteredTodayMatches + viewModel.filteredUpcomingMatches {
+            if cal.isDate(m.startTime, inSameDayAs: selectedDate) { add(m, isLive: false) }
+        }
+        for m in viewModel.filteredCompletedMatches {
+            if cal.isDate(m.startTime, inSameDayAs: selectedDate) { add(m, isLive: false) }
+        }
+
+        return byLeague.values.map { (league, pairs) in
+            let sorted = pairs.sorted { a, b in
+                if a.1 != b.1 { return a.1 }
+                return a.0.startTime < b.0.startTime
+            }
+            return LeagueMatchGroup(league: league, matches: sorted)
+        }.sorted { a, b in
+            let aLive = a.matches.contains { $0.isLive }
+            let bLive = b.matches.contains { $0.isLive }
+            if aLive != bLive { return aLive }
+            return a.league.name < b.league.name
+        }
     }
 
     // MARK: - Match List
@@ -102,27 +230,36 @@ struct TodayView: View {
             ScrollView {
                 LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
                     Color.clear.frame(height: 0).id("top")
-                    if viewModel.hasFavoriteTeams {
-                        favoritesToggle
-                    }
-                    if viewModel.isFavoritesFilterEmpty {
-                        favoritesEmptyView
+
+                    if viewModel.showFavoritesOnly && groupsForSelectedDate.isEmpty {
+                        emptyView(
+                            icon: "star.slash",
+                            message: "즐겨찾기한 팀의 경기가 없습니다"
+                        )
+                    } else if groupsForSelectedDate.isEmpty {
+                        emptyView(
+                            icon: "calendar.badge.exclamationmark",
+                            message: "이 날짜에 경기가 없습니다"
+                        )
                     } else {
-                        if !viewModel.filteredLiveMatches.isEmpty {
-                            liveSection
-                        }
-                        if !viewModel.filteredTodayMatches.isEmpty {
-                            scheduledSection
-                        }
-                        if !viewModel.filteredUpcomingMatches.isEmpty {
-                            upcomingSection
-                        }
-                        if !viewModel.filteredCompletedMatches.isEmpty {
-                            completedSection
+                        ForEach(groupsForSelectedDate) { group in
+                            Section {
+                                ForEach(group.matches, id: \.match.id) { (match, isLive) in
+                                    NavigationLink(value: match) {
+                                        MatchCardView(match: match, isLive: isLive)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 5)
+                                }
+                                .padding(.bottom, 8)
+                            } header: {
+                                LeagueSectionHeader(league: group.league)
+                            }
                         }
                     }
                 }
-                .padding(.bottom, 16)
+                .padding(.bottom, 20)
             }
             .refreshable {
                 await viewModel.loadTodayMatches()
@@ -131,184 +268,17 @@ struct TodayView: View {
         }
     }
 
-    private var favoritesToggle: some View {
-        HStack(spacing: 8) {
-            Button {
-                viewModel.showFavoritesOnly = false
-            } label: {
-                Text("전체")
-                    .font(.subheadline).fontWeight(.semibold)
-                    .padding(.horizontal, 16).padding(.vertical, 7)
-                    .background(viewModel.showFavoritesOnly ? Color.clear : Color.accentColor)
-                    .foregroundStyle(viewModel.showFavoritesOnly ? Color.secondary : Color.white)
-                    .clipShape(Capsule())
-                    .overlay(Capsule().strokeBorder(viewModel.showFavoritesOnly ? Color.secondary.opacity(0.3) : Color.clear))
-            }
-            Button {
-                viewModel.showFavoritesOnly = true
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "star.fill")
-                        .font(.caption)
-                    Text("즐겨찾기")
-                        .font(.subheadline).fontWeight(.semibold)
-                }
-                .padding(.horizontal, 16).padding(.vertical, 7)
-                .background(viewModel.showFavoritesOnly ? Color.accentColor : Color.clear)
-                .foregroundStyle(viewModel.showFavoritesOnly ? Color.white : Color.secondary)
-                .clipShape(Capsule())
-                .overlay(Capsule().strokeBorder(viewModel.showFavoritesOnly ? Color.clear : Color.secondary.opacity(0.3)))
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.15), value: viewModel.showFavoritesOnly)
-    }
-
-    private var favoritesEmptyView: some View {
+    private func emptyView(icon: String, message: String) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "star.slash")
-                .font(.system(size: 40))
-                .foregroundStyle(.tertiary)
-            Text("즐겨찾기한 팀의 경기가 없습니다")
+            Image(systemName: icon)
+                .font(.system(size: 36))
+                .foregroundStyle(.quaternary)
+            Text(message)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 80)
-    }
-
-    // MARK: - Sections
-
-    private var liveSection: some View {
-        Section {
-            let grouped = Dictionary(grouping: viewModel.filteredLiveMatches) { $0.match.league.id }
-            ForEach(grouped.keys.sorted(), id: \.self) { leagueId in
-                if let items = grouped[leagueId], let league = items.first?.match.league {
-                    LeagueSectionHeader(league: league)
-                    ForEach(items) { liveMatch in
-                        NavigationLink(value: liveMatch.match) {
-                            MatchCardView(match: liveMatch.match, isLive: true)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-        } header: {
-            sectionTitle("LIVE", color: .red)
-        }
-    }
-
-    private var scheduledSection: some View {
-        Section {
-            let grouped = Dictionary(grouping: viewModel.filteredTodayMatches) { $0.league.id }
-            ForEach(grouped.keys.sorted(), id: \.self) { leagueId in
-                if let matches = grouped[leagueId], let league = matches.first?.league {
-                    LeagueSectionHeader(league: league)
-                    ForEach(matches) { match in
-                        NavigationLink(value: match) {
-                            MatchCardView(match: match, isLive: false)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-        } header: {
-            sectionTitle("오늘 예정", color: .primary)
-        }
-    }
-
-    private var upcomingSection: some View {
-        Section {
-            ForEach(groupByDate(viewModel.filteredUpcomingMatches, ascending: true)) { dayGroup in
-                dateSubHeader(dayGroup.date)
-                ForEach(dayGroup.leagueGroups) { group in
-                    if let league = group.league {
-                        LeagueSectionHeader(league: league)
-                    }
-                    ForEach(group.matches) { match in
-                        NavigationLink(value: match) {
-                            MatchCardView(match: match, isLive: false)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-        } header: {
-            sectionTitle("예정 경기", color: .primary)
-        }
-    }
-
-    private var completedSection: some View {
-        Section {
-            let allCompleted = viewModel.filteredCompletedMatches
-            let limit = viewModel.completedMatchesLimit
-            let visible = viewModel.showAllCompleted
-                ? allCompleted
-                : Array(allCompleted.prefix(limit))
-
-            ForEach(groupByDate(visible, ascending: false)) { dayGroup in
-                dateSubHeader(dayGroup.date)
-                ForEach(dayGroup.leagueGroups) { group in
-                    if let league = group.league {
-                        LeagueSectionHeader(league: league)
-                    }
-                    ForEach(group.matches) { match in
-                        NavigationLink(value: match) {
-                            MatchCardView(match: match, isLive: false)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-
-            if allCompleted.count > limit {
-                Button {
-                    viewModel.showAllCompleted.toggle()
-                } label: {
-                    HStack {
-                        Text(viewModel.showAllCompleted
-                             ? "접기"
-                             : "더 보기 (\(allCompleted.count - limit)개)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Image(systemName: viewModel.showAllCompleted
-                              ? "chevron.up"
-                              : "chevron.down")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                }
-            }
-        } header: {
-            sectionTitle("완료된 경기", color: .secondary)
-        }
-    }
-
-    // MARK: - Section Title
-
-    private func sectionTitle(_ title: String, color: Color) -> some View {
-        HStack {
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(color)
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Color(.systemGroupedBackground))
     }
 }
 

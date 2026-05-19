@@ -12,7 +12,6 @@ struct FavoritesView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(TodayViewModel.self) private var todayViewModel
     @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
-    @AppStorage("notificationMinutesBefore") private var notificationMinutes: Int = 60
     @State private var showingTeamSearch = false
 
     private var hasFavorites: Bool { !favoriteTeams.isEmpty || !favoritePlayers.isEmpty }
@@ -24,9 +23,9 @@ struct FavoritesView: View {
                 Section {
                     // 빈 섹션 본문: 헤더만 렌더링
                 } header: {
-                    HStack(alignment: .firstTextBaseline) {
+                    HStack {
                         Text("즐겨찾기")
-                            .font(.system(size: 34, weight: .bold))
+                            .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(Color(.label))
                             .textCase(nil)
                         Spacer()
@@ -35,11 +34,13 @@ struct FavoritesView: View {
                                 showingTeamSearch = true
                             } label: {
                                 Image(systemName: "plus")
-                                    .font(.title2)
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundStyle(Color.accentColor)
+                                    .frame(width: 36, height: 36)
                             }
                         }
                     }
-                    .padding(.top, 8)
+                    .padding(.top, 12)
                     .padding(.bottom, 4)
                 }
 
@@ -123,33 +124,16 @@ struct FavoritesView: View {
                         }
                     }
                 }
-                // ── 알림 설정 섹션 ─────────────────────────────────
-                Section("알림 설정") {
-                    Picker("알림 시간", selection: $notificationMinutes) {
-                        Text("1시간 전").tag(60)
-                        Text("30분 전").tag(30)
-                        Text("15분 전").tag(15)
-                        Text("5분 전").tag(5)
-                    }
-
-                    NavigationLink(destination: NotificationCenterView()) {
-                        Label("예정 알림 보기", systemImage: "bell.badge")
-                    }
-                }
             }
             .listStyle(.insetGrouped)
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingTeamSearch) {
                 TeamSearchView()
-            }
-            .onChange(of: notificationMinutes) { _, _ in
-                Task { await MatchNotificationService.shared.reschedule(for: favoriteTeams) }
             }
         }
     }
 
     // MARK: - Team Row
-
     private func teamRow(_ fav: FavoriteTeam) -> some View {
         HStack(spacing: 12) {
             CachedAsyncImage(url: URL(string: fav.teamImageURL ?? ""))
