@@ -140,18 +140,26 @@ struct MatchDetailView: View {
     private var statusBadge: some View {
         switch match.state {
         case .inProgress:
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 6, height: 6)
-                    .scaleEffect(isPulsing ? 1.4 : 1.0)
-                    .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
-                    .onAppear { isPulsing = true }
-                Text("LIVE")
-                    .font(.caption).fontWeight(.bold).foregroundStyle(.red)
+            VStack(spacing: 4) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 6, height: 6)
+                        .scaleEffect(isPulsing ? 1.4 : 1.0)
+                        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
+                        .onAppear { isPulsing = true }
+                    Text("LIVE")
+                        .font(.caption).fontWeight(.bold).foregroundStyle(.red)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Color.red.opacity(0.15)).clipShape(Capsule())
+
+                if let t = viewModel.lastPolledAt {
+                    Text("업데이트 \(t, style: .relative) 전")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
             }
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(Color.red.opacity(0.15)).clipShape(Capsule())
 
         case .completed:
             Text("경기 종료")

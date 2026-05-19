@@ -19,6 +19,7 @@ final class MatchDetailViewModel {
     var errorMessage: String? = nil
     var selectedGameId: String? = nil
     var currentGameTime: Int? = nil   // 인게임 경과 시간 (초)
+    var lastPolledAt: Date? = nil     // 마지막 폴링 시각
 
     // MARK: - Computed
 
@@ -169,6 +170,8 @@ final class MatchDetailViewModel {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
                 guard !Task.isCancelled else { break }
+
+                lastPolledAt = Date()
 
                 // eventDetail 폴링: 드래프트 밴픽 + 게임 상태 변화 감지
                 if let freshDetail = try? await esports.fetchEventDetails(matchId: matchId) {
