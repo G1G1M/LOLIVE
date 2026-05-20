@@ -19,11 +19,20 @@ struct LeaguesView: View {
         }
     }
 
+    private let internationalSlugs: Set<String> = ["worlds", "msi"]
+
     private var grouped: [(region: String, leagues: [League])] {
         let dict = Dictionary(grouping: filtered) { $0.region.isEmpty ? "기타" : $0.region }
         return dict
             .sorted { regionOrder($0.key) < regionOrder($1.key) }
-            .map { (region: regionDisplay($0.key), leagues: $0.value.sorted { $0.name < $1.name }) }
+            .compactMap { key, leagues in
+                var list = leagues.sorted { $0.name < $1.name }
+                if key == "국제 대회" {
+                    list = list.filter { internationalSlugs.contains($0.slug) }
+                }
+                guard !list.isEmpty else { return nil }
+                return (region: regionDisplay(key), leagues: list)
+            }
     }
 
     var body: some View {
