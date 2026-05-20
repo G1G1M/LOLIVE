@@ -86,11 +86,23 @@ struct LeaguesView: View {
     private var leagueList: some View {
         List {
             ForEach(grouped, id: \.region) { group in
-                Section(group.region) {
+                Section {
                     ForEach(group.leagues) { league in
                         NavigationLink(value: league) {
-                            leagueRow(league)
+                            leagueRow(league, isInternational: group.region == "국제 대회")
                         }
+                    }
+                } header: {
+                    if group.region == "국제 대회" {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trophy.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color(red: 1.0, green: 0.8, blue: 0.0))
+                            Text(group.region)
+                                .textCase(nil)
+                        }
+                    } else {
+                        Text(group.region)
                     }
                 }
             }
@@ -98,13 +110,22 @@ struct LeaguesView: View {
         .listStyle(.insetGrouped)
     }
 
-    private func leagueRow(_ league: League) -> some View {
+    private func leagueRow(_ league: League, isInternational: Bool = false) -> some View {
         HStack(spacing: 12) {
             CachedAsyncImage(url: URL(string: league.imageURL ?? ""))
                 .frame(width: 32, height: 32)
 
             Text(league.name)
-                .font(.subheadline).fontWeight(.medium)
+                .font(.subheadline)
+                .fontWeight(isInternational ? .semibold : .medium)
+
+            Spacer()
+
+            if isInternational {
+                Image(systemName: "trophy.bracket")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -121,22 +142,22 @@ struct LeaguesView: View {
 
     private func regionOrder(_ region: String) -> Int {
         switch region {
-        case "한국":                     return 0
-        case "중국":                     return 1
-        case "EMEA":                     return 2
-        case "북미":                     return 3
-        case "퍼시픽":                   return 4
-        case "아메리카스":               return 5
-        case "일본":                     return 6
-        case "베트남":                   return 7
-        case "브라질":                   return 8
-        case "홍콩, 마카오, 대만":       return 9
-        case "라틴 아메리카":            return 10
-        case "라틴 아메리카 북부":       return 11
-        case "라틴 아메리카 남부":       return 12
-        case "오세아니아":               return 13
-        case "독립 국가 연합 (CIS)":     return 14
-        case "국제 대회":                return 15
+        case "국제 대회":                return 0
+        case "한국":                     return 1
+        case "중국":                     return 2
+        case "EMEA":                     return 3
+        case "북미":                     return 4
+        case "퍼시픽":                   return 5
+        case "아메리카스":               return 6
+        case "일본":                     return 7
+        case "베트남":                   return 8
+        case "브라질":                   return 9
+        case "홍콩, 마카오, 대만":       return 10
+        case "라틴 아메리카":            return 11
+        case "라틴 아메리카 북부":       return 12
+        case "라틴 아메리카 남부":       return 13
+        case "오세아니아":               return 14
+        case "독립 국가 연합 (CIS)":     return 15
         default:                         return 16
         }
     }

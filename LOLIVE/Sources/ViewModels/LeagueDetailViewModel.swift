@@ -56,9 +56,18 @@ final class LeagueDetailViewModel {
     var bracketRounds: [BracketRound] {
         let all = completedMatches + upcomingMatches
         let byBlock = Dictionary(grouping: all.filter { $0.blockName != nil }) { $0.blockName! }
-        return byBlock.map { name, matches in
-            BracketRound(id: name, name: name, matches: matches.sorted { $0.startTime < $1.startTime })
-        }.sorted { roundOrder($0.name) < roundOrder($1.name) }
+        return byBlock
+            .filter { !isGroupStageBlock($0.key) }
+            .map { name, matches in
+                BracketRound(id: name, name: name, matches: matches.sorted { $0.startTime < $1.startTime })
+            }.sorted { roundOrder($0.name) < roundOrder($1.name) }
+    }
+
+    private func isGroupStageBlock(_ name: String) -> Bool {
+        let s = name.lowercased()
+        return s.contains("swiss") || s.contains("group") ||
+               s.contains("regular") || s.hasPrefix("week") ||
+               s.contains("opening week") || s.contains("day ")
     }
 
     // MARK: - Private
@@ -186,7 +195,8 @@ private func roundOrder(_ name: String) -> Int {
     if s.contains("grand final")                               { return 5 }
     if s.contains("final")                                     { return 4 }
     if s.contains("playoff") || s.contains("knockout") ||
-       s.contains("bracket") || s.contains("elimination")      { return 1 }
+       s.contains("bracket stage") || s.contains("elimination") { return 1 }
+    if s.contains("bracket")                                   { return 2 }
     return 6
 }
 
