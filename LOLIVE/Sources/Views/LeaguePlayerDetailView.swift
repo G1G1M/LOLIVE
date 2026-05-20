@@ -129,61 +129,82 @@ struct LeaguePlayerDetailView: View {
     // MARK: - Champion Stats Card
 
     private var championCard: some View {
-        let maxGames = viewModel.championStats.map(\.games).max() ?? 1
-
-        return VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("많이 사용한 챔피언")
+                Text("챔피언 풀")
                     .font(.headline)
                 Spacer()
-                Text("최근 \(viewModel.recentResults.count)경기")
+                Text("최근 \(viewModel.recentResults.count)경기 기준")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
 
+            // 컬럼 헤더
+            HStack(spacing: 0) {
+                Text("#").frame(width: 24, alignment: .center)
+                Text("챔피언").frame(maxWidth: .infinity, alignment: .leading)
+                Text("게임").frame(width: 38, alignment: .center)
+                Text("승률").frame(width: 50, alignment: .center)
+                Text("KDA").frame(width: 54, alignment: .trailing)
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+
             Divider().padding(.horizontal, 16)
 
             ForEach(Array(viewModel.championStats.enumerated()), id: \.element.id) { idx, stat in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 12) {
-                        Text("\(idx + 1)")
-                            .font(.caption).fontWeight(.bold)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 16)
+                HStack(spacing: 0) {
+                    Text("\(idx + 1)")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                        .frame(width: 24, alignment: .center)
 
-                        ChampionImageView(championId: stat.championId, size: 32)
-
+                    HStack(spacing: 8) {
+                        ChampionImageView(championId: stat.championId, size: 30)
                         Text(stat.championId)
                             .font(.subheadline).fontWeight(.medium)
-
-                        Spacer()
-
-                        Text("\(stat.games)게임")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // 사용 빈도 바
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color(.tertiarySystemFill))
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.blue.opacity(0.45))
-                                .frame(width: geo.size.width * CGFloat(stat.games) / CGFloat(maxGames))
-                        }
-                    }
-                    .frame(height: 4)
-                    .padding(.leading, 28)
+                    Text("\(stat.games)")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 38, alignment: .center)
+
+                    Text(String(format: "%.0f%%", stat.winRate * 100))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(winRateColor(stat.winRate))
+                        .frame(width: 50, alignment: .center)
+
+                    Text(String(format: "%.2f", stat.kda))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(kdaColor(stat.kda))
+                        .frame(width: 54, alignment: .trailing)
                 }
-                .padding(.horizontal, 16).padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
 
-                if stat.id != viewModel.championStats.last?.id {
-                    Divider().padding(.leading, 44)
+                if idx < viewModel.championStats.count - 1 {
+                    Divider().padding(.leading, 52)
                 }
             }
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func winRateColor(_ rate: Double) -> Color {
+        if rate >= 0.6 { return .blue }
+        if rate < 0.4  { return .secondary }
+        return Color(.label)
+    }
+
+    private func kdaColor(_ kda: Double) -> Color {
+        if kda >= 4.0 { return .blue }
+        if kda >= 2.0 { return Color(.label) }
+        return .secondary
     }
 
     // MARK: - Recent Matches Card

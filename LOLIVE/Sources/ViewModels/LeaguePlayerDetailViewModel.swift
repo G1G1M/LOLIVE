@@ -16,6 +16,14 @@ final class LeaguePlayerDetailViewModel {
         var id: String { championId }
         let championId: String
         var games: Int
+        var wins: Int = 0
+        var kills: Int = 0
+        var deaths: Int = 0
+        var assists: Int = 0
+        var kda: Double {
+            deaths == 0 ? Double(kills + assists) : Double(kills + assists) / Double(deaths)
+        }
+        var winRate: Double { games == 0 ? 0 : Double(wins) / Double(games) }
     }
 
     struct MatchResult: Identifiable {
@@ -39,17 +47,14 @@ final class LeaguePlayerDetailViewModel {
     private let player: Player
     private let league: League
     private let service: RiotEsportsServiceProtocol
-    private let liveStatsService: LiveStatsServiceProtocol
 
     // MARK: - Init
 
     init(player: Player, league: League,
-         service: RiotEsportsServiceProtocol = RiotEsportsService(),
-         liveStatsService: LiveStatsServiceProtocol = LiveStatsService()) {
+         service: RiotEsportsServiceProtocol = RiotEsportsService()) {
         self.player = player
         self.league = league
         self.service = service
-        self.liveStatsService = liveStatsService
     }
 
     // MARK: - Public
@@ -81,41 +86,39 @@ final class LeaguePlayerDetailViewModel {
                                myScore: my, oppScore: opp, date: match.startTime)
         }
 
-        // 챔피언 데이터: 각 경기의 게임 윈도우 메타데이터에서 추출
-        let svc = service
-        let lsvc = liveStatsService
-        let summonerName = player.summonerName
+        // 챔피언 데이터: Leaguepedia ScoreboardPlayers (승패 + KDA 포함, 과거 데이터 안정적)
+        print("[ChampPool] summonerName=\(player.summonerName) league=\(league.name)")
+        let picks = await LeaguepediaService.shared.playerChampionPicks(
+            summonerName: player.summonerName, league: league
+        )
+        print("[ChampPool] picks=\(picks?.count ?? -1)")
+        if let picks = picks, !picks.isEmpty {
+            var champGames:   [String: Int] = [:]
+            var champWins:    [String: Int] = [:]
+            var champKills:   [String: Int] = [:]
+            var champDeaths:  [String: Int] = [:]
+            var champAssists: [String: Int] = [:]
 
-        var championCounts: [String: Int] = [:]
+            for pick in picks {
+                champGames[pick.champion, default: 0]   += 1
+                champKills[pick.champion, default: 0]   += pick.kills
+                champDeaths[pick.champion, default: 0]  += pick.deaths
+                champAssists[pick.champion, default: 0] += pick.assists
+                if pick.won { champWins[pick.champion, default: 0] += 1 }
+            }
 
-        await withTaskGroup(of: [String].self) { group in
-            for match in teamMatches {
-                group.addTask {
-                    guard let detail = try? await svc.fetchEventDetails(matchId: match.id) else { return [] }
-                    var picks: [String] = []
-                    for game in detail.games where game.state.isPlayable {
-                        // gameMetadata는 startingTime 없이도 항상 반환됨 (챔피언 ID 포함)
-                        guard let window = try? await lsvc.fetchGameWindow(gameId: game.gameId, startingTime: nil)
-                        else { continue }
-                        let allPlayers = window.bluePlayers + window.redPlayers
-                        if let found = allPlayers.first(where: { $0.summonerName == summonerName }),
-                           !found.championId.isEmpty {
-                            picks.append(found.championId)
-                        }
-                    }
-                    return picks
+            championStats = champGames.keys
+                .sorted { (champGames[$0] ?? 0) > (champGames[$1] ?? 0) }
+                .map {
+                    ChampionStat(
+                        championId: $0,
+                        games:   champGames[$0]   ?? 0,
+                        wins:    champWins[$0]    ?? 0,
+                        kills:   champKills[$0]   ?? 0,
+                        deaths:  champDeaths[$0]  ?? 0,
+                        assists: champAssists[$0] ?? 0
+                    )
                 }
-            }
-            for await picks in group {
-                for champ in picks {
-                    championCounts[champ, default: 0] += 1
-                }
-            }
         }
-
-        championStats = championCounts
-            .sorted { $0.value > $1.value }
-            .prefix(5)
-            .map { ChampionStat(championId: $0.key, games: $0.value) }
     }
 }

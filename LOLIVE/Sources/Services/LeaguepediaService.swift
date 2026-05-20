@@ -100,6 +100,50 @@ struct LeaguepediaService: Sendable {
         return URL(string: "https://lol.fandom.com/wiki/Special:FilePath/\(encoded)")
     }
 
+    /// 선수의 이번 시즌 챔피언 픽 목록 (게임별 KDA + 승패).
+    /// 메모리 → 디스크 캐시 우선 조회, 없으면 Leaguepedia ScoreboardPlayers 조인 쿼리.
+    func playerChampionPicks(summonerName: String, league: League) async -> [ChampionPickEntry]? {
+        guard let leagueName = leaguepediaName(for: league),
+              let overviewPage = await currentOverviewPage(leagueName: leagueName)
+        else { return nil }
+
+        let cacheKey = "v2_\(overviewPage)__\(summonerName)"
+        if let cached = await LeaguepediaCache.shared.cachedChampionPicks(key: cacheKey) {
+            return cached.isEmpty ? nil : cached
+        }
+
+        var c = URLComponents(string: baseURL)!
+        c.queryItems = [
+            .init(name: "action",  value: "cargoquery"),
+            .init(name: "tables",  value: "ScoreboardPlayers,ScoreboardGames"),
+            .init(name: "join_on", value: "ScoreboardGames.GameId=ScoreboardPlayers.GameId"),
+            .init(name: "fields",  value: "ScoreboardPlayers.Champion=Champion,ScoreboardPlayers.Kills=K,ScoreboardPlayers.Deaths=D,ScoreboardPlayers.Assists=A,ScoreboardGames.Winner=W,ScoreboardGames.Team1=T1,ScoreboardGames.Team2=T2,ScoreboardPlayers.Team=MyTeam"),
+            .init(name: "where",   value: "ScoreboardPlayers.OverviewPage='\(escapeSql(overviewPage))' AND ScoreboardPlayers.Link='\(escapeSql(summonerName))'"),
+            .init(name: "limit",   value: "500"),
+            .init(name: "format",  value: "json"),
+        ]
+        guard let url = c.url,
+              let data = await cargoData(url: url),
+              let resp = try? JSONDecoder().decode(CargoResp.self, from: data)
+        else { return nil }
+
+        let picks: [ChampionPickEntry] = resp.cargoquery.compactMap { row in
+            guard let champion = row.title["Champion"], !champion.isEmpty else { return nil }
+            let k = Int(row.title["K"] ?? "0") ?? 0
+            let d = Int(row.title["D"] ?? "0") ?? 0
+            let a = Int(row.title["A"] ?? "0") ?? 0
+            let winner = row.title["W"] ?? ""
+            let t1     = row.title["T1"] ?? ""
+            let t2     = row.title["T2"] ?? ""
+            let myTeam = row.title["MyTeam"] ?? ""
+            let won = (winner == "1" && myTeam == t1) || (winner == "2" && myTeam == t2)
+            return ChampionPickEntry(champion: champion, kills: k, deaths: d, assists: a, won: won)
+        }
+
+        await LeaguepediaCache.shared.setChampionPicks(picks, key: cacheKey)
+        return picks.isEmpty ? nil : picks
+    }
+
     func playerNames(league: League) async -> Set<String>? {
         guard let leagueName = leaguepediaName(for: league) else { return nil }
         if let cached = await LeaguepediaCache.shared.playerNames(for: leagueName) { return cached }
@@ -321,18 +365,19 @@ struct LeaguepediaService: Sendable {
         var request = URLRequest(url: url)
         request.setValue("LOLIVE/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
         do {
-            let (data, response) = try await Self.session.data(for: request)
-            let http = response as? HTTPURLResponse
-            guard isRateLimited(data) else { return data }
-
-            let wait = http?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 10.0
-            try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
-            guard !Task.isCancelled else { return nil }
-
-            await LeaguepediaRateLimiter.shared.claimSlot()
-            guard !Task.isCancelled else { return nil }
-            let (data2, _) = try await Self.session.data(for: request)
-            return isRateLimited(data2) ? nil : data2
+            var (data, response) = try await Self.session.data(for: request)
+            var retries = 0
+            while isRateLimited(data) && retries < 3 {
+                let http = response as? HTTPURLResponse
+                let wait = http?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 12.0
+                try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+                guard !Task.isCancelled else { return nil }
+                await LeaguepediaRateLimiter.shared.claimSlot()
+                guard !Task.isCancelled else { return nil }
+                (data, response) = try await Self.session.data(for: request)
+                retries += 1
+            }
+            return isRateLimited(data) ? nil : data
         } catch {
             return nil
         }
@@ -362,7 +407,7 @@ struct LeaguepediaService: Sendable {
 private actor LeaguepediaRateLimiter {
     static let shared = LeaguepediaRateLimiter()
     private var nextSlotTime = Date.distantPast
-    private let slotInterval: TimeInterval = 1.5
+    private let slotInterval: TimeInterval = 2.5
 
     func claimSlot() async {
         guard !Task.isCancelled else { return }
@@ -381,10 +426,11 @@ private actor LeaguepediaRateLimiter {
 private actor LeaguepediaCache {
     static let shared = LeaguepediaCache()
 
-    private var overviewPages:     [String: String]                      = [:]
-    private var playerNameSets:    [String: Set<String>]                 = [:]
-    private var seasonStats:       [String: PlayerSeasonStats?]          = [:]
-    private var allPlayerStatsDic: [String: [String: PlayerSeasonStats]] = [:]
+    private var overviewPages:      [String: String]                      = [:]
+    private var playerNameSets:     [String: Set<String>]                 = [:]
+    private var seasonStats:        [String: PlayerSeasonStats?]          = [:]
+    private var allPlayerStatsDic:  [String: [String: PlayerSeasonStats]] = [:]
+    private var championPicksDic:   [String: [ChampionPickEntry]]         = [:]
 
     private static let cacheDir: URL = {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -402,6 +448,25 @@ private actor LeaguepediaCache {
 
     func cachedSeasonStats(key: String) -> PlayerSeasonStats?? { seasonStats[key] }
     func setSeasonStats(_ stats: PlayerSeasonStats?, key: String) { seasonStats[key] = .some(stats) }
+
+    func cachedChampionPicks(key: String) -> [ChampionPickEntry]? {
+        if let mem = championPicksDic[key] { return mem }
+        let file = Self.champCacheFile(for: key)
+        guard let data = try? Data(contentsOf: file),
+              let wrapper = try? JSONDecoder().decode(ChampPicksDiskWrapper.self, from: data),
+              Date().timeIntervalSince(wrapper.savedAt) < Self.maxAge
+        else { return nil }
+        championPicksDic[key] = wrapper.picks
+        return wrapper.picks
+    }
+
+    func setChampionPicks(_ picks: [ChampionPickEntry], key: String) {
+        championPicksDic[key] = picks
+        let wrapper = ChampPicksDiskWrapper(savedAt: Date(), picks: picks)
+        if let data = try? JSONEncoder().encode(wrapper) {
+            try? data.write(to: Self.champCacheFile(for: key), options: .atomic)
+        }
+    }
 
     /// 메모리 → 디스크 순으로 탐색. 디스크 항목이 24시간 초과면 무효.
     func allPlayerStats(for page: String) -> [String: PlayerSeasonStats]? {
@@ -431,6 +496,18 @@ private actor LeaguepediaCache {
     private struct DiskWrapper: Codable {
         let savedAt: Date
         let stats: [String: PlayerSeasonStats]
+    }
+
+    private struct ChampPicksDiskWrapper: Codable {
+        let savedAt: Date
+        let picks: [ChampionPickEntry]
+    }
+
+    private static func champCacheFile(for key: String) -> URL {
+        let safe = key
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        return cacheDir.appendingPathComponent("champs_\(safe).json")
     }
 }
 

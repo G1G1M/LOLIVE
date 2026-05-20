@@ -111,58 +111,78 @@ struct LeagueDetailView: View {
     private var standingsHeader: some View {
         HStack {
             Text("#")
-                .frame(width: 28, alignment: .center)
-            Spacer().frame(width: 36)
+                .frame(width: 32, alignment: .center)
             Text("팀")
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text("W")
-                .frame(width: 32, alignment: .center)
+                .frame(width: 34, alignment: .center)
             Text("L")
-                .frame(width: 32, alignment: .center)
-            Text("승률")
-                .frame(width: 48, alignment: .trailing)
+                .frame(width: 34, alignment: .center)
+            Text("Win%")
+                .frame(width: 50, alignment: .trailing)
         }
-        .font(.caption)
+        .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
     }
 
     private func standingRow(_ standing: Standing) -> some View {
         NavigationLink(value: standing.team) {
-            HStack {
+            HStack(spacing: 0) {
                 Text("\(standing.rank)")
-                    .font(.subheadline).fontWeight(.bold)
-                    .foregroundStyle(standing.rank <= 3 ? .primary : .secondary)
-                    .frame(width: 28, alignment: .center)
+                    .font(.system(size: 14, weight: standing.rank <= 3 ? .bold : .regular))
+                    .foregroundStyle(rankColor(standing.rank))
+                    .frame(width: 32, alignment: .center)
 
-                CachedAsyncImage(url: URL(string: standing.team.imageURL ?? ""))
-                    .frame(width: 28, height: 28)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(standing.team.name)
-                        .font(.subheadline).fontWeight(.medium)
-                        .lineLimit(1)
-                    Text(standing.team.code)
-                        .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    CachedAsyncImage(url: URL(string: standing.team.imageURL ?? ""))
+                        .frame(width: 28, height: 28)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(standing.team.name)
+                            .font(.system(size: 14, weight: .medium))
+                            .lineLimit(1)
+                        Text(standing.team.code)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text("\(standing.wins)")
-                    .font(.subheadline).fontWeight(.semibold)
-                    .frame(width: 32, alignment: .center)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color(.label))
+                    .frame(width: 34, alignment: .center)
 
                 Text("\(standing.losses)")
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
-                    .frame(width: 32, alignment: .center)
+                    .frame(width: 34, alignment: .center)
 
                 Text(String(format: "%.0f%%", standing.winRate * 100))
-                    .font(.caption).foregroundStyle(.secondary)
-                    .frame(width: 48, alignment: .trailing)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(winRateColor(standing.winRate))
+                    .frame(width: 50, alignment: .trailing)
             }
-            .padding(.horizontal, 16).padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
         }
         .buttonStyle(.plain)
+    }
+
+    private func rankColor(_ rank: Int) -> Color {
+        switch rank {
+        case 1: return Color(red: 1.0, green: 0.8, blue: 0.0)
+        case 2: return Color(.systemGray)
+        case 3: return Color(red: 0.8, green: 0.5, blue: 0.2)
+        default: return Color(.label)
+        }
+    }
+
+    private func winRateColor(_ rate: Double) -> Color {
+        if rate >= 0.6 { return .blue }
+        if rate < 0.4  { return .secondary }
+        return Color(.label)
     }
 
     // MARK: - 일정

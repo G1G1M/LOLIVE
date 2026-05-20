@@ -70,7 +70,32 @@ final class LeagueDetailViewModel {
         // 현재 토너먼트로 순위 + 선수 조회
         guard let tournament = activeTournament(from: tournaments) else { return }
 
-        let fetchedStandings = (try? await service.fetchStandings(tournamentId: tournament.id)) ?? []
+        var fetchedStandings = (try? await service.fetchStandings(tournamentId: tournament.id)) ?? []
+
+        // 세트 득실차 계산 (팀 코드 기준 매칭 — StandingsViewModel과 동일 로직)
+        let completed = allMatches.filter { $0.state == .completed }
+        var gameWinsMap: [String: Int] = [:]
+        var gameLossesMap: [String: Int] = [:]
+        for match in completed {
+            let aCode = match.teamA.code.uppercased()
+            let bCode = match.teamB.code.uppercased()
+            gameWinsMap[aCode, default: 0] += match.scoreA
+            gameLossesMap[aCode, default: 0] += match.scoreB
+            gameWinsMap[bCode, default: 0] += match.scoreB
+            gameLossesMap[bCode, default: 0] += match.scoreA
+        }
+        fetchedStandings = fetchedStandings.map { s in
+            var s = s
+            let code = s.team.code.uppercased()
+            s.gameWins = gameWinsMap[code] ?? 0
+            s.gameLosses = gameLossesMap[code] ?? 0
+            return s
+        }.sorted {
+            if $0.rank != $1.rank { return $0.rank < $1.rank }
+            if $0.wins != $1.wins { return $0.wins > $1.wins }
+            if $0.gameDiff != $1.gameDiff { return $0.gameDiff > $1.gameDiff }
+            return $0.team.name < $1.team.name
+        }
         standings = fetchedStandings
 
         let teamIds = fetchedStandings.map { $0.team.id }

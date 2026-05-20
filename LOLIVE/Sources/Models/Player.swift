@@ -25,3 +25,11 @@ struct PlayerSeasonStats: Codable {
     let kdaRatio: Double
     let avgCSPerMin: Double
 }
+
+struct ChampionPickEntry: Codable {
+    let champion: String
+    let kills: Int
+    let deaths: Int
+    let assists: Int
+    let won: Bool
+}

@@ -59,6 +59,16 @@ final class TodayViewModel {
         favoritedTeamIds.contains(match.teamA.id) || favoritedTeamIds.contains(match.teamB.id)
     }
 
+    private func favoriteTeamCode(for match: Match) -> String? {
+        if favoritedTeamIds.contains(match.teamA.id) || favoritedTeamIds.contains(match.teamA.code) {
+            return match.teamA.code
+        }
+        if favoritedTeamIds.contains(match.teamB.id) || favoritedTeamIds.contains(match.teamB.code) {
+            return match.teamB.code
+        }
+        return nil
+    }
+
     // MARK: - Private
 
     private let service: RiotEsportsServiceProtocol
@@ -111,8 +121,22 @@ final class TodayViewModel {
         stopPolling()
         pollingTask = Task {
             while !Task.isCancelled {
+                // 즐겨찾기 팀의 현재 라이브 경기 스냅샷 (종료 감지용)
+                let prevFavoriteLive = liveMatches.filter { favoriteTeamCode(for: $0.match) != nil }
+
                 do {
                     let live = try await service.fetchLive()
+                    let newLiveIds = Set(live.map { $0.match.id })
+
+                    // 라이브에서 사라진 즐겨찾기 경기 → 결과 알림
+                    for lm in prevFavoriteLive where !newLiveIds.contains(lm.match.id) {
+                        if let code = favoriteTeamCode(for: lm.match) {
+                            await MatchNotificationService.shared.sendResultNotification(
+                                for: lm.match, favoriteTeamCode: code
+                            )
+                        }
+                    }
+
                     liveMatches = enrich(live)
                     await LiveActivityService.shared.syncActivities(liveMatches, favoritedTeamIds: favoritedTeamIds)
                 } catch {

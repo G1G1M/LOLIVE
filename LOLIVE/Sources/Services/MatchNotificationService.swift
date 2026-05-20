@@ -36,6 +36,28 @@ final class MatchNotificationService: Sendable {
         }
     }
 
+    // MARK: - Public (Result)
+
+    func sendResultNotification(for match: Match, favoriteTeamCode: String) async {
+        let isTeamA = match.teamA.code.lowercased() == favoriteTeamCode.lowercased()
+        let myTeam   = isTeamA ? match.teamA  : match.teamB
+        let opponent = isTeamA ? match.teamB  : match.teamA
+        let myScore  = isTeamA ? match.scoreA : match.scoreB
+        let oppScore = isTeamA ? match.scoreB : match.scoreA
+
+        let content = UNMutableNotificationContent()
+        content.title = myScore > oppScore ? "\(myTeam.name) 승리" : "\(myTeam.name) 패배"
+        content.body  = "\(myScore) - \(oppScore)  vs \(opponent.name)"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "lolive_result_\(match.id)_\(favoriteTeamCode.lowercased())",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        )
+        try? await UNUserNotificationCenter.current().add(request)
+    }
+
     // MARK: - Private
 
     private var minutesBefore: Int {
