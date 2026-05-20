@@ -57,9 +57,6 @@ struct TodayView: View {
             await viewModel.loadTodayMatches()
             viewModel.startLivePolling()
         }
-        .onChange(of: selectedDate) {
-            viewModel.showAllCompleted = false
-        }
         .onDisappear { viewModel.stopPolling() }
     }
 
@@ -208,7 +205,7 @@ struct TodayView: View {
         for m in viewModel.filteredTodayMatches + viewModel.filteredUpcomingMatches {
             if cal.isDate(m.startTime, inSameDayAs: selectedDate) { add(m, isLive: false) }
         }
-        for m in viewModel.displayedCompletedMatches {
+        for m in viewModel.filteredCompletedMatches {
             if cal.isDate(m.startTime, inSameDayAs: selectedDate) { add(m, isLive: false) }
         }
 
@@ -261,27 +258,6 @@ struct TodayView: View {
                             }
                         }
 
-                        if viewModel.hasMoreCompleted {
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    viewModel.showAllCompleted = true
-                                }
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Text("완료된 경기 더 보기")
-                                        .font(.subheadline).fontWeight(.medium)
-                                    Image(systemName: "chevron.down")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundStyle(Color.accentColor)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .padding(.horizontal, 16)
-                            }
-                            .buttonStyle(.plain)
-                        }
                     }
                 }
                 .padding(.bottom, 20)
