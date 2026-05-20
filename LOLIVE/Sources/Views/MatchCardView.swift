@@ -8,6 +8,7 @@ import SwiftUI
 struct MatchCardView: View {
     let match: Match
     var isLive: Bool = false
+    var showDate: Bool = false
 
     @State private var isPulsing = false
 
@@ -56,11 +57,35 @@ struct MatchCardView: View {
     // MARK: - Center
 
     private var centerBlock: some View {
-        VStack(spacing: 8) {
-            statusBadge
+        VStack(spacing: showDate ? 3 : 8) {
+            if showDate && !isLive {
+                dateTimeBlock
+            } else {
+                statusBadge
+            }
             scoreOrVS
         }
-        .frame(width: 88)
+        .frame(width: 96)
+    }
+
+    // showDate 모드 전용: 년/월/일/요일 + 시간 + 상태
+    @ViewBuilder
+    private var dateTimeBlock: some View {
+        VStack(spacing: 1) {
+            Text(fullDateStr(match.startTime))
+                .font(.system(size: 9))
+                .foregroundStyle(.quaternary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(timeStr(match.startTime))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(match.state == .completed ? .quaternary : .secondary)
+            if match.state == .completed {
+                Text("종료")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 
     @ViewBuilder
@@ -102,6 +127,21 @@ struct MatchCardView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Helpers
+
+    private func fullDateStr(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "yyyy.MM.dd(EEE)"
+        return f.string(from: date)
+    }
+
+    private func timeStr(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f.string(from: date)
     }
 
     @ViewBuilder

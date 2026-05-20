@@ -154,12 +154,209 @@ struct LeaguepediaService: Sendable {
         return result
     }
 
+    // MARK: - Historical Data (Worlds / MSI pre-Riot-API era)
+
+    /// 해당 리그의 모든 연도 목록 반환 (1번 API 호출, 캐시됨) — 연도 탭 즉시 표시용.
+    func historicalYears(for league: League) async -> [Int] {
+        guard let leagueName = leaguepediaName(for: league) else { return [] }
+        let pages = await cachedOrFetchPages(leagueName: leagueName)
+        return Array(Set(pages.map { $0.year })).sorted(by: >)
+    }
+
+    /// 캐시에 있는 연도 데이터만 즉시 반환 (API 호출 없음). Phase 2 pre-load용.
+    func fetchMatchesFromCacheOnly(for league: League, year: Int) async -> [Match] {
+        guard let leagueName = leaguepediaName(for: league) else { return [] }
+        let allPages = await cachedOrFetchPages(leagueName: leagueName)
+        let yearPages = allPages.filter { $0.year == year }
+        var all: [Match] = []
+        for entry in yearPages {
+            let safePage = entry.page
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: " ", with: "_")
+            let cacheKey = "hist_\(leagueName)_\(safePage)"
+            if let cached = await LeaguepediaCache.shared.cachedHistoricalMatches(key: cacheKey) {
+                all.append(contentsOf: cached)
+            }
+        }
+        var seen = Set<String>()
+        return all.filter { seen.insert($0.id).inserted }
+    }
+
+    /// 특정 연도의 경기 데이터 반환 (연도 탭 선택 시 on-demand 로드, 캐시됨).
+    /// 같은 연도에 여러 OverviewPage가 있을 수 있으므로 전부 로드 후 합침.
+    func fetchMatches(for league: League, year: Int) async -> [Match] {
+        guard let leagueName = leaguepediaName(for: league) else { return [] }
+        let allPages = await cachedOrFetchPages(leagueName: leagueName)
+        let yearPages = allPages.filter { $0.year == year }
+        guard !yearPages.isEmpty else { return [] }
+
+        var all: [Match] = []
+        for entry in yearPages {
+            let safePage = entry.page
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: " ", with: "_")
+            let cacheKey = "hist_\(leagueName)_\(safePage)"
+            if let cached = await LeaguepediaCache.shared.cachedHistoricalMatches(key: cacheKey) {
+                all.append(contentsOf: cached)
+            } else {
+                let matches = await matchesForOverviewPage(entry.page, league: league)
+                await LeaguepediaCache.shared.setHistoricalMatches(matches, key: cacheKey)
+                all.append(contentsOf: matches)
+            }
+        }
+        var seen = Set<String>()
+        return all.filter { seen.insert($0.id).inserted }
+    }
+
+    /// 대회 페이지 목록을 캐시에서 읽거나 API로 가져옴 (내부 공통 헬퍼).
+    private func cachedOrFetchPages(leagueName: String) async -> [LPTournamentEntry] {
+        let pagesKey = "ovpages_\(leagueName)"
+        if let cached = await LeaguepediaCache.shared.cachedTournamentPages(key: pagesKey) {
+            return cached
+        }
+        let pages = await allOverviewPagesForLeague(leagueName: leagueName)
+        if !pages.isEmpty {
+            await LeaguepediaCache.shared.setTournamentPages(pages, key: pagesKey)
+        }
+        return pages
+    }
+
+    /// 모든 연도의 경기를 한꺼번에 로드 (excludingYears 제외).
+    func fetchAllHistoricalMatches(for league: League, excludingYears: Set<Int> = []) async -> [Match] {
+        guard let leagueName = leaguepediaName(for: league) else { return [] }
+        let pages = await cachedOrFetchPages(leagueName: leagueName)
+
+        var all: [Match] = []
+        for entry in pages where !excludingYears.contains(entry.year) {
+            let matchKey = "hist_\(leagueName)_\(entry.year)"
+            if let cached = await LeaguepediaCache.shared.cachedHistoricalMatches(key: matchKey) {
+                all.append(contentsOf: cached)
+            } else {
+                let matches = await matchesForOverviewPage(entry.page, league: league)
+                await LeaguepediaCache.shared.setHistoricalMatches(matches, key: matchKey)
+                all.append(contentsOf: matches)
+            }
+        }
+        return all
+    }
+
+    private func allOverviewPagesForLeague(leagueName: String) async -> [LPTournamentEntry] {
+        // Worlds/MSI는 OverviewPage 이름 패턴으로 직접 조회 (Leagues 조인 없이 더 안정적)
+        let whereClause: String
+        switch leagueName {
+        case "Worlds": whereClause = "Tournaments.OverviewPage LIKE '%Season World Championship%'"
+        case "MSI":    whereClause = "Tournaments.OverviewPage LIKE '%Mid-Season Invitational%'"
+        default:       whereClause = "Leagues.League_Short='\(escapeSql(leagueName))'"
+        }
+
+        var c = URLComponents(string: baseURL)!
+        if leagueName == "Worlds" || leagueName == "MSI" {
+            c.queryItems = [
+                .init(name: "action",   value: "cargoquery"),
+                .init(name: "tables",   value: "Tournaments"),
+                .init(name: "fields",   value: "Tournaments.OverviewPage,Tournaments.DateStart"),
+                .init(name: "where",    value: whereClause),
+                .init(name: "order_by", value: "Tournaments.DateStart DESC"),
+                .init(name: "limit",    value: "20"),
+                .init(name: "format",   value: "json"),
+            ]
+        } else {
+            c.queryItems = [
+                .init(name: "action",   value: "cargoquery"),
+                .init(name: "tables",   value: "Tournaments,Leagues"),
+                .init(name: "join_on",  value: "Tournaments.League=Leagues.League"),
+                .init(name: "fields",   value: "Tournaments.OverviewPage,Tournaments.DateStart"),
+                .init(name: "where",    value: whereClause),
+                .init(name: "order_by", value: "Tournaments.DateStart DESC"),
+                .init(name: "limit",    value: "50"),
+                .init(name: "format",   value: "json"),
+            ]
+        }
+
+        guard let url = c.url,
+              let data = await cargoData(url: url),
+              let resp = try? JSONDecoder().decode(CargoResp.self, from: data) else { return [] }
+
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        return resp.cargoquery.compactMap { row -> LPTournamentEntry? in
+            guard let page = row.title["OverviewPage"], !page.isEmpty,
+                  let dateStr = row.title["DateStart"],
+                  let date = fmt.date(from: dateStr) else { return nil }
+            let year = Calendar.current.component(.year, from: date)
+            return LPTournamentEntry(page: page, year: year)
+        }
+    }
+
+    private func matchesForOverviewPage(_ overviewPage: String, league: League) async -> [Match] {
+        var allRows: [[String: String]] = []
+        var offset = 0
+        let batchSize = 500
+
+        while !Task.isCancelled {
+            var c = URLComponents(string: baseURL)!
+            c.queryItems = [
+                .init(name: "action",   value: "cargoquery"),
+                .init(name: "tables",   value: "MatchSchedule"),
+                .init(name: "fields",   value: "MatchId,DateTime_UTC,Team1,Team2,Team1Score,Team2Score,Winner,Tab"),
+                .init(name: "where",    value: "OverviewPage='\(escapeSql(overviewPage))' AND Team1 IS NOT NULL AND Team2 IS NOT NULL AND DateTime_UTC IS NOT NULL"),
+                .init(name: "order_by", value: "DateTime_UTC ASC"),
+                .init(name: "offset",   value: "\(offset)"),
+                .init(name: "limit",    value: "\(batchSize)"),
+                .init(name: "format",   value: "json"),
+            ]
+            guard let url = c.url,
+                  let data = await cargoData(url: url),
+                  let resp = try? JSONDecoder().decode(CargoResp.self, from: data) else { break }
+            let batch = resp.cargoquery.map { $0.title }
+            allRows.append(contentsOf: batch)
+            if batch.count < batchSize { break }
+            offset += batchSize
+        }
+
+        let fmt1 = DateFormatter()
+        fmt1.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        fmt1.timeZone = TimeZone(identifier: "UTC")
+        let fmt2 = ISO8601DateFormatter()
+
+        return allRows.compactMap { row -> Match? in
+            guard let dateStr = row["DateTime UTC"], !dateStr.isEmpty,
+                  let startTime = fmt1.date(from: dateStr) ?? fmt2.date(from: dateStr),
+                  let team1 = row["Team1"], !team1.isEmpty,
+                  let team2 = row["Team2"], !team2.isEmpty
+            else { return nil }
+
+            let rawId = row["MatchId"]?.trimmingCharacters(in: .whitespaces) ?? ""
+            let matchId = rawId.isEmpty
+                ? "lp_\(overviewPage)_\(team1)_\(team2)_\(dateStr)"
+                : "lp_\(rawId)"
+
+            let scoreA = Int(row["Team1Score"] ?? "") ?? 0
+            let scoreB = Int(row["Team2Score"] ?? "") ?? 0
+            let winner = row["Winner"] ?? ""
+            let state: MatchState = winner.isEmpty ? .unstarted : .completed
+            let blockNameRaw = row["Tab"]?.trimmingCharacters(in: .whitespaces) ?? ""
+            let blockName: String? = blockNameRaw.isEmpty ? nil : blockNameRaw
+
+            let teamA = Team(id: "lp_\(team1)", name: team1, code: team1, imageURL: nil)
+            let teamB = Team(id: "lp_\(team2)", name: team2, code: team2, imageURL: nil)
+            return Match(id: matchId, league: league,
+                         teamA: teamA, teamB: teamB,
+                         scoreA: scoreA, scoreB: scoreB,
+                         startTime: startTime, state: state,
+                         blockName: blockName)
+        }
+    }
+
     // MARK: - League name mapping
 
     private func leaguepediaName(for league: League) -> String? {
         let lower = league.name.lowercased().trimmingCharacters(in: .whitespaces)
         let slug  = league.slug.lowercased().trimmingCharacters(in: .whitespaces)
         switch true {
+        case lower == "worlds" || slug == "worlds" ||
+             lower.contains("world championship"):                      return "Worlds"
+        case lower == "msi" || slug == "msi" ||
+             lower.contains("mid-season"):                              return "MSI"
         case lower == "lck" || slug == "lck":                         return "LCK"
         case lower.contains("챌린저스") && (lower.contains("lck") || slug.contains("lck")),
              lower.contains("challengers") && (lower.contains("lck") || slug.contains("lck")),
@@ -426,11 +623,13 @@ private actor LeaguepediaRateLimiter {
 private actor LeaguepediaCache {
     static let shared = LeaguepediaCache()
 
-    private var overviewPages:      [String: String]                      = [:]
-    private var playerNameSets:     [String: Set<String>]                 = [:]
-    private var seasonStats:        [String: PlayerSeasonStats?]          = [:]
-    private var allPlayerStatsDic:  [String: [String: PlayerSeasonStats]] = [:]
-    private var championPicksDic:   [String: [ChampionPickEntry]]         = [:]
+    private var overviewPages:       [String: String]                      = [:]
+    private var playerNameSets:      [String: Set<String>]                 = [:]
+    private var seasonStats:         [String: PlayerSeasonStats?]          = [:]
+    private var allPlayerStatsDic:   [String: [String: PlayerSeasonStats]] = [:]
+    private var championPicksDic:    [String: [ChampionPickEntry]]         = [:]
+    private var historicalMatchesDic:[String: [Match]]                     = [:]
+    private var tournamentPagesDic:  [String: [LPTournamentEntry]]         = [:]
 
     private static let cacheDir: URL = {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -439,6 +638,18 @@ private actor LeaguepediaCache {
         return dir
     }()
     private static let maxAge: TimeInterval = 24 * 3600  // 24시간
+
+    init() {
+        // 이전 버그(DateTime_UTC 파싱 실패)로 잘못 캐시된 빈 hist 파일 제거
+        let dir = Self.cacheDir
+        if let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey]) {
+            for file in files where file.lastPathComponent.hasPrefix("hist_") {
+                if let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize, size < 200 {
+                    try? FileManager.default.removeItem(at: file)
+                }
+            }
+        }
+    }
 
     func overviewPage(for leagueName: String) -> String? { overviewPages[leagueName] }
     func setOverviewPage(_ page: String, for leagueName: String) { overviewPages[leagueName] = page }
@@ -488,6 +699,68 @@ private actor LeaguepediaCache {
         }
     }
 
+    // MARK: Historical matches cache (30-day TTL)
+
+    private static let historicalMaxAge: TimeInterval = 30 * 24 * 3600
+
+    func cachedHistoricalMatches(key: String) -> [Match]? {
+        if let mem = historicalMatchesDic[key] { return mem }
+        let file = Self.historicalFile(for: key)
+        guard let data = try? Data(contentsOf: file),
+              let wrapper = try? JSONDecoder().decode(HistMatchesWrapper.self, from: data),
+              Date().timeIntervalSince(wrapper.savedAt) < Self.historicalMaxAge else { return nil }
+        historicalMatchesDic[key] = wrapper.matches
+        return wrapper.matches
+    }
+
+    func setHistoricalMatches(_ matches: [Match], key: String) {
+        historicalMatchesDic[key] = matches
+        // 빈 배열은 디스크에 저장하지 않음 → 파싱 버그로 인한 빈 결과가 영구 캐시되는 것 방지
+        guard !matches.isEmpty else { return }
+        let wrapper = HistMatchesWrapper(savedAt: Date(), matches: matches)
+        if let data = try? JSONEncoder().encode(wrapper) {
+            try? data.write(to: Self.historicalFile(for: key), options: .atomic)
+        }
+    }
+
+    func cachedTournamentPages(key: String) -> [LPTournamentEntry]? {
+        if let mem = tournamentPagesDic[key] { return mem }
+        let file = Self.tournamentPagesFile(for: key)
+        guard let data = try? Data(contentsOf: file),
+              let wrapper = try? JSONDecoder().decode(TournamentPagesWrapper.self, from: data),
+              Date().timeIntervalSince(wrapper.savedAt) < Self.maxAge else { return nil }
+        tournamentPagesDic[key] = wrapper.entries
+        return wrapper.entries
+    }
+
+    func setTournamentPages(_ entries: [LPTournamentEntry], key: String) {
+        tournamentPagesDic[key] = entries
+        let wrapper = TournamentPagesWrapper(savedAt: Date(), entries: entries)
+        if let data = try? JSONEncoder().encode(wrapper) {
+            try? data.write(to: Self.tournamentPagesFile(for: key), options: .atomic)
+        }
+    }
+
+    private static func historicalFile(for key: String) -> URL {
+        let safe = key.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: " ", with: "_")
+        return cacheDir.appendingPathComponent("hist_\(safe).json")
+    }
+
+    private static func tournamentPagesFile(for key: String) -> URL {
+        let safe = key.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: " ", with: "_")
+        return cacheDir.appendingPathComponent("ovpages_\(safe).json")
+    }
+
+    private struct HistMatchesWrapper: Codable {
+        let savedAt: Date
+        let matches: [Match]
+    }
+
+    private struct TournamentPagesWrapper: Codable {
+        let savedAt: Date
+        let entries: [LPTournamentEntry]
+    }
+
     private static func cacheFile(for page: String) -> URL {
         let safe = page.replacingOccurrences(of: "/", with: "_")
         return cacheDir.appendingPathComponent("\(safe).json")
@@ -509,6 +782,13 @@ private actor LeaguepediaCache {
             .replacingOccurrences(of: " ", with: "_")
         return cacheDir.appendingPathComponent("champs_\(safe).json")
     }
+}
+
+// MARK: - Leaguepedia Internal Types
+
+private struct LPTournamentEntry: Codable {
+    let page: String
+    let year: Int
 }
 
 // MARK: - Cargo models

@@ -27,9 +27,18 @@
 | API | 용도 |
 |-----|------|
 | Riot Esports API (비공식) | 경기 일정, 라이브 스코어, 팀·선수 정보 |
-| Leaguepedia MediaWiki Cargo API | 선수 시즌 스탯 (KDA, 승률, CS/분 등) |
+| Leaguepedia MediaWiki Cargo API | 선수 시즌 스탯, 과거 대회 경기 기록 (2023년 이전 Worlds/MSI) |
 
 ## 주요 기능
+
+### 대회 상세 (Worlds / MSI)
+- 연도별 탭 자동 생성 (Riot API 커버 범위 + Leaguepedia 과거 데이터 합산)
+- 라운드(플레이-인 / 그룹 / 8강 / 4강 / 결승 등) 칩 선택 → 날짜별 경기 목록
+- **3단계 데이터 로딩**:
+  1. Riot API로 즉시 표시 (2023년 이후)
+  2. Leaguepedia 연도 목록으로 과거 탭 즉시 추가 (1회 API 호출 + 30일 캐시)
+  3. 탭 선택 시 해당 연도 경기 on-demand 로드 (캐시 히트 시 즉시 반환)
+- 앱 재진입 시 캐시된 과거 데이터 자동 복원 (화면 이탈 후 돌아와도 유지)
 
 ### Today
 - FotMob 스타일 날짜 선택 스트립 (오늘 기준 ±5일, 시작 시 오늘 날짜 자동 중앙 정렬)
@@ -101,6 +110,32 @@
            └─ 온보딩 완료  → ContentView
 ```
 
+## 대회 일정 아키텍처 (Worlds / MSI)
+
+Riot API는 2023년 이후 데이터만 제공하므로, 과거 대회는 Leaguepedia Cargo API로 보완합니다.
+
+```
+TournamentDetailViewModel.load()
+    ├─ [Phase 1] Riot API → 즉시 화면 표시 (isLoading = false)
+    │
+    ├─ [Phase 2] Leaguepedia.historicalYears()
+    │      └─ OverviewPage 목록 1회 조회 → 연도 탭 즉시 추가
+    │             └─ fetchMatchesFromCacheOnly() → 캐시 데이터 바로 allMatches에 병합
+    │
+    └─ [Phase 3] partialYears 보완 (Riot 경기 수 < 20인 연도)
+           └─ Leaguepedia.fetchMatches() → deduplicateAgainstRiot()
+
+연도 탭 선택 (캐시 미스 시)
+    └─ selectTournament() → isLoadingHistoricalMatches = true
+           └─ loadHistoricalYear()
+                  └─ fetchMatches() → allMatches 병합 → isLoadingHistoricalMatches = false
+```
+
+- OverviewPage 목록: 24시간 TTL 디스크 캐시
+- 경기 데이터: 30일 TTL 디스크 캐시 (OverviewPage 단위)
+- Rate limit: API 호출 간 2.5초 대기 (actor 기반 순서 보장)
+- 빈 결과는 디스크에 저장하지 않아 재시도 가능
+
 ## 시즌 스탯 아키텍처
 
 Leaguepedia의 rate limit 이슈를 해결하기 위해 아래 구조를 적용했습니다.
@@ -156,20 +191,21 @@ LOLIVE/
 │   │   ├── MatchNotificationService — 로컬 알림
 │   │   └── SharedDataService    — App Groups 동기화
 │   ├── ViewModels/
-│   │   ├── TodayViewModel       — 경기 목록 + 라이브 폴링
-│   │   ├── StandingsViewModel   — 리그 순위
-│   │   ├── PlayersViewModel     — 선수 목록 + 필터
-│   │   ├── SearchViewModel      — 통합 검색
+│   │   ├── TodayViewModel           — 경기 목록 + 라이브 폴링
+│   │   ├── TournamentDetailViewModel — 대회 일정 (Riot + Leaguepedia 3단계)
+│   │   ├── StandingsViewModel       — 리그 순위
+│   │   ├── PlayersViewModel         — 선수 목록 + 필터
+│   │   ├── SearchViewModel          — 통합 검색
 │   │   ├── LeagueDetailViewModel
 │   │   ├── TeamDetailViewModel
 │   │   ├── LeaguePlayerDetailViewModel — 챔피언/경기 데이터
-│   │   └── MatchDetailViewModel — 경기 상세 + 폴링
+│   │   └── MatchDetailViewModel     — 경기 상세 + 폴링
 │   └── Views/
 │       ├── TodayView, StandingsView, PlayersView
 │       ├── SearchView, FavoritesView
 │       ├── AppMenuView, AppSettingsView
-│       ├── LeagueDetailView, TeamDetailView
-│       ├── LeaguePlayerDetailView, SeasonStatsView
+│       ├── LeagueDetailView, TournamentDetailView
+│       ├── TeamDetailView, LeaguePlayerDetailView, SeasonStatsView
 │       ├── MatchDetailView, PlayerDetailView
 │       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, ...
 ├── ContentView.swift        — TabView 진입점 + 딥링크 처리

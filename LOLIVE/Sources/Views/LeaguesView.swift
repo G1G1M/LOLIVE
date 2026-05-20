@@ -84,7 +84,11 @@ struct LeaguesView: View {
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: League.self) { league in
-                LeagueDetailView(league: league)
+                if internationalSlugs.contains(league.slug) {
+                    TournamentDetailView(league: league)
+                } else {
+                    LeagueDetailView(league: league)
+                }
             }
         }
         .task { await load() }

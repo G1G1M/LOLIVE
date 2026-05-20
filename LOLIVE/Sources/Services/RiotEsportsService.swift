@@ -19,6 +19,7 @@ enum APIError: Error {
 protocol RiotEsportsServiceProtocol: Sendable {
     func fetchLeagues() async throws -> [League]
     func fetchSchedule(league: League) async throws -> [Match]
+    func fetchAllSchedule(league: League) async throws -> [Match]
     func fetchLive() async throws -> [LiveMatch]
     func fetchEventDetails(matchId: String) async throws -> EventDetailInfo
     func fetchTournaments(leagueId: String) async throws -> [Tournament]
@@ -55,6 +56,39 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         let data = try await request(path: "/getSchedule", queryItems: query)
         let response = try decode(ScheduleResponse.self, from: data)
         return response.data.schedule.events.compactMap { mapEventToMatch($0, fallbackLeague: league) }
+    }
+
+    // 국제 대회(Worlds/MSI) 전용: 모든 페이지를 순회하여 전체 경기 목록 반환
+    func fetchAllSchedule(league: League) async throws -> [Match] {
+        var allMatches: [Match] = []
+        var pageToken: String? = nil
+        var pageCount = 0
+        let maxPages = 60
+
+        repeat {
+            var query = [URLQueryItem(name: "leagueId", value: league.id)]
+            if let token = pageToken {
+                query.append(URLQueryItem(name: "pageToken", value: token))
+            }
+
+            do {
+                let data = try await request(path: "/getSchedule", queryItems: query)
+                let response = try decode(ScheduleResponse.self, from: data)
+                let page = response.data.schedule.events
+                    .compactMap { mapEventToMatch($0, fallbackLeague: league) }
+                allMatches.append(contentsOf: page)
+                pageToken = response.data.schedule.pages?.older
+            } catch {
+                // 특정 페이지 오류는 건너뛰고 수집된 데이터 반환
+                break
+            }
+
+            pageCount += 1
+        } while pageToken != nil && pageCount < maxPages
+
+        // 중복 제거 (match ID 기준)
+        var seen = Set<String>()
+        return allMatches.filter { seen.insert($0.id).inserted }
     }
 
     func fetchLive() async throws -> [LiveMatch] {

@@ -32,7 +32,13 @@ struct ScheduleResponse: Decodable {
 }
 
 struct ScheduleDTO: Decodable {
+    let pages: PagesDTO?
     let events: [EventDTO]
+}
+
+struct PagesDTO: Decodable {
+    let older: String?
+    let newer: String?
 }
 
 // MARK: - Live
