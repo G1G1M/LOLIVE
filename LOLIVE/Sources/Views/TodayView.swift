@@ -266,6 +266,11 @@ struct TodayView: View {
                 await viewModel.loadTodayMatches()
                 proxy.scrollTo("top", anchor: .top)
             }
+            .onChange(of: selectedDate) {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo("top", anchor: .top)
+                }
+            }
         }
     }
 
