@@ -28,12 +28,38 @@ final class LeagueDetailViewModel {
     // MARK: - Properties
 
     var selectedTab: Tab = .standings
+    var showBracket: Bool = false
     var standings: [Standing] = []
     var upcomingMatches: [Match] = []
     var completedMatches: [Match] = []
     var players: [Player] = []
     var isLoading = false
     var errorMessage: String? = nil
+
+    // MARK: - Bracket
+
+    struct BracketRound: Identifiable {
+        let id: String
+        let name: String
+        let matches: [Match]
+    }
+
+    var isBracketAvailable: Bool {
+        (upcomingMatches + completedMatches).contains {
+            guard let b = $0.blockName?.lowercased() else { return false }
+            return b.contains("final") || b.contains("semi") || b.contains("quarter") ||
+                   b.contains("playoff") || b.contains("knockout") || b.contains("bracket") ||
+                   b.contains("elimination")
+        }
+    }
+
+    var bracketRounds: [BracketRound] {
+        let all = completedMatches + upcomingMatches
+        let byBlock = Dictionary(grouping: all.filter { $0.blockName != nil }) { $0.blockName! }
+        return byBlock.map { name, matches in
+            BracketRound(id: name, name: name, matches: matches.sorted { $0.startTime < $1.startTime })
+        }.sorted { roundOrder($0.name) < roundOrder($1.name) }
+    }
 
     // MARK: - Private
 
@@ -149,6 +175,19 @@ final class LeagueDetailViewModel {
         }
         return active ?? tournaments.last
     }
+}
+
+private func roundOrder(_ name: String) -> Int {
+    let s = name.lowercased()
+    if s.contains("play-in") || s.contains("playin")          { return 0 }
+    if s.contains("round of 16")                               { return 1 }
+    if s.contains("round of 8") || s.contains("quarter")       { return 2 }
+    if s.contains("semi")                                      { return 3 }
+    if s.contains("grand final")                               { return 5 }
+    if s.contains("final")                                     { return 4 }
+    if s.contains("playoff") || s.contains("knockout") ||
+       s.contains("bracket") || s.contains("elimination")      { return 1 }
+    return 6
 }
 
 private func roleOrder(_ role: String) -> Int {

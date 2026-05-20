@@ -85,6 +85,138 @@ struct LeagueDetailView: View {
         }
     }
 
+    // MARK: - 일정 (래퍼: 토글 + 목록/브라켓 전환)
+
+    private var scheduleContent: some View {
+        VStack(spacing: 0) {
+            if viewModel.isBracketAvailable {
+                scheduleToggle
+                Divider()
+            }
+            if viewModel.showBracket {
+                bracketContent
+            } else {
+                scheduleListContent
+            }
+        }
+    }
+
+    private var scheduleToggle: some View {
+        HStack(spacing: 8) {
+            scheduleToggleButton(title: "목록", sf: "list.bullet", selected: !viewModel.showBracket) {
+                viewModel.showBracket = false
+            }
+            scheduleToggleButton(title: "브라켓", sf: "trophy.bracket", selected: viewModel.showBracket) {
+                viewModel.showBracket = true
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private func scheduleToggleButton(title: String, sf: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: sf).font(.system(size: 12))
+                Text(title).font(.subheadline).fontWeight(selected ? .semibold : .regular)
+            }
+            .foregroundStyle(selected ? .white : .secondary)
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .background(selected ? Color.accentColor : Color(.secondarySystemGroupedBackground))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - 브라켓 뷰
+
+    private var bracketContent: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 4) {
+                ForEach(Array(viewModel.bracketRounds.enumerated()), id: \.element.id) { idx, round in
+                    bracketRoundColumn(round)
+
+                    if idx < viewModel.bracketRounds.count - 1 {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .light))
+                            .foregroundStyle(.tertiary)
+                            .padding(.top, 36)
+                            .frame(width: 20)
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private func bracketRoundColumn(_ round: LeagueDetailViewModel.BracketRound) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(round.name)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 12) {
+                ForEach(round.matches) { match in
+                    bracketMatchCard(match)
+                }
+            }
+        }
+        .frame(width: 184)
+    }
+
+    private func bracketMatchCard(_ match: Match) -> some View {
+        NavigationLink(value: match) {
+            VStack(spacing: 0) {
+                bracketTeamRow(
+                    team: match.teamA, score: match.scoreA,
+                    won: match.state == .completed && match.scoreA > match.scoreB,
+                    state: match.state
+                )
+                Divider().padding(.horizontal, 12)
+                bracketTeamRow(
+                    team: match.teamB, score: match.scoreB,
+                    won: match.state == .completed && match.scoreB > match.scoreA,
+                    state: match.state
+                )
+            }
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func bracketTeamRow(team: Team, score: Int, won: Bool, state: MatchState) -> some View {
+        HStack(spacing: 8) {
+            CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
+                .frame(width: 20, height: 20)
+            Text(team.code)
+                .font(.system(size: 13, weight: won ? .bold : .regular))
+                .foregroundStyle(won ? Color(.label) : .secondary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if state == .completed {
+                Text("\(score)")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(won ? Color(.label) : .secondary)
+                    .frame(width: 18, alignment: .trailing)
+            } else {
+                Text("-")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 18, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 9)
+        .background(won ? Color.accentColor.opacity(0.08) : Color.clear)
+    }
+
     // MARK: - 순위
 
     private var standingsContent: some View {
@@ -221,7 +353,7 @@ struct LeagueDetailView: View {
         }
     }
 
-    private var scheduleContent: some View {
+    private var scheduleListContent: some View {
         ScrollView {
             LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
                 if !viewModel.upcomingMatches.isEmpty {
