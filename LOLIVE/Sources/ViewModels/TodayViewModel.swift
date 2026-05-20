@@ -47,6 +47,15 @@ final class TodayViewModel {
         return completedMatches.filter { isFavorited($0) }
     }
 
+    var displayedCompletedMatches: [Match] {
+        let all = filteredCompletedMatches
+        return showAllCompleted ? all : Array(all.prefix(completedMatchesLimit))
+    }
+
+    var hasMoreCompleted: Bool {
+        !showAllCompleted && filteredCompletedMatches.count > completedMatchesLimit
+    }
+
     var isFavoritesFilterEmpty: Bool {
         showFavoritesOnly &&
         filteredLiveMatches.isEmpty &&

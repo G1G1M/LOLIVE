@@ -138,17 +138,21 @@ struct StandingsView: View {
         HStack {
             Text("#")
                 .frame(width: 32, alignment: .center)
+                .foregroundStyle(.secondary)
             Text("팀")
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(.secondary)
             Text("W")
                 .frame(width: 34, alignment: .center)
+                .foregroundStyle(.blue)
             Text("L")
                 .frame(width: 34, alignment: .center)
+                .foregroundStyle(.red)
             Text("Win%")
                 .frame(width: 50, alignment: .trailing)
+                .foregroundStyle(.secondary)
         }
         .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(.secondary)
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
     }
@@ -179,13 +183,13 @@ struct StandingsView: View {
             // 승
             Text("\(standing.wins)")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color(.label))
+                .foregroundStyle(.blue)
                 .frame(width: 34, alignment: .center)
 
             // 패
             Text("\(standing.losses)")
                 .font(.system(size: 14))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.red)
                 .frame(width: 34, alignment: .center)
 
             // 승률
