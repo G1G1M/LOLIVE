@@ -174,7 +174,7 @@ final class LeagueDetailViewModel {
         }
 
         players = filteredPlayers.sorted {
-            let r0 = roleOrder($0.role), r1 = roleOrder($1.role)
+            let r0 = RoleStyle.order($0.role), r1 = RoleStyle.order($1.role)
             return r0 != r1 ? r0 < r1 : $0.summonerName < $1.summonerName
         }
     }
@@ -209,13 +209,3 @@ private func roundOrder(_ name: String) -> Int {
     return 6
 }
 
-private func roleOrder(_ role: String) -> Int {
-    switch role.lowercased() {
-    case "top":              return 0
-    case "jungle":           return 1
-    case "mid":              return 2
-    case "bottom", "bot":    return 3
-    case "support":          return 4
-    default:                 return 5
-    }
-}

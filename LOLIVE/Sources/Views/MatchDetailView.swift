@@ -496,16 +496,7 @@ struct MatchDetailView: View {
         return Team(id: esportsId, name: team.name, code: team.code, imageURL: team.imageURL)
     }
 
-    private func roleLabel(_ role: String) -> String {
-        switch role.lowercased() {
-        case "top":     return "TOP"
-        case "jungle":  return "JGL"
-        case "mid":     return "MID"
-        case "bottom":  return "BOT"
-        case "support": return "SUP"
-        default:        return role.uppercased()
-        }
-    }
+    private func roleLabel(_ role: String) -> String { RoleStyle.label(role) }
 
     private func formatGold(_ gold: Int) -> String {
         gold >= 1000 ? String(format: "%.1fk", Double(gold) / 1000) : "\(gold)"

@@ -225,27 +225,8 @@ struct FavoritesView: View {
 
     // MARK: - Helpers
 
-    private func roleLabel(_ role: String) -> String {
-        switch role.lowercased() {
-        case "top":              return "TOP"
-        case "jungle":           return "JGL"
-        case "mid":              return "MID"
-        case "bottom", "bot":    return "BOT"
-        case "support":          return "SUP"
-        default:                 return role.uppercased()
-        }
-    }
-
-    private func roleColor(_ role: String) -> Color {
-        switch role.lowercased() {
-        case "top":              return .orange
-        case "jungle":           return .green
-        case "mid":              return .blue
-        case "bottom", "bot":    return .red
-        case "support":          return .purple
-        default:                 return .secondary
-        }
-    }
+    private func roleLabel(_ role: String) -> String { RoleStyle.label(role) }
+    private func roleColor(_ role: String) -> Color  { RoleStyle.color(role) }
 }
 
 #Preview {

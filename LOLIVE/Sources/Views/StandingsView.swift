@@ -52,6 +52,9 @@ struct StandingsView: View {
             }
             .padding(.bottom, 20)
         }
+        .refreshable {
+            await viewModel.refreshStandings()
+        }
     }
 
     // MARK: - League Selector

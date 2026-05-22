@@ -70,6 +70,13 @@ final class StandingsViewModel {
         await loadStandings(for: league)
     }
 
+    func refreshStandings() async {
+        guard let league = selectedLeague else { return }
+        standingsCache.removeValue(forKey: league.id)
+        AppDiskCache.clear(key: "standings_\(league.id)")
+        await loadStandings(for: league)
+    }
+
     // MARK: - Private
 
     private func loadStandings(for league: League) async {

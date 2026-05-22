@@ -138,17 +138,25 @@ struct TodayView: View {
         .buttonStyle(.plain)
     }
 
-    private func weekdayStr(_ date: Date) -> String {
+    private static let weekdayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "ko_KR")
         f.dateFormat = "EEE"
-        return f.string(from: date).replacingOccurrences(of: ".", with: "")
+        return f
+    }()
+
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d"
+        return f
+    }()
+
+    private func weekdayStr(_ date: Date) -> String {
+        Self.weekdayFormatter.string(from: date).replacingOccurrences(of: ".", with: "")
     }
 
     private func dayStr(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "d"
-        return f.string(from: date)
+        Self.dayFormatter.string(from: date)
     }
 
     // MARK: - Fixed: Favorites Toggle

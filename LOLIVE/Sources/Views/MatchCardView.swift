@@ -166,7 +166,8 @@ struct MatchCardView: View {
     }
 
     private func scoreColor(mine: Int, opp: Int) -> Color {
-        guard match.state == .completed else { return Color(.label) }
+        guard match.state == .completed || match.state == .inProgress else { return Color(.label) }
+        if mine == opp { return Color(.label) }
         return mine > opp ? Color(.label) : Color.secondary
     }
 }

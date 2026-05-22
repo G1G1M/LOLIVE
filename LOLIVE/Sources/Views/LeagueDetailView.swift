@@ -495,13 +495,31 @@ struct LeagueDetailView: View {
     // MARK: - 팀
 
     private var teamsContent: some View {
-        ScrollView {
+        let groups = viewModel.standingGroups
+        return ScrollView {
             LazyVStack(spacing: 12) {
                 if viewModel.standings.isEmpty {
                     emptyState("팀 데이터를 불러올 수 없습니다").padding(.top, 60)
-                } else {
+                } else if groups.isEmpty {
                     ForEach(viewModel.standings) { standing in
                         teamCard(standing: standing)
+                    }
+                } else {
+                    ForEach(groups, id: \.name) { group in
+                        HStack(spacing: 6) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.accentColor)
+                                .frame(width: 3, height: 14)
+                            Text(group.name)
+                                .font(.system(size: 13, weight: .semibold))
+                            Spacer()
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.top, 4)
+
+                        ForEach(group.standings) { standing in
+                            teamCard(standing: standing)
+                        }
                     }
                 }
             }
@@ -652,25 +670,6 @@ struct LeagueDetailView: View {
         .padding(.vertical, 40)
     }
 
-    private func roleLabel(_ role: String) -> String {
-        switch role.lowercased() {
-        case "top":              return "TOP"
-        case "jungle":           return "JGL"
-        case "mid":              return "MID"
-        case "bottom", "bot":    return "BOT"
-        case "support":          return "SUP"
-        default:                 return role.uppercased()
-        }
-    }
-
-    private func roleColor(_ role: String) -> Color {
-        switch role.lowercased() {
-        case "top":              return .orange
-        case "jungle":           return .green
-        case "mid":              return .blue
-        case "bottom", "bot":    return .red
-        case "support":          return .purple
-        default:                 return .secondary
-        }
-    }
+    private func roleLabel(_ role: String) -> String { RoleStyle.label(role) }
+    private func roleColor(_ role: String) -> Color  { RoleStyle.color(role) }
 }

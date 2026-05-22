@@ -615,16 +615,7 @@ struct OnboardingView: View {
         gold >= 1000 ? String(format: "%.1fk", Double(gold) / 1000) : "\(gold)"
     }
 
-    private func roleLabel(_ role: String) -> String {
-        switch role.lowercased() {
-        case "top":     return "TOP"
-        case "jungle":  return "JGL"
-        case "mid":     return "MID"
-        case "bottom":  return "BOT"
-        case "support": return "SUP"
-        default:        return String(role.prefix(3)).uppercased()
-        }
-    }
+    private func roleLabel(_ role: String) -> String { RoleStyle.label(role) }
 }
 
 #Preview {
