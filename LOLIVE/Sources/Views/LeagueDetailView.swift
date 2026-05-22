@@ -241,7 +241,7 @@ struct LeagueDetailView: View {
     }
 
     private var standingsHeader: some View {
-        HStack {
+        HStack(spacing: 0) {
             Text("#")
                 .frame(width: 32, alignment: .center)
                 .foregroundStyle(.secondary)

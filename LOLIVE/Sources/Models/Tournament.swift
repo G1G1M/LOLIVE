@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct Tournament: Identifiable {
+struct Tournament: Codable, Identifiable {
     let id: String
     let slug: String
     let startDate: String   // "2025-01-15" 형식

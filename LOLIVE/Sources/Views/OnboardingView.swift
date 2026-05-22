@@ -12,23 +12,100 @@ import SwiftUI
 final class OnboardingLoader {
     var match: Match?
     var gameWindow: GameWindow?
-    var playerImageURLs: [Int: URL] = [:]   // participantId → 프로필 이미지 URL
+    var playerImageURLs: [String: URL] = [:]  // summonerName → 프로필 이미지 URL
+
+    // MARK: - Disk Cache
+
+    private static let cacheFile: URL = {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        return base.appendingPathComponent("onboarding_v1.json")
+    }()
+
+    private struct CachedData: Codable {
+        let matchId: String
+        let scoreA: Int
+        let scoreB: Int
+        let teamAName: String
+        let teamACode: String
+        let teamAImageURL: String?
+        let teamBName: String
+        let teamBCode: String
+        let teamBImageURL: String?
+        let leagueName: String
+        let gameId: String?
+        let playerImageURLs: [String: String]  // summonerName → URL string
+    }
 
     func load() async {
+        // 1. 디스크 캐시 확인
+        if let cached = loadCache() {
+            restoreFromCache(cached)
+            return
+        }
+        // 2. 신규 fetch (T1 vs Gen.G 우선)
+        await fetchAndCache()
+    }
+
+    private func loadCache() -> CachedData? {
+        guard let data = try? Data(contentsOf: Self.cacheFile),
+              let cached = try? JSONDecoder().decode(CachedData.self, from: data) else { return nil }
+        return cached
+    }
+
+    private func restoreFromCache(_ cached: CachedData) {
+        let league = League(id: "lck", slug: "lck", name: cached.leagueName, region: "한국", imageURL: nil)
+        let teamA = Team(id: cached.teamACode, name: cached.teamAName, code: cached.teamACode, imageURL: cached.teamAImageURL)
+        let teamB = Team(id: cached.teamBCode, name: cached.teamBName, code: cached.teamBCode, imageURL: cached.teamBImageURL)
+        match = Match(id: cached.matchId, league: league, teamA: teamA, teamB: teamB,
+                      scoreA: cached.scoreA, scoreB: cached.scoreB,
+                      startTime: Date(), state: .completed)
+        playerImageURLs = cached.playerImageURLs.compactMapValues { URL(string: $0) }
+
+        // GameWindow는 GameWindowCache에서 복원
+        if let gameId = cached.gameId {
+            Task {
+                gameWindow = await GameWindowCache.shared.window(for: gameId)
+            }
+        }
+    }
+
+    private func saveCache(match: Match, gameId: String?, playerImageURLs: [String: URL]) {
+        let data = CachedData(
+            matchId: match.id,
+            scoreA: match.scoreA, scoreB: match.scoreB,
+            teamAName: match.teamA.name, teamACode: match.teamA.code, teamAImageURL: match.teamA.imageURL,
+            teamBName: match.teamB.name, teamBCode: match.teamB.code, teamBImageURL: match.teamB.imageURL,
+            leagueName: match.league.name,
+            gameId: gameId,
+            playerImageURLs: playerImageURLs.mapValues { $0.absoluteString }
+        )
+        if let encoded = try? JSONEncoder().encode(data) {
+            try? encoded.write(to: Self.cacheFile, options: .atomic)
+        }
+    }
+
+    private func fetchAndCache() async {
         let esports = RiotEsportsService()
 
         guard let leagues = try? await esports.fetchLeagues(),
               let lck = leagues.first(where: { $0.slug == "lck" }) else { return }
 
-        guard let schedule = try? await esports.fetchSchedule(league: lck),
-              let recentMatch = schedule.first(where: { $0.state == .completed }) else { return }
+        guard let schedule = try? await esports.fetchSchedule(league: lck) else { return }
+
+        // T1 vs Gen.G 완료 경기 우선, 없으면 아무 완료 경기
+        let recentMatch = schedule.first(where: {
+            $0.state == .completed &&
+            Set([$0.teamA.code, $0.teamB.code]) == Set(["T1", "GEN"])
+        }) ?? schedule.first(where: { $0.state == .completed })
+
+        guard let recentMatch else { return }
         match = recentMatch
 
         guard let detail = try? await esports.fetchEventDetails(matchId: recentMatch.id),
               let game = detail.games.first(where: { $0.state == .completed }) else { return }
 
-        let cache = GameWindowCache.shared
-        if let cached = await cache.window(for: game.gameId) {
+        let gameWindowCache = GameWindowCache.shared
+        if let cached = await gameWindowCache.window(for: game.gameId) {
             gameWindow = cached
         } else {
             let liveStats = LiveStatsService()
@@ -37,24 +114,28 @@ final class OnboardingLoader {
                 if let w = try? await liveStats.fetchGameWindow(gameId: game.gameId, startingTime: startTime),
                    w.hasLiveStats {
                     gameWindow = w
-                    await cache.save(w)
+                    await gameWindowCache.save(w)
                     break
                 }
             }
         }
 
-        // 즐겨찾기 페이지용 선수 프로필 이미지 (각 팀 1명씩)
-        guard let window = gameWindow else { return }
+        // 선수 프로필 이미지 (summonerName 키로 저장)
+        guard let window = gameWindow else {
+            saveCache(match: recentMatch, gameId: game.gameId, playerImageURLs: [:])
+            return
+        }
         let targets = [window.bluePlayers.first, window.redPlayers.first].compactMap { $0 }
         let leaguepedia = LeaguepediaService.shared
-        var urls: [Int: URL] = [:]
+        var urls: [String: URL] = [:]
         for player in targets {
             guard !Task.isCancelled else { break }
             if let url = await leaguepedia.fetchPlayerImageURL(summonerName: player.summonerName) {
-                urls[player.participantId] = url
+                urls[player.summonerName] = url
             }
         }
         playerImageURLs = urls
+        saveCache(match: recentMatch, gameId: game.gameId, playerImageURLs: urls)
     }
 }
 
@@ -481,15 +562,9 @@ struct OnboardingView: View {
 
     private func favPlayerRowLive(player: PlayerStats) -> some View {
         HStack(spacing: 12) {
-            let profileURL = loader.playerImageURLs[player.participantId]
-            if profileURL != nil {
-                CachedAsyncImage(url: profileURL)
-                    .frame(width: 36, height: 36)
-                    .clipShape(Circle())
-            } else {
-                ChampionImageView(championId: player.championId, size: 36)
-                    .clipShape(Circle())
-            }
+            CachedAsyncImage(url: loader.playerImageURLs[player.summonerName])
+                .frame(width: 36, height: 36)
+                .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(player.summonerName)

@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct Player: Identifiable, Hashable {
+struct Player: Codable, Identifiable, Hashable {
     let id: String
     let summonerName: String
     let firstName: String?

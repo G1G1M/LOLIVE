@@ -44,22 +44,32 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
     // MARK: - Public
 
     func fetchLeagues() async throws -> [League] {
+        let key = "leagues"
+        if let cached: [League] = AppDiskCache.get(key: key, maxAge: 24 * 3600) { return cached }
         let data = try await request(path: "/getLeagues", queryItems: [])
         let response = try decode(LeaguesResponse.self, from: data)
-        return response.data.leagues.map {
+        let leagues = response.data.leagues.map {
             League(id: $0.id, slug: $0.slug ?? "", name: $0.name, region: $0.region, imageURL: https($0.image))
         }
+        AppDiskCache.set(key: key, value: leagues)
+        return leagues
     }
 
     func fetchSchedule(league: League) async throws -> [Match] {
+        let key = "schedule_\(league.id)"
+        if let cached: [Match] = AppDiskCache.get(key: key, maxAge: 15 * 60) { return cached }
         let query = [URLQueryItem(name: "leagueId", value: league.id)]
         let data = try await request(path: "/getSchedule", queryItems: query)
         let response = try decode(ScheduleResponse.self, from: data)
-        return response.data.schedule.events.compactMap { mapEventToMatch($0, fallbackLeague: league) }
+        let matches = response.data.schedule.events.compactMap { mapEventToMatch($0, fallbackLeague: league) }
+        AppDiskCache.set(key: key, value: matches)
+        return matches
     }
 
     // 국제 대회(Worlds/MSI) 전용: 모든 페이지를 순회하여 전체 경기 목록 반환
     func fetchAllSchedule(league: League) async throws -> [Match] {
+        let key = "all_schedule_\(league.id)"
+        if let cached: [Match] = AppDiskCache.get(key: key, maxAge: 2 * 3600) { return cached }
         var allMatches: [Match] = []
         var pageToken: String? = nil
         var pageCount = 0
@@ -88,7 +98,9 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
 
         // 중복 제거 (match ID 기준)
         var seen = Set<String>()
-        return allMatches.filter { seen.insert($0.id).inserted }
+        let result = allMatches.filter { seen.insert($0.id).inserted }
+        if !result.isEmpty { AppDiskCache.set(key: key, value: result) }
+        return result
     }
 
     func fetchLive() async throws -> [LiveMatch] {
@@ -162,27 +174,31 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
     }
 
     func fetchTournaments(leagueId: String) async throws -> [Tournament] {
+        let key = "tournaments_\(leagueId)"
+        if let cached: [Tournament] = AppDiskCache.get(key: key, maxAge: 24 * 3600) { return cached }
         let query = [URLQueryItem(name: "leagueId", value: leagueId)]
         let data = try await request(path: "/getTournamentsForLeague", queryItems: query)
         let response = try decode(TournamentsResponse.self, from: data)
-        return response.data.leagues.flatMap { $0.tournaments }.map {
+        let tournaments = response.data.leagues.flatMap { $0.tournaments }.map {
             Tournament(id: $0.id, slug: $0.slug, startDate: $0.startDate, endDate: $0.endDate)
         }
+        AppDiskCache.set(key: key, value: tournaments)
+        return tournaments
     }
 
     func fetchStandings(tournamentId: String) async throws -> [Standing] {
+        let key = "standings_\(tournamentId)"
+        if let cached: [Standing] = AppDiskCache.get(key: key, maxAge: 3600) { return cached }
         let query = [URLQueryItem(name: "tournamentId", value: tournamentId)]
         let data = try await request(path: "/getStandings", queryItems: query)
         let response = try decode(StandingsResponse.self, from: data)
-        // "groups" 타입(정규시즌) 스테이지 우선, 없으면 랭킹이 가장 많은 스테이지
         let standingGroup = response.data.standings.first
         let stage = standingGroup?.stages.first { $0.type == "groups" }
                  ?? standingGroup?.stages.max(by: {
                      $0.sections.flatMap { $0.rankings }.count < $1.sections.flatMap { $0.rankings }.count
                  })
-        // 모든 섹션의 랭킹을 합치고, 동률 팀도 모두 포함
         let allRankings = stage?.sections.flatMap { $0.rankings } ?? []
-        return allRankings.flatMap { ranking in
+        let standings = allRankings.flatMap { ranking in
             ranking.teams.map { dto in
                 let team = Team(id: dto.id, name: dto.name, code: dto.code, imageURL: https(dto.image))
                 let total = dto.record.wins + dto.record.losses
@@ -196,19 +212,25 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
             if $0.wins != $1.wins { return $0.wins > $1.wins }
             return $0.team.name < $1.team.name
         }
+        AppDiskCache.set(key: key, value: standings)
+        return standings
     }
 
     func fetchTeamRoster(teamId: String) async throws -> [Player] {
+        let key = "roster_\(teamId)"
+        if let cached: [Player] = AppDiskCache.get(key: key, maxAge: 12 * 3600) { return cached }
         let query = [URLQueryItem(name: "id", value: teamId)]
         let data = try await request(path: "/getTeams", queryItems: query)
         let response = try decode(TeamsResponse.self, from: data)
         guard let team = response.data.teams.first else { return [] }
-        return (team.players ?? []).map { p in
+        let players = (team.players ?? []).map { p in
             Player(id: p.id, summonerName: p.summonerName,
                    firstName: p.firstName, lastName: p.lastName,
                    role: p.role ?? "", imageURL: https(p.image),
                    teamId: team.id, teamCode: team.code)
         }
+        AppDiskCache.set(key: key, value: players)
+        return players
     }
 
     func fetchEventDetails(matchId: String) async throws -> EventDetailInfo {

@@ -135,7 +135,7 @@ struct StandingsView: View {
     }
 
     private var tableHeader: some View {
-        HStack {
+        HStack(spacing: 0) {
             Text("#")
                 .frame(width: 32, alignment: .center)
                 .foregroundStyle(.secondary)
