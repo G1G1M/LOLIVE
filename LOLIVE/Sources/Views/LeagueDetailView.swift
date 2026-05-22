@@ -106,7 +106,7 @@ struct LeagueDetailView: View {
             scheduleToggleButton(title: "목록", sf: "list.bullet", selected: !viewModel.showBracket) {
                 viewModel.showBracket = false
             }
-            scheduleToggleButton(title: "브라켓", sf: "trophy.bracket", selected: viewModel.showBracket) {
+            scheduleToggleButton(title: "브라켓", sf: "bracket.wide", selected: viewModel.showBracket) {
                 viewModel.showBracket = true
             }
             Spacer()

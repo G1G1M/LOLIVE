@@ -173,7 +173,7 @@ struct LeaguepediaService: Sendable {
             let safePage = entry.page
                 .replacingOccurrences(of: "/", with: "_")
                 .replacingOccurrences(of: " ", with: "_")
-            let cacheKey = "hist_\(leagueName)_\(safePage)"
+            let cacheKey = "histv2_\(leagueName)_\(safePage)"
             if let cached = await LeaguepediaCache.shared.cachedHistoricalMatches(key: cacheKey) {
                 all.append(contentsOf: cached)
             }
@@ -195,7 +195,7 @@ struct LeaguepediaService: Sendable {
             let safePage = entry.page
                 .replacingOccurrences(of: "/", with: "_")
                 .replacingOccurrences(of: " ", with: "_")
-            let cacheKey = "hist_\(leagueName)_\(safePage)"
+            let cacheKey = "histv2_\(leagueName)_\(safePage)"
             if let cached = await LeaguepediaCache.shared.cachedHistoricalMatches(key: cacheKey) {
                 all.append(contentsOf: cached)
             } else {
@@ -228,7 +228,10 @@ struct LeaguepediaService: Sendable {
 
         var all: [Match] = []
         for entry in pages where !excludingYears.contains(entry.year) {
-            let matchKey = "hist_\(leagueName)_\(entry.year)"
+            let safePage = entry.page
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: " ", with: "_")
+            let matchKey = "histv2_\(leagueName)_\(safePage)"
             if let cached = await LeaguepediaCache.shared.cachedHistoricalMatches(key: matchKey) {
                 all.append(contentsOf: cached)
             } else {
@@ -313,6 +316,12 @@ struct LeaguepediaService: Sendable {
             offset += batchSize
         }
 
+        // 팀 이미지 배치 조회 (Teams 테이블 → 없으면 URL 패턴 폴백)
+        let uniqueTeamNames = Set(allRows.flatMap {
+            [$0["Team1"], $0["Team2"]].compactMap { $0 }.filter { !$0.isEmpty }
+        })
+        let teamImages = await fetchTeamImageURLs(uniqueTeamNames)
+
         let fmt1 = DateFormatter()
         fmt1.dateFormat = "yyyy-MM-dd HH:mm:ss"
         fmt1.timeZone = TimeZone(identifier: "UTC")
@@ -337,14 +346,50 @@ struct LeaguepediaService: Sendable {
             let blockNameRaw = row["Tab"]?.trimmingCharacters(in: .whitespaces) ?? ""
             let blockName: String? = blockNameRaw.isEmpty ? nil : blockNameRaw
 
-            let teamA = Team(id: "lp_\(team1)", name: team1, code: team1, imageURL: nil)
-            let teamB = Team(id: "lp_\(team2)", name: team2, code: team2, imageURL: nil)
+            let imageA = teamImages[team1] ?? lpTeamLogoURL(team1)
+            let imageB = teamImages[team2] ?? lpTeamLogoURL(team2)
+            let teamA = Team(id: "lp_\(team1)", name: team1, code: team1, imageURL: imageA)
+            let teamB = Team(id: "lp_\(team2)", name: team2, code: team2, imageURL: imageB)
             return Match(id: matchId, league: league,
                          teamA: teamA, teamB: teamB,
                          scoreA: scoreA, scoreB: scoreB,
                          startTime: startTime, state: state,
                          blockName: blockName)
         }
+    }
+
+    private func fetchTeamImageURLs(_ names: Set<String>) async -> [String: String] {
+        guard !names.isEmpty else { return [:] }
+        let inClause = names.map { "'\(escapeSql($0))'" }.joined(separator: ",")
+        var c = URLComponents(string: baseURL)!
+        c.queryItems = [
+            .init(name: "action", value: "cargoquery"),
+            .init(name: "tables", value: "Teams"),
+            .init(name: "fields", value: "Teams.Short=Short,Teams.Image=Image"),
+            .init(name: "where",  value: "Teams.Short IN (\(inClause))"),
+            .init(name: "limit",  value: "50"),
+            .init(name: "format", value: "json"),
+        ]
+        guard let url = c.url,
+              let data = await cargoData(url: url),
+              let resp = try? JSONDecoder().decode(CargoResp.self, from: data) else { return [:] }
+
+        var result: [String: String] = [:]
+        for row in resp.cargoquery {
+            guard let short = row.title["Short"], !short.isEmpty,
+                  let image = row.title["Image"], !image.isEmpty else { continue }
+            let encoded = image.replacingOccurrences(of: " ", with: "_")
+                .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? image
+            result[short] = "https://lol.fandom.com/wiki/Special:FilePath/\(encoded)"
+        }
+        return result
+    }
+
+    private func lpTeamLogoURL(_ name: String) -> String? {
+        let fileName = "\(name)logo std.png"
+        guard let encoded = fileName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        else { return nil }
+        return "https://lol.fandom.com/wiki/Special:FilePath/\(encoded)"
     }
 
     // MARK: - League name mapping
@@ -640,11 +685,18 @@ private actor LeaguepediaCache {
     private static let maxAge: TimeInterval = 24 * 3600  // 24시간
 
     init() {
-        // 이전 버그(DateTime_UTC 파싱 실패)로 잘못 캐시된 빈 hist 파일 제거
         let dir = Self.cacheDir
         if let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey]) {
-            for file in files where file.lastPathComponent.hasPrefix("hist_") {
-                if let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize, size < 200 {
+            for file in files {
+                let name = file.lastPathComponent
+                // 구버전 캐시(이미지 없음) 전체 삭제
+                if name.hasPrefix("hist_") {
+                    try? FileManager.default.removeItem(at: file)
+                    continue
+                }
+                // 빈 파일 삭제
+                if name.hasPrefix("histv2_"),
+                   let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize, size < 200 {
                     try? FileManager.default.removeItem(at: file)
                 }
             }
@@ -743,7 +795,7 @@ private actor LeaguepediaCache {
 
     private static func historicalFile(for key: String) -> URL {
         let safe = key.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: " ", with: "_")
-        return cacheDir.appendingPathComponent("hist_\(safe).json")
+        return cacheDir.appendingPathComponent("\(safe).json")
     }
 
     private static func tournamentPagesFile(for key: String) -> URL {

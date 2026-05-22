@@ -35,14 +35,15 @@ struct TournamentDetailView: View {
                     } else if viewModel.isLoadingHistoricalMatches {
                         ProgressView("경기 기록 불러오는 중...")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if viewModel.availableRounds.isEmpty {
+                    } else if viewModel.selectedRoundDateGroups.isEmpty && viewModel.tournamentMatches.isEmpty {
                         emptyState("데이터를 불러올 수 없습니다")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        // 라운드 칩 선택 (고정)
-                        roundSelector
-                        Divider()
-                        // 경기 목록 (스크롤)
+                        // rounds 있을 때만 라운드 칩 표시
+                        if !viewModel.availableRounds.isEmpty {
+                            roundSelector
+                            Divider()
+                        }
                         matchList
                     }
                 }
@@ -151,6 +152,8 @@ struct TournamentDetailView: View {
                     }
                     .padding(.bottom, 20)
                 }
+                // 라운드 또는 연도 바뀔 때 스크롤 위치 맨 위로 리셋
+                .id(viewModel.selectedTournamentId + (viewModel.selectedRound ?? ""))
             }
         }
     }

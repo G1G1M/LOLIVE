@@ -80,9 +80,13 @@ final class TournamentDetailViewModel {
     // MARK: - Computed: 날짜별 그룹 (최신 날짜 먼저)
 
     var selectedRoundDateGroups: [DateGroup] {
-        guard let round = selectedRound else { return [] }
-        let matches = tournamentMatches
-            .filter { $0.blockName == round }
+        // round 없으면 전체 경기 표시 (blockName 없는 과거 데이터 대응)
+        let matches: [Match]
+        if let round = selectedRound {
+            matches = tournamentMatches.filter { $0.blockName == round }
+        } else {
+            matches = tournamentMatches
+        }
         let cal = Calendar.current
         let byDay = Dictionary(grouping: matches) { cal.startOfDay(for: $0.startTime) }
         let fmt = DateFormatter()

@@ -135,7 +135,7 @@ struct LeaguesView: View {
             Spacer()
 
             if isInternational {
-                Image(systemName: "trophy.bracket")
+                Image(systemName: "bracket.wide")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
