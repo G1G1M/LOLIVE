@@ -213,14 +213,41 @@ struct FavoritesView: View {
 
             Spacer()
 
-            Text(roleLabel(fav.role))
-                .font(.caption2).fontWeight(.bold)
-                .padding(.horizontal, 6).padding(.vertical, 3)
-                .background(roleColor(fav.role).opacity(0.2))
-                .foregroundStyle(roleColor(fav.role))
-                .clipShape(Capsule())
+            if let live = liveInfo(for: fav) {
+                VStack(alignment: .trailing, spacing: 3) {
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.red).frame(width: 6, height: 6)
+                        Text("LIVE")
+                            .font(.caption2).fontWeight(.bold).foregroundStyle(.red)
+                    }
+                    Text(live.score)
+                        .font(.caption).fontWeight(.semibold)
+                    Text("Game \(live.game)")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            } else {
+                Text(roleLabel(fav.role))
+                    .font(.caption2).fontWeight(.bold)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(roleColor(fav.role).opacity(0.2))
+                    .foregroundStyle(roleColor(fav.role))
+                    .clipShape(Capsule())
+            }
         }
         .padding(.vertical, 4)
+    }
+
+    private func liveInfo(for fav: FavoritePlayer) -> LiveInfo? {
+        guard let liveMatch = todayViewModel.liveMatches.first(where: {
+            $0.match.teamA.code.lowercased() == fav.teamCode.lowercased() ||
+            $0.match.teamB.code.lowercased() == fav.teamCode.lowercased()
+        }) else { return nil }
+
+        let isTeamA  = liveMatch.match.teamA.code.lowercased() == fav.teamCode.lowercased()
+        let myScore  = isTeamA ? liveMatch.match.scoreA : liveMatch.match.scoreB
+        let oppScore = isTeamA ? liveMatch.match.scoreB : liveMatch.match.scoreA
+        let oppCode  = isTeamA ? liveMatch.match.teamB.code : liveMatch.match.teamA.code
+        return LiveInfo(score: "\(myScore) - \(oppScore)  vs \(oppCode)", game: liveMatch.currentSet)
     }
 
     // MARK: - Helpers
