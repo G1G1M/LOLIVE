@@ -18,6 +18,16 @@ final class StandingsViewModel {
     var isLoadingLeagues = false
     var isLoadingStandings = false
 
+    // 그룹이 2개 이상일 때 사용. 단일 그룹이면 빈 배열 반환
+    var standingGroups: [(name: String, standings: [Standing])] {
+        var seen = Set<String>()
+        let groupNames = standings.compactMap { $0.group }.filter { seen.insert($0).inserted }
+        guard groupNames.count > 1 else { return [] }
+        return groupNames.map { name in
+            (name: name, standings: standings.filter { $0.group == name })
+        }
+    }
+
     // MARK: - Private
 
     private let service: RiotEsportsServiceProtocol

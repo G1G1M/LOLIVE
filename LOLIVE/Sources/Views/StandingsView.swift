@@ -109,10 +109,39 @@ struct StandingsView: View {
     // MARK: - Table
 
     private var standingsTable: some View {
+        let groups = viewModel.standingGroups
+        return VStack(spacing: groups.isEmpty ? 0 : 12) {
+            if groups.isEmpty {
+                standingsBlock(standings: viewModel.standings, showGroupHeader: false, groupName: nil)
+            } else {
+                ForEach(groups, id: \.name) { group in
+                    standingsBlock(standings: group.standings, showGroupHeader: true, groupName: group.name)
+                }
+            }
+        }
+        .padding(16)
+    }
+
+    private func standingsBlock(standings: [Standing], showGroupHeader: Bool, groupName: String?) -> some View {
         VStack(spacing: 0) {
+            if showGroupHeader, let name = groupName {
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentColor)
+                        .frame(width: 3, height: 14)
+                    Text(name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color(.secondarySystemGroupedBackground))
+                Divider().padding(.horizontal, 16)
+            }
             tableHeader
             Divider().padding(.horizontal, 16)
-            ForEach(Array(viewModel.standings.enumerated()), id: \.offset) { index, standing in
+            ForEach(Array(standings.enumerated()), id: \.offset) { _, standing in
                 NavigationLink {
                     TeamDetailView(
                         team: standing.team,
@@ -123,15 +152,13 @@ struct StandingsView: View {
                     standingRow(standing)
                 }
                 .buttonStyle(.plain)
-
-                if standing.id != viewModel.standings.last?.id {
+                if standing.id != standings.last?.id {
                     Divider().padding(.leading, 64)
                 }
             }
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(16)
     }
 
     private var tableHeader: some View {

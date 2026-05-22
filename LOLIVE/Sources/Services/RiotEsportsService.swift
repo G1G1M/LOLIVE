@@ -197,17 +197,24 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
                  ?? standingGroup?.stages.max(by: {
                      $0.sections.flatMap { $0.rankings }.count < $1.sections.flatMap { $0.rankings }.count
                  })
-        let allRankings = stage?.sections.flatMap { $0.rankings } ?? []
-        let standings = allRankings.flatMap { ranking in
-            ranking.teams.map { dto in
-                let team = Team(id: dto.id, name: dto.name, code: dto.code, imageURL: https(dto.image))
-                let total = dto.record.wins + dto.record.losses
-                let winRate = total > 0 ? Double(dto.record.wins) / Double(total) : 0
-                return Standing(team: team, wins: dto.record.wins, losses: dto.record.losses,
-                                rank: ranking.ordinal, winRate: winRate)
+        let sections = stage?.sections ?? []
+        var standings: [Standing] = []
+        for section in sections {
+            let groupName = section.name
+            for ranking in section.rankings {
+                for dto in ranking.teams {
+                    let team = Team(id: dto.id, name: dto.name, code: dto.code, imageURL: https(dto.image))
+                    let total = dto.record.wins + dto.record.losses
+                    let winRate = total > 0 ? Double(dto.record.wins) / Double(total) : 0
+                    var s = Standing(team: team, wins: dto.record.wins, losses: dto.record.losses,
+                                     rank: ranking.ordinal, winRate: winRate)
+                    s.group = groupName
+                    standings.append(s)
+                }
             }
         }
-        .sorted {
+        standings = standings.sorted {
+            if $0.group != $1.group { return ($0.group ?? "") < ($1.group ?? "") }
             if $0.rank != $1.rank { return $0.rank < $1.rank }
             if $0.wins != $1.wins { return $0.wins > $1.wins }
             return $0.team.name < $1.team.name

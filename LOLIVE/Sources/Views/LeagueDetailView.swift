@@ -220,24 +220,51 @@ struct LeagueDetailView: View {
     // MARK: - 순위
 
     private var standingsContent: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                if viewModel.standings.isEmpty {
-                    emptyState("순위 데이터를 불러올 수 없습니다")
-                } else {
-                    standingsHeader
-                    ForEach(viewModel.standings) { standing in
-                        standingRow(standing)
-                        if standing.id != viewModel.standings.last?.id {
-                            Divider().padding(.leading, 72)
-                        }
+        let groups = viewModel.standingGroups
+        return ScrollView {
+            if viewModel.standings.isEmpty {
+                emptyState("순위 데이터를 불러올 수 없습니다")
+                    .padding(16)
+            } else if groups.isEmpty {
+                standingsBlock(standings: viewModel.standings, groupName: nil)
+                    .padding(16)
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(groups, id: \.name) { group in
+                        standingsBlock(standings: group.standings, groupName: group.name)
                     }
                 }
+                .padding(16)
             }
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .padding(16)
         }
+    }
+
+    private func standingsBlock(standings: [Standing], groupName: String?) -> some View {
+        VStack(spacing: 0) {
+            if let name = groupName {
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentColor)
+                        .frame(width: 3, height: 14)
+                    Text(name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                Divider().padding(.horizontal, 16)
+            }
+            standingsHeader
+            ForEach(standings) { standing in
+                standingRow(standing)
+                if standing.id != standings.last?.id {
+                    Divider().padding(.leading, 72)
+                }
+            }
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     private var standingsHeader: some View {

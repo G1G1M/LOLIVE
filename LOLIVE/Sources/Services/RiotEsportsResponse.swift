@@ -180,6 +180,7 @@ struct StageDTO: Decodable {
 }
 
 struct SectionDTO: Decodable {
+    let name: String?
     let rankings: [RankingDTO]
 }
 

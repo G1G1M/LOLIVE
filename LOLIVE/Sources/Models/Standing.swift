@@ -15,4 +15,5 @@ struct Standing: Codable, Identifiable, Hashable {
     var gameWins: Int = 0
     var gameLosses: Int = 0
     var gameDiff: Int { gameWins - gameLosses }
+    var group: String? = nil
 }

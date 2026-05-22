@@ -30,6 +30,15 @@ final class LeagueDetailViewModel {
     var selectedTab: Tab = .standings
     var showBracket: Bool = false
     var standings: [Standing] = []
+
+    var standingGroups: [(name: String, standings: [Standing])] {
+        var seen = Set<String>()
+        let groupNames = standings.compactMap { $0.group }.filter { seen.insert($0).inserted }
+        guard groupNames.count > 1 else { return [] }
+        return groupNames.map { name in
+            (name: name, standings: standings.filter { $0.group == name })
+        }
+    }
     var upcomingMatches: [Match] = []
     var completedMatches: [Match] = []
     var players: [Player] = []
