@@ -142,14 +142,23 @@ struct StandingsView: View {
             Text("팀")
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .foregroundStyle(.secondary)
-            Text("W")
-                .frame(width: 34, alignment: .center)
-                .foregroundStyle(.blue)
-            Text("L")
-                .frame(width: 34, alignment: .center)
-                .foregroundStyle(.red)
+            HStack(spacing: 0) {
+                Text("W")
+                    .foregroundStyle(.blue)
+                    .frame(width: 22, alignment: .center)
+                Text("-")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 10, alignment: .center)
+                Text("L")
+                    .foregroundStyle(.red)
+                    .frame(width: 22, alignment: .center)
+            }
+            .frame(width: 54)
+            Text("GD")
+                .frame(width: 44, alignment: .center)
+                .foregroundStyle(.secondary)
             Text("Win%")
-                .frame(width: 50, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
                 .foregroundStyle(.secondary)
         }
         .font(.system(size: 11, weight: .semibold))
@@ -180,23 +189,36 @@ struct StandingsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // 승
-            Text("\(standing.wins)")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.blue)
-                .frame(width: 34, alignment: .center)
+            // 승-패
+            HStack(spacing: 0) {
+                Text("\(standing.wins)")
+                    .foregroundStyle(.blue)
+                    .monospacedDigit()
+                    .frame(width: 22, alignment: .center)
+                Text("-")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 10, alignment: .center)
+                Text("\(standing.losses)")
+                    .foregroundStyle(.red)
+                    .monospacedDigit()
+                    .frame(width: 22, alignment: .center)
+            }
+            .font(.system(size: 13, weight: .medium))
+            .frame(width: 54)
 
-            // 패
-            Text("\(standing.losses)")
-                .font(.system(size: 14))
-                .foregroundStyle(.red)
-                .frame(width: 34, alignment: .center)
+            // 세트 득실
+            Text(gdString(standing.gameDiff))
+                .font(.system(size: 13, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(Color(.label))
+                .frame(width: 44, alignment: .center)
 
             // 승률
             Text(String(format: "%.0f%%", standing.winRate * 100))
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(winRateColor(standing.winRate))
-                .frame(width: 50, alignment: .trailing)
+                .monospacedDigit()
+                .foregroundStyle(Color(.label))
+                .frame(width: 46, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
@@ -228,11 +250,11 @@ struct StandingsView: View {
         }
     }
 
-    private func winRateColor(_ rate: Double) -> Color {
-        if rate >= 0.6 { return .blue }
-        if rate < 0.4  { return .secondary }
-        return Color(.label)
+    private func gdString(_ gd: Int) -> String {
+        if gd > 0 { return "+\(gd)" }
+        return "\(gd)"
     }
+
 }
 
 #Preview {

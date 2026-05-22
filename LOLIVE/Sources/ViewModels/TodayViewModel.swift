@@ -64,6 +64,7 @@ final class TodayViewModel {
         filteredCompletedMatches.isEmpty
     }
 
+
     private func isFavorited(_ match: Match) -> Bool {
         favoritedTeamIds.contains(match.teamA.id) || favoritedTeamIds.contains(match.teamB.id)
     }
