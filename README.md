@@ -34,10 +34,12 @@
 ### 대회 상세 (Worlds / MSI)
 - 연도별 탭 자동 생성 (Riot API 커버 범위 + Leaguepedia 과거 데이터 합산)
 - 라운드(플레이-인 / 그룹 / 8강 / 4강 / 결승 등) 칩 선택 → 날짜별 경기 목록
+- 라운드 구분 없는 과거 데이터는 전체 경기 목록 표시 (칩 숨김)
 - **3단계 데이터 로딩**:
   1. Riot API로 즉시 표시 (2023년 이후)
   2. Leaguepedia 연도 목록으로 과거 탭 즉시 추가 (1회 API 호출 + 30일 캐시)
   3. 탭 선택 시 해당 연도 경기 on-demand 로드 (캐시 히트 시 즉시 반환)
+- 과거 경기 팀 로고: Leaguepedia Teams 테이블 배치 조회 → URL 패턴 폴백
 - 앱 재진입 시 캐시된 과거 데이터 자동 복원 (화면 이탈 후 돌아와도 유지)
 
 ### Today
@@ -132,7 +134,8 @@ TournamentDetailViewModel.load()
 ```
 
 - OverviewPage 목록: 24시간 TTL 디스크 캐시
-- 경기 데이터: 30일 TTL 디스크 캐시 (OverviewPage 단위)
+- 경기 데이터: 30일 TTL 디스크 캐시 (OverviewPage 단위, 캐시 키 `histv2_` prefix)
+- 팀 로고: Leaguepedia Teams 테이블 배치 조회 → `Special:FilePath/` URL 패턴 폴백
 - Rate limit: API 호출 간 2.5초 대기 (actor 기반 순서 보장)
 - 빈 결과는 디스크에 저장하지 않아 재시도 가능
 
