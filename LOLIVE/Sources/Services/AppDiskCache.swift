@@ -32,7 +32,7 @@ struct AppDiskCache {
     }
 
     /// 캐시에서 값을 읽습니다. maxAge 초 이내의 데이터만 반환하며, 만료된 파일은 자동 삭제합니다.
-    static func get<T: Decodable>(key: String, maxAge: TimeInterval) -> T? {
+    static func get<T: Codable>(key: String, maxAge: TimeInterval) -> T? {
         let file = fileURL(for: key)
         guard let data = try? Data(contentsOf: file) else { return nil }
         guard let envelope = try? decoder.decode(Envelope<T>.self, from: data) else {
@@ -47,10 +47,10 @@ struct AppDiskCache {
     }
 
     /// 값을 디스크에 저장합니다.
-    static func set<T: Encodable>(key: String, value: T) {
+    static func set<T: Codable>(key: String, value: T) {
         let envelope = Envelope(value: value, savedAt: Date())
         guard let data = try? encoder.encode(envelope) else { return }
-        try? data.write(to: fileURL(for: key), options: .atomic)
+        try? data.write(to: fileURL(for: key), options: Data.WritingOptions.atomic)
     }
 
     /// 특정 키의 캐시를 삭제합니다.
