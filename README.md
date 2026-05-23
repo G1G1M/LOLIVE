@@ -55,7 +55,8 @@
 - GD: 세트 득실차 (+/-), 순위 정렬 기준으로 활용
 - 순위 색상: 1위 금색, 2위 은색, 3위 동색
 - 내부 정렬 기준: 순위 → 승수 → 세트 득실 → 팀명
-- 리그 선택 칩 (lazy 로딩 + 캐싱)
+- LPL 그룹 A/B 섹션 헤더 자동 분리 표시
+- 리그 선택 칩 (lazy 로딩 + 캐싱), 리그 전환 시 디스크 캐시 즉시 표시
 - 팀 탭 → 팀 상세 페이지 이동
 - 리그 상세의 순위 탭과 동일한 UI/데이터 구조 공유
 
@@ -88,6 +89,7 @@
 ### Favorites
 - SwiftData 기반 팀 / 선수 즐겨찾기
 - 즐겨찾기한 팀의 LIVE 경기 실시간 뱃지 + 스코어
+- 즐겨찾기한 선수 행에 현재 LIVE 경기 정보 실시간 표시
 - **대표 팀 설정**: 팀 행 길게 누르면 대표 팀 지정 → 앱 전체 Tint 색상 적용
 - Live Activity: 잠금화면 실시간 스코어 + Dynamic Island
 
@@ -141,28 +143,63 @@ TournamentDetailViewModel.load()
 - Rate limit: API 호출 간 2.5초 대기 (actor 기반 순서 보장)
 - 빈 결과는 디스크에 저장하지 않아 재시도 가능
 
-## 시즌 스탯 아키텍처
+## 디스크 캐시 아키텍처
 
-Leaguepedia의 rate limit 이슈를 해결하기 위해 아래 구조를 적용했습니다.
+앱 재실행 시 로딩 스피너 없이 즉시 데이터를 표시하기 위해 전 계층에 디스크 캐시를 적용했습니다.
+
+### 캐시 레이어
+
+| 데이터 | 캐시 키 | TTL | 저장소 |
+|--------|---------|-----|--------|
+| 리그 목록 | `leagues` | 24h | AppDiskCache |
+| 경기 일정 | `schedule_{leagueId}` | 15분 | AppDiskCache |
+| 토너먼트 | `tournaments_{leagueId}` | 24h | AppDiskCache |
+| 순위 | `standings_{tournamentId}` | 1h | AppDiskCache |
+| 팀 로스터 | `roster_{teamId}` | 12h | AppDiskCache |
+| 선수 목록 전체 | `players_all` | 12h | AppDiskCache |
+| 검색 데이터 | `search_teams` / `search_players` | 12h | AppDiskCache |
+| 이미지 | SHA256 해시 파일명 | 영구 | ~/Library/Caches/image_cache/ |
+| OverviewPage | `overview_pages.json` | 24h | LeaguepediaStats/ |
+| 시즌 스탯 전체 | `{overviewPage}.json` | 24h | LeaguepediaStats/ |
+| 챔피언 픽 전체 | `champ_batch_{overviewPage}.json` | 24h | LeaguepediaStats/ |
+| 챔피언 픽 (개별) | `champs_{key}.json` | 24h | LeaguepediaStats/ |
+| 과거 경기 | `histv2_{key}.json` | 30일 | LeaguepediaStats/ |
+
+### ViewModel 선로딩 패턴
 
 ```
-선수 목록 로드 완료
+앱 실행
+    └─ 각 ViewModel.load()
+           ├─ preloadFromCache() → 디스크 캐시 즉시 표시 (스피너 없음)
+           └─ 백그라운드 API fetch → 조용히 갱신
+```
+
+- 캐시 부분 히트(일부 리그만 캐시됨)도 있는 것만 즉시 표시
+- `CachedAsyncImage`: 메모리 → 디스크 → 네트워크 3단계 캐시
+
+## 시즌 스탯 / 챔피언 픽 아키텍처
+
+Leaguepedia rate limit(API 호출 간 2.5초 대기) 이슈를 배치 로딩으로 해결합니다.
+
+```
+앱 실행 후 Players/Search 탭 방문 시
     └─ Task.detached(background)
-           └─ LeaguepediaService.preloadLeagueStats(league)
-                  ├─ currentOverviewPage() → Cargo API (캐시)
-                  ├─ allPlayerStats() → 500행씩 페이지네이션 배치 로드
-                  └─ LeaguepediaCache.setAllPlayerStats() → 메모리 + 디스크 (24시간 TTL)
+           └─ LeaguepediaService.preloadLeagueStats(league)  ← 리그별 순차 실행
+                  ├─ currentOverviewPage() → 디스크 캐시 (24h TTL)
+                  ├─ allPlayerStats()      → 500행씩 배치, 디스크 캐시 (24h TTL)
+                  └─ allChampionPicks()    → 500행씩 배치, 디스크 캐시 (24h TTL)
 
 선수 상세 진입
-    └─ SeasonStatsView.task
-           └─ playerSeasonStats(summonerName:league:)
-                  ├─ 캐시 히트 → 즉시 반환
-                  └─ 캐시 미스 → allPlayerStats() 호출 (이미 로드된 경우 즉시)
+    ├─ SeasonStatsView.task
+    │      └─ playerSeasonStats() → 배치 캐시 히트 → 즉시 반환
+    └─ LeaguePlayerDetailViewModel.load()
+           ├─ async let scheduleTask  (Riot API, 병렬)
+           └─ async let picksTask     → 배치 캐시 히트 → 즉시 반환
 ```
 
-- 리그 전체 스탯을 한 번의 배치 요청으로 수집 → API 호출 최소화
-- 디스크 캐시(24시간 TTL)로 재실행 시 API 호출 없음
-- `SeasonStatsView`가 자체 `.task`로 로딩 → ViewModel 의존성 없음, SwiftUI lifecycle 자동 취소
+- 리그 전체 스탯·픽을 배치 1회 요청으로 수집 → 선수별 개별 API 호출 제거
+- 앱 재실행 시 디스크 캐시로 API 호출 없이 즉시 반환
+- `OverviewPage`도 디스크 캐시 → cold start 시 2.5초 rate limit 대기 제거
 
 ## GameWindow 캐시 아키텍처
 
