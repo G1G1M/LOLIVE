@@ -26,6 +26,53 @@ struct LeaguepediaService: Sendable {
         guard let leagueName = leaguepediaName(for: league),
               let overviewPage = await currentOverviewPage(leagueName: leagueName) else { return }
         _ = await allPlayerStats(overviewPage: overviewPage)
+        _ = await allChampionPicks(overviewPage: overviewPage)
+    }
+
+    private func allChampionPicks(overviewPage: String) async -> [String: [ChampionPickEntry]]? {
+        if let cached = await LeaguepediaCache.shared.allChampionPicksBatch(for: overviewPage) {
+            return cached
+        }
+        var allRows: [[String: String]] = []
+        var offset = 0
+        let batchSize = 500
+        while !Task.isCancelled {
+            var c = URLComponents(string: baseURL)!
+            c.queryItems = [
+                .init(name: "action",  value: "cargoquery"),
+                .init(name: "tables",  value: "ScoreboardPlayers,ScoreboardGames"),
+                .init(name: "join_on", value: "ScoreboardGames.GameId=ScoreboardPlayers.GameId"),
+                .init(name: "fields",  value: "ScoreboardPlayers.Link=L,ScoreboardPlayers.Champion=Champion,ScoreboardPlayers.Kills=K,ScoreboardPlayers.Deaths=D,ScoreboardPlayers.Assists=A,ScoreboardGames.Winner=W,ScoreboardGames.Team1=T1,ScoreboardGames.Team2=T2,ScoreboardPlayers.Team=MyTeam"),
+                .init(name: "where",   value: "ScoreboardPlayers.OverviewPage='\(escapeSql(overviewPage))'"),
+                .init(name: "offset",  value: "\(offset)"),
+                .init(name: "limit",   value: "\(batchSize)"),
+                .init(name: "format",  value: "json"),
+            ]
+            guard let url = c.url,
+                  let data = await cargoData(url: url),
+                  let resp = try? JSONDecoder().decode(CargoResp.self, from: data) else { break }
+            let batch = resp.cargoquery.map { $0.title }
+            allRows.append(contentsOf: batch)
+            if batch.count < batchSize { break }
+            offset += batchSize
+        }
+        guard !allRows.isEmpty else { return nil }
+        var result: [String: [ChampionPickEntry]] = [:]
+        for row in allRows {
+            let link = row["L"] ?? ""
+            guard !link.isEmpty, let champion = row["Champion"], !champion.isEmpty else { continue }
+            let k = Int(row["K"] ?? "0") ?? 0
+            let d = Int(row["D"] ?? "0") ?? 0
+            let a = Int(row["A"] ?? "0") ?? 0
+            let myTeam = row["MyTeam"] ?? ""
+            let winner = row["W"] ?? ""
+            let t1     = row["T1"] ?? ""
+            let t2     = row["T2"] ?? ""
+            let won = (winner == "1" && myTeam == t1) || (winner == "2" && myTeam == t2)
+            result[link, default: []].append(ChampionPickEntry(champion: champion, kills: k, deaths: d, assists: a, won: won))
+        }
+        await LeaguepediaCache.shared.setAllChampionPicksBatch(result, for: overviewPage)
+        return result.isEmpty ? nil : result
     }
 
     /// 리그 전체를 배치로 한 번에 로드하고 캐싱 — 같은 리그의 두 번째 선수부터는 즉시 반환.
@@ -110,6 +157,15 @@ struct LeaguepediaService: Sendable {
         let cacheKey = "v2_\(overviewPage)__\(summonerName)"
         if let cached = await LeaguepediaCache.shared.cachedChampionPicks(key: cacheKey) {
             return cached.isEmpty ? nil : cached
+        }
+
+        // 배치 캐시 우선 확인 (preloadLeagueStats가 완료된 경우 API 호출 불필요)
+        if let batch = await LeaguepediaCache.shared.allChampionPicksBatch(for: overviewPage) {
+            let picks = batch[summonerName]
+                ?? batch.first(where: { $0.key.hasPrefix("\(summonerName) (") })?.value
+                ?? []
+            await LeaguepediaCache.shared.setChampionPicks(picks, key: cacheKey)
+            return picks.isEmpty ? nil : picks
         }
 
         var c = URLComponents(string: baseURL)!
@@ -668,13 +724,14 @@ private actor LeaguepediaRateLimiter {
 private actor LeaguepediaCache {
     static let shared = LeaguepediaCache()
 
-    private var overviewPages:       [String: String]                      = [:]
-    private var playerNameSets:      [String: Set<String>]                 = [:]
-    private var seasonStats:         [String: PlayerSeasonStats?]          = [:]
-    private var allPlayerStatsDic:   [String: [String: PlayerSeasonStats]] = [:]
-    private var championPicksDic:    [String: [ChampionPickEntry]]         = [:]
-    private var historicalMatchesDic:[String: [Match]]                     = [:]
-    private var tournamentPagesDic:  [String: [LPTournamentEntry]]         = [:]
+    private var overviewPages:          [String: String]                               = [:]
+    private var playerNameSets:         [String: Set<String>]                          = [:]
+    private var seasonStats:            [String: PlayerSeasonStats?]                   = [:]
+    private var allPlayerStatsDic:      [String: [String: PlayerSeasonStats]]          = [:]
+    private var championPicksDic:       [String: [ChampionPickEntry]]                  = [:]
+    private var allChampionPicksBatchDic: [String: [String: [ChampionPickEntry]]]      = [:]
+    private var historicalMatchesDic:   [String: [Match]]                              = [:]
+    private var tournamentPagesDic:     [String: [LPTournamentEntry]]                  = [:]
 
     private static let cacheDir: URL = {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -834,6 +891,35 @@ private actor LeaguepediaCache {
     private struct OverviewPagesDiskWrapper: Codable {
         let savedAt: Date
         let pages: [String: String]
+    }
+
+    func allChampionPicksBatch(for page: String) -> [String: [ChampionPickEntry]]? {
+        if let mem = allChampionPicksBatchDic[page] { return mem }
+        let file = Self.champBatchFile(for: page)
+        guard let data = try? Data(contentsOf: file),
+              let wrapper = try? JSONDecoder().decode(ChampBatchDiskWrapper.self, from: data),
+              Date().timeIntervalSince(wrapper.savedAt) < Self.maxAge
+        else { return nil }
+        allChampionPicksBatchDic[page] = wrapper.picks
+        return wrapper.picks
+    }
+
+    func setAllChampionPicksBatch(_ picks: [String: [ChampionPickEntry]], for page: String) {
+        allChampionPicksBatchDic[page] = picks
+        let wrapper = ChampBatchDiskWrapper(savedAt: Date(), picks: picks)
+        if let data = try? JSONEncoder().encode(wrapper) {
+            try? data.write(to: Self.champBatchFile(for: page), options: .atomic)
+        }
+    }
+
+    private static func champBatchFile(for page: String) -> URL {
+        let safe = page.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: " ", with: "_")
+        return cacheDir.appendingPathComponent("champ_batch_\(safe).json")
+    }
+
+    private struct ChampBatchDiskWrapper: Codable {
+        let savedAt: Date
+        let picks: [String: [ChampionPickEntry]]
     }
 
     private struct DiskWrapper: Codable {
