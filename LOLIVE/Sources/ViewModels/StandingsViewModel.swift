@@ -81,13 +81,17 @@ final class StandingsViewModel {
     // MARK: - Private
 
     private func loadStandings(for league: League) async {
-        // 캐시 확인
         if let cached = standingsCache[league.id] {
             standings = cached
             return
         }
 
-        isLoadingStandings = true
+        if let diskCached = preloadStandingsFromCache(for: league) {
+            standings = diskCached
+            standingsCache[league.id] = diskCached
+        } else {
+            isLoadingStandings = true
+        }
         defer { isLoadingStandings = false }
 
         guard let tournaments = try? await service.fetchTournaments(leagueId: league.id),
