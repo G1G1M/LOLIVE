@@ -701,10 +701,21 @@ private actor LeaguepediaCache {
                 }
             }
         }
+        if let data = try? Data(contentsOf: Self.overviewPagesDiskFile),
+           let wrapper = try? JSONDecoder().decode(OverviewPagesDiskWrapper.self, from: data),
+           Date().timeIntervalSince(wrapper.savedAt) < Self.maxAge {
+            overviewPages = wrapper.pages
+        }
     }
 
     func overviewPage(for leagueName: String) -> String? { overviewPages[leagueName] }
-    func setOverviewPage(_ page: String, for leagueName: String) { overviewPages[leagueName] = page }
+    func setOverviewPage(_ page: String, for leagueName: String) {
+        overviewPages[leagueName] = page
+        let wrapper = OverviewPagesDiskWrapper(savedAt: Date(), pages: overviewPages)
+        if let data = try? JSONEncoder().encode(wrapper) {
+            try? data.write(to: Self.overviewPagesDiskFile, options: .atomic)
+        }
+    }
 
     func playerNames(for leagueName: String) -> Set<String>? { playerNameSets[leagueName] }
     func setPlayerNames(_ names: Set<String>, for leagueName: String) { playerNameSets[leagueName] = names }
@@ -816,6 +827,13 @@ private actor LeaguepediaCache {
     private static func cacheFile(for page: String) -> URL {
         let safe = page.replacingOccurrences(of: "/", with: "_")
         return cacheDir.appendingPathComponent("\(safe).json")
+    }
+
+    private static let overviewPagesDiskFile = cacheDir.appendingPathComponent("overview_pages.json")
+
+    private struct OverviewPagesDiskWrapper: Codable {
+        let savedAt: Date
+        let pages: [String: String]
     }
 
     private struct DiskWrapper: Codable {

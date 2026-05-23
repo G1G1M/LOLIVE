@@ -63,7 +63,12 @@ final class LeaguePlayerDetailViewModel {
         isLoadingStats = true
         defer { isLoadingStats = false }
 
-        let allMatches = (try? await service.fetchSchedule(league: league)) ?? []
+        async let scheduleTask = service.fetchSchedule(league: league)
+        async let picksTask = LeaguepediaService.shared.playerChampionPicks(
+            summonerName: player.summonerName, league: league
+        )
+
+        let allMatches = (try? await scheduleTask) ?? []
 
         // 선수가 속한 팀의 완료된 경기 (최근 5경기)
         let teamMatches = allMatches
@@ -86,12 +91,7 @@ final class LeaguePlayerDetailViewModel {
                                myScore: my, oppScore: opp, date: match.startTime)
         }
 
-        // 챔피언 데이터: Leaguepedia ScoreboardPlayers (승패 + KDA 포함, 과거 데이터 안정적)
-        print("[ChampPool] summonerName=\(player.summonerName) league=\(league.name)")
-        let picks = await LeaguepediaService.shared.playerChampionPicks(
-            summonerName: player.summonerName, league: league
-        )
-        print("[ChampPool] picks=\(picks?.count ?? -1)")
+        let picks = await picksTask
         if let picks = picks, !picks.isEmpty {
             var champGames:   [String: Int] = [:]
             var champWins:    [String: Int] = [:]
