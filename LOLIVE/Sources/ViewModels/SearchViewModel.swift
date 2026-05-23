@@ -69,6 +69,7 @@ final class SearchViewModel {
 
     func load() async {
         guard allLeagues.isEmpty else { return }
+        if preloadFromCache() { return }
         isLoading = true
         defer { isLoading = false }
 
@@ -127,6 +128,11 @@ final class SearchViewModel {
             }
         }
 
+        let teamEntries = allTeams.map { SearchTeamEntry(team: $0.team, league: $0.league) }
+        let playerEntries = allPlayers.map { SearchPlayerEntry(player: $0.player, league: $0.league) }
+        AppDiskCache.set(key: "search_teams", value: teamEntries)
+        AppDiskCache.set(key: "search_players", value: playerEntries)
+
         // 선수 목록 완료 후 1군 리그 스탯 백그라운드 프리로드
         let primaryLeagues = leagues.filter { isPrimary($0) }
         Task.detached(priority: .background) {
@@ -134,6 +140,24 @@ final class SearchViewModel {
                 await LeaguepediaService.shared.preloadLeagueStats(for: league)
             }
         }
+    }
+
+    private func preloadFromCache() -> Bool {
+        guard let cachedLeagues: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600),
+              let teams: [SearchTeamEntry] = AppDiskCache.get(key: "search_teams", maxAge: 12 * 3600),
+              let players: [SearchPlayerEntry] = AppDiskCache.get(key: "search_players", maxAge: 12 * 3600),
+              !cachedLeagues.isEmpty
+        else { return false }
+        allLeagues = cachedLeagues
+        allTeams = teams.map { (team: $0.team, league: $0.league) }
+        allPlayers = players.map { (player: $0.player, league: $0.league) }
+        let primaryLeagues = cachedLeagues.filter { isPrimary($0) }
+        Task.detached(priority: .background) {
+            for league in primaryLeagues {
+                await LeaguepediaService.shared.preloadLeagueStats(for: league)
+            }
+        }
+        return true
     }
 
     private nonisolated func activeTournament(from tournaments: [Tournament]) -> Tournament? {
@@ -182,6 +206,16 @@ final class SearchViewModel {
 
     private func isSecondaryLeague(_ league: League) -> Bool {
         !isInternational(league) && !isPrimary(league)
+    }
+
+    private struct SearchTeamEntry: Codable {
+        let team: Team
+        let league: League
+    }
+
+    private struct SearchPlayerEntry: Codable {
+        let player: Player
+        let league: League
     }
 
     private func isInternational(_ league: League) -> Bool {

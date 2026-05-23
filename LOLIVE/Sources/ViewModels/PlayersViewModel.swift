@@ -12,7 +12,7 @@ final class PlayersViewModel {
 
     // MARK: - Types
 
-    struct PlayerEntry: Identifiable {
+    struct PlayerEntry: Identifiable, Codable {
         var id: String { "\(league.id)_\(player.id)" }
         let player: Player
         let league: League
@@ -62,6 +62,7 @@ final class PlayersViewModel {
     // MARK: - Load
 
     func load() async {
+        if preloadFromCache() { return }
         isLoading = true
         defer { isLoading = false }
 
@@ -132,6 +133,7 @@ final class PlayersViewModel {
         allPlayers = deduped.sorted {
             $0.player.summonerName.lowercased() < $1.player.summonerName.lowercased()
         }
+        AppDiskCache.set(key: "players_all", value: allPlayers)
 
         // 선수 목록 로드 완료 후 1군 리그 스탯을 백그라운드에서 순서대로 프리로드.
         // 디스크 캐시가 유효하면 즉시 반환되므로 24시간 이내 재실행 시 API 호출 없음.
@@ -141,6 +143,24 @@ final class PlayersViewModel {
                 await LeaguepediaService.shared.preloadLeagueStats(for: league)
             }
         }
+    }
+
+    private func preloadFromCache() -> Bool {
+        guard let cached: [PlayerEntry] = AppDiskCache.get(key: "players_all", maxAge: 12 * 3600),
+              let cachedLeagues: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600),
+              !cached.isEmpty
+        else { return false }
+        allPlayers = cached
+        leagues = cachedLeagues
+            .filter { !excludedRegions.contains($0.region) && isPrimary($0) }
+            .sorted { regionOrder($0.region) < regionOrder($1.region) }
+        let primaryLeagues = leagues
+        Task.detached(priority: .background) {
+            for league in primaryLeagues {
+                await LeaguepediaService.shared.preloadLeagueStats(for: league)
+            }
+        }
+        return true
     }
 
     // MARK: - Primary League Classification

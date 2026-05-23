@@ -35,7 +35,8 @@ final class TeamDetailViewModel {
     }
 
     func load() async {
-        isLoading = true
+        let hadCache = preloadFromCache()
+        isLoading = !hadCache
         defer { isLoading = false }
 
         async let rosterTask = service.fetchTeamRoster(teamId: team.id)
@@ -54,6 +55,25 @@ final class TeamDetailViewModel {
 
         recentMatches = Array(completed.prefix(10))
         h2hRecords = buildH2H(from: completed)
+    }
+
+    private func preloadFromCache() -> Bool {
+        var hadAny = false
+        if let roster: [Player] = AppDiskCache.get(key: "roster_\(team.id)", maxAge: 12 * 3600) {
+            players = roster.sorted { roleOrder($0.role) < roleOrder($1.role) }
+            hadAny = true
+        }
+        if let allMatches: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) {
+            let completed = allMatches.filter {
+                ($0.teamA.id == team.id || $0.teamA.code == team.code ||
+                 $0.teamB.id == team.id || $0.teamB.code == team.code) &&
+                $0.state == .completed
+            }.sorted { $0.startTime > $1.startTime }
+            recentMatches = Array(completed.prefix(10))
+            h2hRecords = buildH2H(from: completed)
+            hadAny = true
+        }
+        return hadAny
     }
 
     private func buildH2H(from matches: [Match]) -> [H2HRecord] {
