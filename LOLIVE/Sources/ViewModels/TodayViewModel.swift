@@ -185,8 +185,9 @@ final class TodayViewModel {
         guard let leagues: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600) else { return false }
         var allMatches: [Match] = []
         for league in leagues {
-            guard let matches: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) else { return false }
-            allMatches.append(contentsOf: matches)
+            if let matches: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) {
+                allMatches.append(contentsOf: matches)
+            }
         }
         cachedLeagues = leagues
         classify(matches: allMatches)
