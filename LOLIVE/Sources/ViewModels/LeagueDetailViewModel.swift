@@ -94,7 +94,8 @@ final class LeagueDetailViewModel {
     // MARK: - Public
 
     func load() async {
-        isLoading = true
+        let hadCache = preloadFromCache()
+        isLoading = !hadCache
         defer { isLoading = false }
 
         // 일정 + 토너먼트 병렬 조회
@@ -114,33 +115,8 @@ final class LeagueDetailViewModel {
         // 현재 토너먼트로 순위 + 선수 조회
         guard let tournament = activeTournament(from: tournaments) else { return }
 
-        var fetchedStandings = (try? await service.fetchStandings(tournamentId: tournament.id)) ?? []
-
-        // 세트 득실차 계산 (팀 코드 기준 매칭 — StandingsViewModel과 동일 로직)
-        let completed = allMatches.filter { $0.state == .completed }
-        var gameWinsMap: [String: Int] = [:]
-        var gameLossesMap: [String: Int] = [:]
-        for match in completed {
-            let aCode = match.teamA.code.uppercased()
-            let bCode = match.teamB.code.uppercased()
-            gameWinsMap[aCode, default: 0] += match.scoreA
-            gameLossesMap[aCode, default: 0] += match.scoreB
-            gameWinsMap[bCode, default: 0] += match.scoreB
-            gameLossesMap[bCode, default: 0] += match.scoreA
-        }
-        fetchedStandings = fetchedStandings.map { s in
-            var s = s
-            let code = s.team.code.uppercased()
-            s.gameWins = gameWinsMap[code] ?? 0
-            s.gameLosses = gameLossesMap[code] ?? 0
-            return s
-        }.sorted {
-            if $0.rank != $1.rank { return $0.rank < $1.rank }
-            if $0.wins != $1.wins { return $0.wins > $1.wins }
-            if $0.gameDiff != $1.gameDiff { return $0.gameDiff > $1.gameDiff }
-            return $0.team.name < $1.team.name
-        }
-        standings = fetchedStandings
+        let fetchedStandings = (try? await service.fetchStandings(tournamentId: tournament.id)) ?? []
+        standings = applyGD(fetchedStandings, schedule: allMatches)
 
         let teamIds = fetchedStandings.map { $0.team.id }
         let svc = service
@@ -180,6 +156,49 @@ final class LeagueDetailViewModel {
     }
 
     // MARK: - Private
+
+    private func preloadFromCache() -> Bool {
+        guard let allMatches: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) else { return false }
+        let now = Date()
+        upcomingMatches = allMatches
+            .filter { $0.startTime >= now && $0.state == .unstarted }
+            .sorted { $0.startTime < $1.startTime }
+        completedMatches = allMatches
+            .filter { $0.state == .completed }
+            .sorted { $0.startTime > $1.startTime }
+        if let tournaments: [Tournament] = AppDiskCache.get(key: "tournaments_\(league.id)", maxAge: 24 * 3600),
+           let tournament = activeTournament(from: tournaments),
+           let fetched: [Standing] = AppDiskCache.get(key: "standings_\(tournament.id)", maxAge: 3600) {
+            standings = applyGD(fetched, schedule: allMatches)
+        }
+        return true
+    }
+
+    private func applyGD(_ standings: [Standing], schedule: [Match]) -> [Standing] {
+        let completed = schedule.filter { $0.state == .completed }
+        var gameWinsMap: [String: Int] = [:]
+        var gameLossesMap: [String: Int] = [:]
+        for match in completed {
+            let aCode = match.teamA.code.uppercased()
+            let bCode = match.teamB.code.uppercased()
+            gameWinsMap[aCode, default: 0] += match.scoreA
+            gameLossesMap[aCode, default: 0] += match.scoreB
+            gameWinsMap[bCode, default: 0] += match.scoreB
+            gameLossesMap[bCode, default: 0] += match.scoreA
+        }
+        return standings.map { s in
+            var s = s
+            let code = s.team.code.uppercased()
+            s.gameWins = gameWinsMap[code] ?? 0
+            s.gameLosses = gameLossesMap[code] ?? 0
+            return s
+        }.sorted {
+            if $0.rank != $1.rank { return $0.rank < $1.rank }
+            if $0.wins != $1.wins { return $0.wins > $1.wins }
+            if $0.gameDiff != $1.gameDiff { return $0.gameDiff > $1.gameDiff }
+            return $0.team.name < $1.team.name
+        }
+    }
 
     private func activeTournament(from tournaments: [Tournament]) -> Tournament? {
         let fmt = DateFormatter()

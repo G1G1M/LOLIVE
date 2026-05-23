@@ -45,7 +45,8 @@ final class StandingsViewModel {
     // MARK: - Public
 
     func loadLeagues() async {
-        isLoadingLeagues = true
+        let hadCache = preloadFromCache()
+        isLoadingLeagues = !hadCache
         defer { isLoadingLeagues = false }
 
         let fetched = (try? await service.fetchLeagues()) ?? []
@@ -98,10 +99,44 @@ final class StandingsViewModel {
         async let standingsFetch = service.fetchStandings(tournamentId: tournament.id)
         async let scheduleFetch = service.fetchSchedule(league: league)
 
-        var fetched = (try? await standingsFetch) ?? []
+        let fetched = (try? await standingsFetch) ?? []
         let schedule = (try? await scheduleFetch) ?? []
 
-        // 완료된 경기의 세트 득실차 계산 (팀 코드 기준 매칭 — ID 불일치 방지)
+        let sorted = applyGD(fetched, schedule: schedule)
+        standingsCache[league.id] = sorted
+        standings = sorted
+    }
+
+    private func preloadFromCache() -> Bool {
+        guard let fetched: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600) else { return false }
+        let filtered = fetched
+            .filter { !excludedRegions.contains($0.region) }
+            .filter { league in
+                let name = league.name.lowercased()
+                return !secondaryKeywords.contains(where: { name.contains($0) })
+            }
+            .sorted { regionOrder($0.region) < regionOrder($1.region) }
+        guard !filtered.isEmpty else { return false }
+        leagues = filtered
+        let first = filtered[0]
+        selectedLeague = first
+        if let cached = preloadStandingsFromCache(for: first) {
+            standings = cached
+            standingsCache[first.id] = cached
+        }
+        return true
+    }
+
+    private func preloadStandingsFromCache(for league: League) -> [Standing]? {
+        guard let tournaments: [Tournament] = AppDiskCache.get(key: "tournaments_\(league.id)", maxAge: 24 * 3600),
+              let tournament = activeTournament(from: tournaments),
+              let fetched: [Standing] = AppDiskCache.get(key: "standings_\(tournament.id)", maxAge: 3600)
+        else { return nil }
+        let schedule: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) ?? []
+        return applyGD(fetched, schedule: schedule)
+    }
+
+    private func applyGD(_ standings: [Standing], schedule: [Match]) -> [Standing] {
         let completed = schedule.filter { $0.state == .completed }
         var gameWinsMap: [String: Int] = [:]
         var gameLossesMap: [String: Int] = [:]
@@ -113,10 +148,9 @@ final class StandingsViewModel {
             gameWinsMap[bCode, default: 0] += match.scoreB
             gameLossesMap[bCode, default: 0] += match.scoreA
         }
-
-        fetched = fetched.map { standing in
-            var s = standing
-            let code = standing.team.code.uppercased()
+        return standings.map { s in
+            var s = s
+            let code = s.team.code.uppercased()
             s.gameWins = gameWinsMap[code] ?? 0
             s.gameLosses = gameLossesMap[code] ?? 0
             return s
@@ -126,9 +160,6 @@ final class StandingsViewModel {
             if $0.gameDiff != $1.gameDiff { return $0.gameDiff > $1.gameDiff }
             return $0.team.name < $1.team.name
         }
-
-        standingsCache[league.id] = fetched
-        standings = fetched
     }
 
     private func activeTournament(from tournaments: [Tournament]) -> Tournament? {

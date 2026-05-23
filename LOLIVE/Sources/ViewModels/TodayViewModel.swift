@@ -100,7 +100,9 @@ final class TodayViewModel {
     // MARK: - Public
 
     func loadTodayMatches() async {
-        isLoading = true
+        if !preloadFromCache() {
+            isLoading = true
+        }
         errorMessage = nil
 
         do {
@@ -178,6 +180,18 @@ final class TodayViewModel {
     }
 
     // MARK: - Private
+
+    private func preloadFromCache() -> Bool {
+        guard let leagues: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600) else { return false }
+        var allMatches: [Match] = []
+        for league in leagues {
+            guard let matches: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) else { return false }
+            allMatches.append(contentsOf: matches)
+        }
+        cachedLeagues = leagues
+        classify(matches: allMatches)
+        return true
+    }
 
     private func enrich(_ live: [LiveMatch]) -> [LiveMatch] {
         let map = Dictionary(uniqueKeysWithValues: cachedLeagues.map { ($0.id, $0.imageURL) })
