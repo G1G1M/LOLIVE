@@ -146,8 +146,12 @@ struct LeaguesView: View {
     // MARK: - Data
 
     private func load() async {
-        isLoading = true
-        leagues = (try? await service.fetchLeagues()) ?? []
+        if let cached: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600), !cached.isEmpty {
+            leagues = cached
+        } else {
+            isLoading = true
+        }
+        leagues = (try? await service.fetchLeagues()) ?? leagues
         isLoading = false
     }
 
