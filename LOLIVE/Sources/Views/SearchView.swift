@@ -12,6 +12,7 @@ struct SearchView: View {
     @Query private var favoriteTeams: [FavoriteTeam]
     @Query private var favoritePlayers: [FavoritePlayer]
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     private var results: [SearchViewModel.SearchResult] {
         viewModel.results(for: searchText)
@@ -36,6 +37,11 @@ struct SearchView: View {
             .navigationTitle("검색")
             .navigationBarTitleDisplayMode(.large)
             .searchable(text: $searchText, prompt: "리그, 팀, 선수 검색")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("닫기") { dismiss() }
+                }
+            }
         }
         .task { await viewModel.load() }
     }
@@ -216,7 +222,6 @@ struct SearchView: View {
         }
     }
 }
-
 
 #Preview {
     SearchView()

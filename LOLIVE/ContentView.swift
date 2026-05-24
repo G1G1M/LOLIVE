@@ -13,35 +13,51 @@ struct ContentView: View {
     @Query private var favoriteTeams: [FavoriteTeam]
     @Environment(TodayViewModel.self) private var todayViewModel
     @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
+    @State private var selectedTab = 0
+    @State private var showSearch = false
 
     private var themeColor: Color {
         primaryTeamCode.isEmpty ? Color.accentColor : TeamTheme.color(for: primaryTeamCode)
     }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             TodayView()
+                .tag(0)
                 .tabItem { Label("Today", systemImage: "house.fill") }
 
             LeaguesView()
+                .tag(1)
                 .tabItem { Label("Leagues", systemImage: "trophy.fill") }
 
-            StandingsView()
-                .tabItem { Label("Standings", systemImage: "chart.bar.fill") }
-
             PlayersView()
+                .tag(2)
                 .tabItem { Label("Players", systemImage: "person.fill") }
 
             FavoritesView()
+                .tag(3)
                 .tabItem { Label("Favorites", systemImage: "star.fill") }
+
+            Color.clear
+                .tag(4)
+                .tabItem { Label("Search", systemImage: "magnifyingglass") }
         }
         .tint(themeColor)
+        .onChange(of: selectedTab) { old, new in
+            if new == 4 {
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) { showSearch = true }
+                selectedTab = old
+            }
+        }
+        .fullScreenCover(isPresented: $showSearch) {
+            SearchView()
+        }
         .task {
-            // await 이전에 동기로 저장 — task가 취소(백그라운드 전환 등)되어도 반드시 실행됨
             syncFavoritedTeamIds()
             SharedDataService.saveFavoriteTeams(favoriteTeams)
             WidgetCenter.shared.reloadAllTimelines()
-            // 이후 async 작업 (취소 가능)
             await MatchNotificationService.shared.requestPermission()
             await MatchNotificationService.shared.reschedule(for: favoriteTeams)
         }
