@@ -67,6 +67,7 @@
 - 선수 상세: 시즌 스탯, most픽 챔피언, 최근 경기 결과
 
 ### 검색
+- 탭바 Search 탭으로 즉시 접근 (5번째 탭 → fullScreenCover 전환)
 - 리그 / 팀 / 선수 통합 검색
 - 검색 결과에서 팀·선수 상세 페이지 바로 이동
 - 즐겨찾기 인라인 토글
@@ -250,7 +251,7 @@ LOLIVE/
 │       ├── TeamDetailView, LeaguePlayerDetailView, SeasonStatsView
 │       ├── MatchDetailView, PlayerDetailView
 │       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, ...
-├── ContentView.swift        — TabView 진입점 + 딥링크 처리
+├── ContentView.swift        — TabView 진입점 (Today/Leagues/Players/Favorites/Search 5탭)
 ├── LOLIVEApp.swift          — 앱 진입점
 └── LOLIVEWidgets/           — Widget Extension
     ├── FavoriteTeamWidget.swift
