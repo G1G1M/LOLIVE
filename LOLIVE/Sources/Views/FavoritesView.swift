@@ -18,32 +18,29 @@ struct FavoritesView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                // ── 커스텀 Large Title 헤더 ──────────────────────────
-                Section {
-                    // 빈 섹션 본문: 헤더만 렌더링
-                } header: {
-                    HStack {
-                        Text("즐겨찾기")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundStyle(Color(.label))
-                            .textCase(nil)
-                        Spacer()
-                        if hasFavorites {
-                            Button {
-                                showingTeamSearch = true
-                            } label: {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 17, weight: .medium))
-                                    .foregroundStyle(Color.accentColor)
-                                    .frame(width: 36, height: 36)
-                            }
+            VStack(spacing: 0) {
+                HStack {
+                    Text("즐겨찾기")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Color(.label))
+                    Spacer()
+                    if hasFavorites {
+                        Button {
+                            showingTeamSearch = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 36, height: 36)
                         }
                     }
-                    .padding(.top, 12)
-                    .padding(.bottom, 4)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 6)
+                .background(Color(.systemGroupedBackground))
 
+                List {
                 // ── 즐겨찾기 없을 때 ─────────────────────────────────
                 if !hasFavorites {
                     Section {
@@ -125,7 +122,9 @@ struct FavoritesView: View {
                     }
                 }
             }
-            .listStyle(.insetGrouped)
+                .listStyle(.insetGrouped)
+            } // VStack end
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingTeamSearch) {
                 TeamSearchView()

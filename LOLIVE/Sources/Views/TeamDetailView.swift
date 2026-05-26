@@ -29,6 +29,8 @@ struct TeamDetailView: View {
             if viewModel.isLoading {
                 ProgressView("불러오는 중...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.loadFailed {
+                fetchErrorView { Task { await viewModel.load() } }
             } else {
                 ScrollView {
                     VStack(spacing: 16) {
@@ -61,6 +63,22 @@ struct TeamDetailView: View {
             await viewModel.load()
             checkFavoriteStatus()
         }
+    }
+
+    // MARK: - Error
+
+    private func fetchErrorView(_ retry: @escaping () -> Void) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 36))
+                .foregroundStyle(.secondary)
+            Text("데이터를 불러올 수 없습니다")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button("다시 시도", action: retry)
+                .buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Favorite

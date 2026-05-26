@@ -30,6 +30,7 @@ final class LeagueDetailViewModel {
     var selectedTab: Tab = .standings
     var showBracket: Bool = false
     var standings: [Standing] = []
+    var loadFailed = false
 
     var standingGroups: [(name: String, standings: [Standing])] {
         var seen = Set<String>()
@@ -96,13 +97,24 @@ final class LeagueDetailViewModel {
     func load() async {
         let hadCache = preloadFromCache()
         isLoading = !hadCache
+        loadFailed = false
         defer { isLoading = false }
 
         // 일정 + 토너먼트 병렬 조회
         async let scheduleTask = service.fetchSchedule(league: league)
         async let tournamentsTask = service.fetchTournaments(leagueId: league.id)
-        let allMatches = (try? await scheduleTask) ?? []
-        let tournaments = (try? await tournamentsTask) ?? []
+        let scheduleFetch    = try? await scheduleTask
+        let tournamentsFetch = try? await tournamentsTask
+
+        if scheduleFetch == nil && tournamentsFetch == nil && !hadCache {
+            if !preloadFromStaleCache() {
+                loadFailed = true
+            }
+            return
+        }
+
+        let allMatches  = scheduleFetch    ?? []
+        let tournaments = tournamentsFetch ?? []
 
         let now = Date()
         upcomingMatches = allMatches
@@ -111,6 +123,11 @@ final class LeagueDetailViewModel {
         completedMatches = allMatches
             .filter { $0.state == .completed }
             .sorted { $0.startTime > $1.startTime }
+
+        // 최근 완료 경기 상세 데이터 백그라운드 프리로드
+        for match in completedMatches.prefix(8) {
+            MatchDetailViewModel.preload(match: match)
+        }
 
         // 현재 토너먼트로 순위 + 선수 조회
         guard let tournament = activeTournament(from: tournaments) else { return }
@@ -174,6 +191,23 @@ final class LeagueDetailViewModel {
         return true
     }
 
+    private func preloadFromStaleCache() -> Bool {
+        guard let allMatches: [Match] = AppDiskCache.getStale(key: "schedule_\(league.id)") else { return false }
+        let now = Date()
+        upcomingMatches = allMatches
+            .filter { $0.startTime >= now && $0.state == .unstarted }
+            .sorted { $0.startTime < $1.startTime }
+        completedMatches = allMatches
+            .filter { $0.state == .completed }
+            .sorted { $0.startTime > $1.startTime }
+        if let tournaments: [Tournament] = AppDiskCache.getStale(key: "tournaments_\(league.id)"),
+           let tournament = activeTournament(from: tournaments),
+           let fetched: [Standing] = AppDiskCache.getStale(key: "standings_\(tournament.id)") {
+            standings = applyGD(fetched, schedule: allMatches)
+        }
+        return true
+    }
+
     private func applyGD(_ standings: [Standing], schedule: [Match]) -> [Standing] {
         let completed = schedule.filter { $0.state == .completed }
         var gameWinsMap: [String: Int] = [:]
@@ -200,18 +234,6 @@ final class LeagueDetailViewModel {
         }
     }
 
-    private func activeTournament(from tournaments: [Tournament]) -> Tournament? {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        let now = Date()
-        // 현재 진행 중인 토너먼트 우선, 없으면 가장 최근
-        let active = tournaments.first {
-            guard let s = fmt.date(from: $0.startDate),
-                  let e = fmt.date(from: $0.endDate) else { return false }
-            return now >= s && now <= e
-        }
-        return active ?? tournaments.last
-    }
 }
 
 private func roundOrder(_ name: String) -> Int {

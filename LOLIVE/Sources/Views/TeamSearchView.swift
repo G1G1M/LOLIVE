@@ -32,10 +32,30 @@ struct TeamSearchView: View {
                 if viewModel.isLoading {
                     ProgressView("팀 목록 불러오는 중...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if viewModel.loadFailed {
+                    VStack(spacing: 14) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 36)).foregroundStyle(.secondary)
+                        Text("팀 목록을 불러올 수 없습니다")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        Button("다시 시도") { Task { await viewModel.load() } }
+                            .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(filtered) { result in
-                        teamRow(result)
-                            .listRowBackground(Color(.secondarySystemGroupedBackground))
+                    List {
+                        if filtered.isEmpty && !searchText.isEmpty {
+                            Text("'\(searchText)'에 대한 결과 없음")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 40)
+                                .listRowBackground(Color(.systemGroupedBackground))
+                        } else {
+                            ForEach(filtered) { result in
+                                teamRow(result)
+                                    .listRowBackground(Color(.secondarySystemGroupedBackground))
+                            }
+                        }
                     }
                     .listStyle(.insetGrouped)
                     .searchable(text: $searchText, prompt: "팀 이름 또는 리그 검색")

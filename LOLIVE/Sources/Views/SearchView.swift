@@ -7,12 +7,14 @@ import SwiftUI
 import SwiftData
 
 struct SearchView: View {
+    let focusTrigger: Int
+
     @State private var viewModel = SearchViewModel()
     @State private var searchText = ""
+    @FocusState private var isSearchFocused: Bool
     @Query private var favoriteTeams: [FavoriteTeam]
     @Query private var favoritePlayers: [FavoritePlayer]
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
 
     private var results: [SearchViewModel.SearchResult] {
         viewModel.results(for: searchText)
@@ -20,30 +22,63 @@ struct SearchView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Text("검색")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Color(.label))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 6)
+                .background(Color(.systemGroupedBackground))
 
-                if viewModel.isLoading && searchText.isEmpty {
-                    ProgressView("불러오는 중...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if searchText.isEmpty {
-                    emptyPrompt
-                } else if results.isEmpty {
-                    noResults
-                } else {
-                    resultList
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("리그, 팀, 선수 검색", text: $searchText)
+                        .font(.subheadline)
+                        .focused($isSearchFocused)
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color(.systemGroupedBackground))
+
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+
+                    if viewModel.isLoading && searchText.isEmpty {
+                        ProgressView("불러오는 중...")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if searchText.isEmpty {
+                        emptyPrompt
+                    } else if results.isEmpty {
+                        noResults
+                    } else {
+                        resultList
+                    }
                 }
             }
-            .navigationTitle("검색")
-            .navigationBarTitleDisplayMode(.large)
-            .searchable(text: $searchText, prompt: "리그, 팀, 선수 검색")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
-                }
-            }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
         }
         .task { await viewModel.load() }
+        .task(id: focusTrigger) {
+            guard focusTrigger > 0 else { return }
+            try? await Task.sleep(for: .milliseconds(150))
+            isSearchFocused = true
+        }
     }
 
     // MARK: - States
@@ -224,6 +259,6 @@ struct SearchView: View {
 }
 
 #Preview {
-    SearchView()
+    SearchView(focusTrigger: 0)
         .preferredColorScheme(.dark)
 }

@@ -8,7 +8,8 @@ import Foundation
 struct AppDiskCache {
 
     private static let dir: URL = {
-        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
         let dir = base.appendingPathComponent("riot_cache", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
@@ -43,6 +44,15 @@ struct AppDiskCache {
             try? FileManager.default.removeItem(at: file)
             return nil
         }
+        return envelope.value
+    }
+
+    /// API 실패 시 stale fallback용 — TTL 무시하고 캐시된 데이터를 그대로 반환합니다.
+    static func getStale<T: Codable>(key: String) -> T? {
+        let file = fileURL(for: key)
+        guard let data = try? Data(contentsOf: file),
+              let envelope = try? decoder.decode(Envelope<T>.self, from: data)
+        else { return nil }
         return envelope.value
     }
 

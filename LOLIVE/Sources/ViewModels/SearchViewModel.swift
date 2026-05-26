@@ -84,7 +84,7 @@ final class SearchViewModel {
                 for league in leagues {
                     group.addTask {
                         guard let tournaments = try? await svc.fetchTournaments(leagueId: league.id),
-                              let tournament = self.activeTournament(from: tournaments) else { return ([], []) }
+                              let tournament = activeTournament(from: tournaments) else { return ([], []) }
 
                         let standings = (try? await svc.fetchStandings(tournamentId: tournament.id)) ?? []
                         let teams: [(Team, League)] = standings.map { ($0.team, league) }
@@ -160,17 +160,6 @@ final class SearchViewModel {
         return true
     }
 
-    private nonisolated func activeTournament(from tournaments: [Tournament]) -> Tournament? {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        let now = Date()
-        let active = tournaments.first {
-            guard let s = fmt.date(from: $0.startDate),
-                  let e = fmt.date(from: $0.endDate) else { return false }
-            return now >= s && now <= e
-        }
-        return active ?? tournaments.last
-    }
 
     private let primaryLeagueIDs: Set<String> = [
         "98767991310872058",  // LCK

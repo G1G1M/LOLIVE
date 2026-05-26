@@ -17,6 +17,7 @@ final class StandingsViewModel {
     var selectedLeague: League? = nil
     var isLoadingLeagues = false
     var isLoadingStandings = false
+    var loadFailed = false
 
     // 그룹이 2개 이상일 때 사용. 단일 그룹이면 빈 배열 반환
     var standingGroups: [(name: String, standings: [Standing])] {
@@ -47,16 +48,22 @@ final class StandingsViewModel {
     func loadLeagues() async {
         let hadCache = preloadFromCache()
         isLoadingLeagues = !hadCache
+        loadFailed = false
         defer { isLoadingLeagues = false }
 
-        let fetched = (try? await service.fetchLeagues()) ?? []
-        leagues = fetched
-            .filter { !excludedRegions.contains($0.region) }
-            .filter { league in
-                let name = league.name.lowercased()
-                return !secondaryKeywords.contains(where: { name.contains($0) })
-            }
-            .sorted { regionOrder($0.region) < regionOrder($1.region) }
+        let fetchResult = try? await service.fetchLeagues()
+        if let fetched = fetchResult {
+            leagues = fetched
+                .filter { !excludedRegions.contains($0.region) }
+                .filter { league in
+                    let name = league.name.lowercased()
+                    return !secondaryKeywords.contains(where: { name.contains($0) })
+                }
+                .sorted { regionOrder($0.region) < regionOrder($1.region) }
+        } else if !hadCache {
+            loadFailed = true
+            return
+        }
 
         // 기본 선택: 첫 번째 리그
         if let first = leagues.first {
@@ -166,17 +173,6 @@ final class StandingsViewModel {
         }
     }
 
-    private func activeTournament(from tournaments: [Tournament]) -> Tournament? {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        let now = Date()
-        let active = tournaments.first {
-            guard let s = fmt.date(from: $0.startDate),
-                  let e = fmt.date(from: $0.endDate) else { return false }
-            return now >= s && now <= e
-        }
-        return active ?? tournaments.last
-    }
 
     private func regionOrder(_ region: String) -> Int {
         switch region {

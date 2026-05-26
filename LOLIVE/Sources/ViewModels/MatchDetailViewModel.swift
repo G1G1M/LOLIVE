@@ -77,6 +77,9 @@ final class MatchDetailViewModel {
     // MARK: - Public
 
     func load() async {
+        // 완료된 경기: 디스크 캐시 먼저 확인 → 있으면 로딩 없이 즉시 표시
+        if match.state == .completed, await tryLoadFromCache() { return }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -138,24 +141,99 @@ final class MatchDetailViewModel {
                 selectedGameId = lastPlayable.gameId
             }
 
-            // Riot API에 밴 데이터가 없으면 Leaguepedia에서 보완
-            let lpService = leaguepediaService
-            let completedGames = playableGames.filter { $0.state == .completed }
-            await withTaskGroup(of: (String, (team1Bans: [String], team2Bans: [String])?).self) { group in
-                for game in completedGames {
-                    guard game.blueBans.isEmpty && game.redBans.isEmpty else { continue }
-                    let gameId = game.gameId
-                    group.addTask {
-                        let bans = await lpService.fetchBans(riotGameId: gameId)
-                        return (gameId, bans)
-                    }
-                }
-                for await (gameId, bans) in group {
-                    if let bans { leaguepediaBans[gameId] = bans }
-                }
+            // 완료 경기는 디스크에 저장 (다음 진입 시 즉시 표시)
+            if match.state == .completed {
+                AppDiskCache.set(key: "event_detail_\(match.id)", value: detail)
             }
+
+            await fetchLeaguepediaBans(for: playableGames.filter { $0.state == .completed })
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Static Preload
+
+    /// 경기 목록 화면에서 완료된 경기 데이터를 백그라운드로 미리 캐싱.
+    /// 이미 캐시된 경기는 건너뜀.
+    static func preload(match: Match) {
+        guard match.state == .completed else { return }
+        let detailKey = "event_detail_\(match.id)"
+        guard (AppDiskCache.get(key: detailKey, maxAge: 30 * 24 * 3600) as EventDetailInfo?) == nil else { return }
+
+        Task.detached(priority: .background) {
+            let esports = RiotEsportsService()
+            let liveStats = LiveStatsService()
+            guard let detail = try? await esports.fetchEventDetails(matchId: match.id) else { return }
+            AppDiskCache.set(key: detailKey, value: detail)
+
+            let cache = GameWindowCache.shared
+            let startTime = match.startTime
+            await withTaskGroup(of: Void.self) { group in
+                for game in detail.games where game.state == .completed {
+                    let gid = game.gameId
+                    let num = game.number
+                    group.addTask {
+                        guard await cache.window(for: gid) == nil else { return }
+                        if let w = try? await liveStats.fetchGameWindow(gameId: gid, startingTime: nil),
+                           w.hasLiveStats {
+                            await cache.save(w); return
+                        }
+                        let base = 20.0 + Double(num - 1) * 70.0
+                        var best: (Double, GameWindow)? = nil
+                        await withTaskGroup(of: (Double, GameWindow?).self) { inner in
+                            for extra in [55.0, 45.0, 35.0, 20.0] {
+                                let t = startTime.addingTimeInterval((base + extra) * 60)
+                                inner.addTask {
+                                    let w = try? await liveStats.fetchGameWindow(gameId: gid, startingTime: t)
+                                    return (base + extra, w?.hasLiveStats == true ? w : nil)
+                                }
+                            }
+                            for await (k, w) in inner {
+                                if let w, best == nil || k > best!.0 { best = (k, w) }
+                            }
+                        }
+                        if let w = best?.1 { await cache.save(w) }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Cache helpers
+
+    private func tryLoadFromCache() async -> Bool {
+        guard let detail: EventDetailInfo = AppDiskCache.get(key: "event_detail_\(match.id)", maxAge: 30 * 24 * 3600)
+        else { return false }
+
+        eventDetail = detail
+        selectedGameId = detail.games.last(where: { $0.state.isPlayable })?.gameId
+
+        let cache = GameWindowCache.shared
+        for game in detail.games.filter({ $0.state.isPlayable }) {
+            if let window = await cache.window(for: game.gameId) {
+                gameWindows[game.gameId] = window
+            }
+        }
+
+        await fetchLeaguepediaBans(for: detail.games.filter { $0.state == .completed })
+        return true
+    }
+
+    private func fetchLeaguepediaBans(for games: [GameInfo]) async {
+        let lpService = leaguepediaService
+        await withTaskGroup(of: (String, (team1Bans: [String], team2Bans: [String])?).self) { group in
+            for game in games {
+                guard game.blueBans.isEmpty && game.redBans.isEmpty else { continue }
+                let gameId = game.gameId
+                group.addTask {
+                    let bans = await lpService.fetchBans(riotGameId: gameId)
+                    return (gameId, bans)
+                }
+            }
+            for await (gameId, bans) in group {
+                if let bans { self.leaguepediaBans[gameId] = bans }
+            }
         }
     }
 

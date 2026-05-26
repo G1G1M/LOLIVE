@@ -18,6 +18,7 @@ final class TeamSearchViewModel {
 
     var allTeams: [TeamResult] = []
     var isLoading = false
+    var loadFailed = false
 
     private let service: RiotEsportsServiceProtocol
 
@@ -28,9 +29,13 @@ final class TeamSearchViewModel {
     func load() async {
         guard allTeams.isEmpty else { return }
         isLoading = true
+        loadFailed = false
         defer { isLoading = false }
 
-        let leagues = (try? await service.fetchLeagues()) ?? []
+        guard let leagues = try? await service.fetchLeagues(), !leagues.isEmpty else {
+            loadFailed = true
+            return
+        }
         let svc = service
 
         var results: [TeamResult] = []
@@ -38,7 +43,7 @@ final class TeamSearchViewModel {
             for league in leagues {
                 group.addTask {
                     guard let tournaments = try? await svc.fetchTournaments(leagueId: league.id),
-                          let tournament = self.activeTournament(from: tournaments)
+                          let tournament = activeTournament(from: tournaments)
                     else { return [] }
                     let standings = (try? await svc.fetchStandings(tournamentId: tournament.id)) ?? []
                     return standings.map { TeamResult(team: $0.team, league: league) }
@@ -56,17 +61,6 @@ final class TeamSearchViewModel {
             .sorted { $0.team.name < $1.team.name }
     }
 
-    private nonisolated func activeTournament(from tournaments: [Tournament]) -> Tournament? {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        let now = Date()
-        let active = tournaments.first {
-            guard let s = fmt.date(from: $0.startDate),
-                  let e = fmt.date(from: $0.endDate) else { return false }
-            return now >= s && now <= e
-        }
-        return active ?? tournaments.last
-    }
 
     private func isInternational(_ league: League) -> Bool {
         let name   = league.name.lowercased()

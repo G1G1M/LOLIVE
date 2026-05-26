@@ -123,7 +123,12 @@ final class TodayViewModel {
             liveMatches = enrich(live)
             classify(matches: allMatches)
         } catch {
-            errorMessage = errorDescription(error)
+            // 화면에 데이터가 전혀 없을 때만 에러 표시
+            // 캐시 데이터가 이미 있으면 에러 알림 없이 유지
+            let hasData = !todayMatches.isEmpty || !completedMatches.isEmpty || !upcomingMatches.isEmpty
+            if !hasData && !loadFromStaleCache() {
+                errorMessage = errorDescription(error)
+            }
         }
 
         isLoading = false
@@ -194,6 +199,20 @@ final class TodayViewModel {
         return true
     }
 
+    private func loadFromStaleCache() -> Bool {
+        guard let leagues: [League] = AppDiskCache.getStale(key: "leagues") else { return false }
+        var allMatches: [Match] = []
+        for league in leagues {
+            if let matches: [Match] = AppDiskCache.getStale(key: "schedule_\(league.id)") {
+                allMatches.append(contentsOf: matches)
+            }
+        }
+        guard !allMatches.isEmpty else { return false }
+        cachedLeagues = leagues
+        classify(matches: allMatches)
+        return true
+    }
+
     private func enrich(_ live: [LiveMatch]) -> [LiveMatch] {
         let map = Dictionary(uniqueKeysWithValues: cachedLeagues.map { ($0.id, $0.imageURL) })
         return live.map { lm in
@@ -235,6 +254,10 @@ final class TodayViewModel {
         completedMatches = matches.filter {
             $0.state == .completed && $0.startTime >= fiveDaysAgo
         }.sorted { $0.startTime > $1.startTime }
+
+        for match in completedMatches.prefix(8) {
+            MatchDetailViewModel.preload(match: match)
+        }
     }
 
     private func errorDescription(_ error: Error) -> String {

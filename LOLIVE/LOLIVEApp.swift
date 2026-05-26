@@ -83,6 +83,7 @@ struct LOLIVEApp: App {
                 case .main:
                     ContentView()
                         .environment(todayViewModel)
+                        .onAppear { AppPreloadService.shared.start() }
                         .onOpenURL { url in
                             guard url.scheme == "lolive",
                                   url.host == "team",

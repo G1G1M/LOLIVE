@@ -9,6 +9,7 @@ struct LeaguesView: View {
 
     @State private var leagues: [League] = []
     @State private var isLoading = false
+    @State private var loadFailed = false
     @State private var searchText = ""
 
     private let service = RiotEsportsService()
@@ -76,6 +77,15 @@ struct LeaguesView: View {
 
                     if isLoading && leagues.isEmpty {
                         ProgressView("불러오는 중...")
+                    } else if loadFailed && leagues.isEmpty {
+                        VStack(spacing: 14) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 36)).foregroundStyle(.secondary)
+                            Text("데이터를 불러올 수 없습니다")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                            Button("다시 시도") { Task { await load() } }
+                                .buttonStyle(.bordered)
+                        }
                     } else {
                         leagueList
                     }
@@ -135,7 +145,7 @@ struct LeaguesView: View {
             Spacer()
 
             if isInternational {
-                Image(systemName: "bracket.wide")
+                Image(systemName: "globe")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -146,12 +156,21 @@ struct LeaguesView: View {
     // MARK: - Data
 
     private func load() async {
+        let hadCache: Bool
         if let cached: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600), !cached.isEmpty {
             leagues = cached
+            hadCache = true
         } else {
             isLoading = true
+            hadCache = false
         }
-        leagues = (try? await service.fetchLeagues()) ?? leagues
+        loadFailed = false
+        let result = try? await service.fetchLeagues()
+        if let result {
+            leagues = result
+        } else if !hadCache {
+            loadFailed = true
+        }
         isLoading = false
     }
 

@@ -26,6 +26,17 @@ struct SeasonStatsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             } else if let stats {
                 statsCard(stats)
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "chart.bar.xaxis")
+                        .foregroundStyle(.secondary)
+                    Text("시즌 스탯 없음")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         }
         .task {

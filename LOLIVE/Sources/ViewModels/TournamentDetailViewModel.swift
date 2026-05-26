@@ -26,6 +26,7 @@ final class TournamentDetailViewModel {
     var allMatches: [Match] = []
     var isLoading = false
     var isLoadingHistoricalMatches = false  // 과거 연도 탭 선택 시 경기 로딩 표시
+    var loadFailed = false
 
     private var historicalYearSet: Set<Int> = []  // Leaguepedia에 존재하는 연도 집합
 
@@ -114,12 +115,21 @@ final class TournamentDetailViewModel {
 
     func load() async {
         isLoading = true
+        loadFailed = false
 
         async let tournamentsTask = service.fetchTournaments(leagueId: league.id)
         async let matchesTask     = service.fetchAllSchedule(league: league)
 
-        let fetched     = (try? await tournamentsTask) ?? []
-        let riotMatches = (try? await matchesTask) ?? []
+        let tournamentsFetch = try? await tournamentsTask
+        let riotMatches      = (try? await matchesTask) ?? []
+
+        if tournamentsFetch == nil && riotMatches.isEmpty {
+            isLoading = false
+            loadFailed = true
+            return
+        }
+
+        let fetched = tournamentsFetch ?? []
 
         allMatches  = riotMatches
         tournaments = buildTournamentList(apiTournaments: fetched, matches: allMatches)
@@ -128,6 +138,11 @@ final class TournamentDetailViewModel {
         if let t = defaultT { selectedTournamentId = t.id }
         selectedRound = availableRounds.first
         isLoading = false  // Riot API 데이터로 즉시 화면 표시
+
+        // 현재 토너먼트 완료 경기 백그라운드 프리로드
+        for match in tournamentMatches.filter({ $0.state == .completed }).prefix(8) {
+            MatchDetailViewModel.preload(match: match)
+        }
 
         // Phase 2: Leaguepedia에서 연도 목록만 가져와 탭 즉시 추가 (경기 데이터 제외)
         let riotYearCounts = Dictionary(
@@ -265,17 +280,6 @@ final class TournamentDetailViewModel {
               let end   = fmt.date(from: tournament.endDate) else { return [] }
         let endExtended = Calendar.current.date(byAdding: .day, value: 1, to: end) ?? end
         return matches.filter { $0.startTime >= start && $0.startTime < endExtended }
-    }
-
-    private func activeTournament(from list: [Tournament]) -> Tournament? {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        let now = Date()
-        return list.first {
-            guard let s = fmt.date(from: $0.startDate),
-                  let e = fmt.date(from: $0.endDate) else { return false }
-            return now >= s && now <= e
-        }
     }
 
     private func roundOrder(_ name: String) -> Int {

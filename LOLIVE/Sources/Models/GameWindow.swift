@@ -7,14 +7,14 @@ import Foundation
 
 // MARK: - Event Detail
 
-struct EventDetailInfo {
+struct EventDetailInfo: Codable {
     let strategyCount: Int
     let games: [GameInfo]
     let teamAEsportsId: String  // match.teamA에 대응하는 실제 esports 팀 ID
     let teamBEsportsId: String  // match.teamB에 대응하는 실제 esports 팀 ID
 }
 
-struct GameInfo: Identifiable {
+struct GameInfo: Identifiable, Codable {
     var id: String { gameId }
     let number: Int
     let gameId: String
@@ -25,7 +25,7 @@ struct GameInfo: Identifiable {
     let redBans: [String]
 }
 
-enum GameInfoState: String {
+enum GameInfoState: String, Codable {
     case completed
     case inProgress
     case unstarted

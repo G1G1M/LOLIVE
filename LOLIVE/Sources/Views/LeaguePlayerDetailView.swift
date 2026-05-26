@@ -40,6 +40,17 @@ struct LeaguePlayerDetailView: View {
                         .padding(.vertical, 24)
                         .background(Color(.secondarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
+                    } else if viewModel.championStats.isEmpty && viewModel.recentResults.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "chart.bar.xaxis")
+                                .foregroundStyle(.secondary)
+                            Text("통계 데이터가 없습니다")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                     } else {
                         if !viewModel.championStats.isEmpty {
                             championCard

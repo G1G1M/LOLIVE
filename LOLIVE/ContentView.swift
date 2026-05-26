@@ -14,7 +14,7 @@ struct ContentView: View {
     @Environment(TodayViewModel.self) private var todayViewModel
     @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
     @State private var selectedTab = 0
-    @State private var showSearch = false
+    @State private var searchFocusTrigger = 0
 
     private var themeColor: Color {
         primaryTeamCode.isEmpty ? Color.accentColor : TeamTheme.color(for: primaryTeamCode)
@@ -38,21 +38,15 @@ struct ContentView: View {
                 .tag(3)
                 .tabItem { Label("Favorites", systemImage: "star.fill") }
 
-            Color.clear
+            SearchView(focusTrigger: searchFocusTrigger)
                 .tag(4)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
         }
         .tint(themeColor)
-        .onChange(of: selectedTab) { old, new in
+        .onChange(of: selectedTab) { _, new in
             if new == 4 {
-                var t = Transaction()
-                t.disablesAnimations = true
-                withTransaction(t) { showSearch = true }
-                selectedTab = old
+                searchFocusTrigger += 1
             }
-        }
-        .fullScreenCover(isPresented: $showSearch) {
-            SearchView()
         }
         .task {
             syncFavoritedTeamIds()

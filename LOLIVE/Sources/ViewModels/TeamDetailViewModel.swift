@@ -22,6 +22,7 @@ final class TeamDetailViewModel {
     var recentMatches: [Match] = []
     var h2hRecords: [H2HRecord] = []
     var isLoading = false
+    var loadFailed = false
 
     private let team: Team
     private let league: League
@@ -37,13 +38,22 @@ final class TeamDetailViewModel {
     func load() async {
         let hadCache = preloadFromCache()
         isLoading = !hadCache
+        loadFailed = false
         defer { isLoading = false }
 
         async let rosterTask = service.fetchTeamRoster(teamId: team.id)
         async let scheduleTask = service.fetchSchedule(league: league)
 
-        let roster = (try? await rosterTask) ?? []
-        let allMatches = (try? await scheduleTask) ?? []
+        let rosterResult = try? await rosterTask
+        let matchResult  = try? await scheduleTask
+
+        if !hadCache && rosterResult == nil && matchResult == nil {
+            loadFailed = true
+            return
+        }
+
+        let roster = rosterResult ?? []
+        let allMatches = matchResult ?? []
 
         players = roster.sorted { roleOrder($0.role) < roleOrder($1.role) }
 

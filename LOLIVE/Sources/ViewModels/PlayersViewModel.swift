@@ -24,6 +24,7 @@ final class PlayersViewModel {
     var allPlayers: [PlayerEntry] = []
     var leagues: [League] = []
     var isLoading = false
+    var loadFailed = false
     var selectedRole: String? = nil
     var selectedLeagueId: String? = nil
     var searchText = ""
@@ -64,12 +65,16 @@ final class PlayersViewModel {
     func load() async {
         if preloadFromCache() { return }
         isLoading = true
+        loadFailed = false
         defer { isLoading = false }
 
         let svc = service
 
         // 1. 전체 리그 로드 → 국제 대회 제외
-        let fetchedLeagues = (try? await svc.fetchLeagues()) ?? []
+        guard let fetchedLeagues = try? await svc.fetchLeagues() else {
+            loadFailed = true
+            return
+        }
         let loadableLeagues = fetchedLeagues.filter { !excludedRegions.contains($0.region) }
 
         // 필터 칩: 1군 리그만 지역 순서로 표시
@@ -85,7 +90,7 @@ final class PlayersViewModel {
             for league in loadableLeagues {
                 group.addTask {
                     guard let tournaments = try? await svc.fetchTournaments(leagueId: league.id),
-                          let tournament = pickActiveTournament(from: tournaments) else { return [] }
+                          let tournament = activeTournament(from: tournaments) else { return [] }
 
                     let standings = (try? await svc.fetchStandings(tournamentId: tournament.id)) ?? []
                     guard !standings.isEmpty else { return [] }
@@ -235,16 +240,3 @@ final class PlayersViewModel {
     }
 }
 
-// MARK: - File-level helper (task group 내부에서 self 없이 호출 가능)
-
-private func pickActiveTournament(from tournaments: [Tournament]) -> Tournament? {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    let now = Date()
-    let active = tournaments.first {
-        guard let s = fmt.date(from: $0.startDate),
-              let e = fmt.date(from: $0.endDate) else { return false }
-        return now >= s && now <= e
-    }
-    return active ?? tournaments.last
-}
