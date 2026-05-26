@@ -170,6 +170,7 @@ TournamentDetailViewModel.load()
 
 ```
 앱 실행
+    ├─ AppPreloadService.start()  — 1군 리그 최근 경기 상세 백그라운드 프리로드
     └─ 각 ViewModel.load()
            ├─ preloadFromCache() → 디스크 캐시 즉시 표시 (스피너 없음)
            └─ 백그라운드 API fetch → 조용히 갱신
@@ -177,6 +178,17 @@ TournamentDetailViewModel.load()
 
 - 캐시 부분 히트(일부 리그만 캐시됨)도 있는 것만 즉시 표시
 - `CachedAsyncImage`: 메모리 → 디스크 → 네트워크 3단계 캐시
+
+### API 오류 대응 (Stale 캐시 폴백)
+
+API 호출이 실패하더라도 TTL이 만료된 기존 캐시가 있으면 데이터를 표시합니다.
+
+```
+API 실패
+    ├─ 유효 캐시 있음 → 기존 데이터 그대로 유지 (에러 화면 미표시)
+    ├─ 만료된 캐시 있음 → AppDiskCache.getStale() → 오래된 데이터라도 표시
+    └─ 캐시 없음 → 에러 메시지 표시
+```
 
 ## 시즌 스탯 / 챔피언 픽 아키텍처
 
@@ -232,6 +244,7 @@ LOLIVE/
 │   │   ├── LiveStatsService     — 게임 윈도우 데이터
 │   │   ├── LiveActivityService  — Dynamic Island / 잠금화면
 │   │   ├── MatchNotificationService — 로컬 알림
+│   │   ├── AppPreloadService    — 앱 시작 시 1군 리그 최근 경기 상세 프리로드
 │   │   └── SharedDataService    — App Groups 동기화
 │   ├── ViewModels/
 │   │   ├── TodayViewModel           — 경기 목록 + 라이브 폴링
