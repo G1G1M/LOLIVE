@@ -109,18 +109,21 @@ final class TodayViewModel {
             let leagues = try await service.fetchLeagues()
             cachedLeagues = leagues
 
-            let service = service
-            async let liveResult = service.fetchLive()
-            async let scheduleResults = withThrowingTaskGroup(of: [Match].self) { group in
+            let svc = service
+
+            // live fetch는 스케줄과 독립적으로 실행 — 실패해도 스케줄 표시에 영향 없음
+            Task {
+                if let live = try? await svc.fetchLive() {
+                    liveMatches = enrich(live)
+                }
+            }
+
+            let allMatches = try await withThrowingTaskGroup(of: [Match].self) { group in
                 for league in leagues {
-                    group.addTask { try await service.fetchSchedule(league: league) }
+                    group.addTask { try await svc.fetchSchedule(league: league) }
                 }
                 return try await group.reduce(into: [Match]()) { $0.append(contentsOf: $1) }
             }
-
-            let (live, allMatches) = try await (liveResult, scheduleResults)
-
-            liveMatches = enrich(live)
             classify(matches: allMatches)
         } catch {
             // 화면에 데이터가 전혀 없을 때만 에러 표시
