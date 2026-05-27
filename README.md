@@ -44,9 +44,11 @@
 
 ### Today
 - FotMob 스타일 날짜 선택 스트립 (오늘 기준 ±5일, 시작 시 오늘 날짜 자동 중앙 정렬)
+- 날짜 탭 시 해당 날짜로 스트립 자동 스크롤 (애니메이션)
 - 선택 날짜 기준 리그별 그룹화 경기 목록
 - LIVE 경기 자동 감지 및 폴링 (오늘 날짜에서만 표시)
 - live fetch와 schedule fetch 독립 실행 — live 실패/지연이 경기 일정 표시에 영향 없음
+- 라이브·예정·완료 경기 동일 ID 중복 제거 (ForEach collision 방지)
 - 즐겨찾기 팀 경기만 필터링 (전체 / ★ 즐겨찾기 토글)
 - 타이틀 · 날짜 스트립 · 필터 고정, 경기 목록만 스크롤
 
@@ -78,6 +80,8 @@
 - 최근 경기 결과 탭 → 경기 상세 이동
 
 ### 선수 상세
+- 최근 경기 결과: Riot API 완료 즉시 표시 (Leaguepedia 대기 없음)
+- 시즌 스탯 / 챔피언 풀: Leaguepedia 로딩 중 스피너, 완료 시 순차 표시
 - 시즌 스탯: 승률, KDA, CS/분, 평균 킬/데스/어시스트
 - most픽 챔피언 (최근 5경기 기준) + 챔피언 이미지
 - 최근 경기 결과 탭 → 경기 상세 이동
@@ -86,6 +90,8 @@
 - 실시간 팀 스탯 (킬 / 골드 / 타워 / 드래곤 / 바론)
 - 게임별 선수 KDA, 골드, CS + 챔피언 이미지
 - 밴 카드: 게임별 blue/red 사이드 밴 챔피언 표시 (Riot API 데이터)
+- 미시작 경기: 로딩 스피너 없이 "경기 예정" 카드 + 시작 시간 표시
+- 게임 시리즈 픽커: 미시작 게임은 "예정" 텍스트 라벨로 표시
 - 팀 로고 탭 → 팀 상세 페이지 이동
 
 ### Favorites
@@ -171,7 +177,7 @@ TournamentDetailViewModel.load()
 
 ```
 앱 실행
-    ├─ AppPreloadService.start()  — 1군 리그 최근 경기 상세 백그라운드 프리로드
+    ├─ AppPreloadService.start()  — 경기 상세 + Leaguepedia 스탯 병렬 프리로드 (3초 지연)
     └─ 각 ViewModel.load()
            ├─ preloadFromCache() → 디스크 캐시 즉시 표시 (스피너 없음)
            └─ 백그라운드 API fetch → 조용히 갱신
@@ -196,21 +202,24 @@ API 실패
 Leaguepedia rate limit(API 호출 간 2.5초 대기) 이슈를 배치 로딩으로 해결합니다.
 
 ```
-앱 실행 후 Players/Search 탭 방문 시
-    └─ Task.detached(background)
-           └─ LeaguepediaService.preloadLeagueStats(league)  ← 리그별 순차 실행
+앱 실행 3초 후 (AppPreloadService)
+    ├─ preloadMatchDetails()        — 1군 리그 최근 완료 경기 상세 (병렬)
+    └─ preloadLeaguepediaStats()    — 1군 리그 시즌 스탯 + 챔피언 픽 (순차)
+           └─ LeaguepediaService.preloadLeagueStats(league)
                   ├─ currentOverviewPage() → 디스크 캐시 (24h TTL)
                   ├─ allPlayerStats()      → 500행씩 배치, 디스크 캐시 (24h TTL)
                   └─ allChampionPicks()    → 500행씩 배치, 디스크 캐시 (24h TTL)
 
 선수 상세 진입
-    ├─ SeasonStatsView.task
-    │      └─ playerSeasonStats() → 배치 캐시 히트 → 즉시 반환
-    └─ LeaguePlayerDetailViewModel.load()
-           ├─ async let scheduleTask  (Riot API, 병렬)
-           └─ async let picksTask     → 배치 캐시 히트 → 즉시 반환
+    ├─ async let scheduleTask   (Riot API, 병렬 시작)
+    ├─ async let seasonStatsTask (Leaguepedia, 병렬 시작)
+    └─ async let picksTask      (Leaguepedia, 병렬 시작)
+           │
+           ├─ scheduleTask 완료 즉시 → recentResults 표시 (Leaguepedia 대기 없음)
+           └─ seasonStats / picks 완료 → 순차 반영 (배치 캐시 히트 시 즉시)
 ```
 
+- 앱 시작 시 AppPreloadService가 Leaguepedia 스탯을 백그라운드 선로딩 → 선수 상세 진입 시 캐시 히트로 즉시 표시
 - 리그 전체 스탯·픽을 배치 1회 요청으로 수집 → 선수별 개별 API 호출 제거
 - 앱 재실행 시 디스크 캐시로 API 호출 없이 즉시 반환
 - `OverviewPage`도 디스크 캐시 → cold start 시 2.5초 rate limit 대기 제거
@@ -245,7 +254,7 @@ LOLIVE/
 │   │   ├── LiveStatsService     — 게임 윈도우 데이터
 │   │   ├── LiveActivityService  — Dynamic Island / 잠금화면
 │   │   ├── MatchNotificationService — 로컬 알림
-│   │   ├── AppPreloadService    — 앱 시작 시 1군 리그 최근 경기 상세 프리로드
+│   │   ├── AppPreloadService    — 앱 시작 시 경기 상세 + Leaguepedia 스탯 병렬 프리로드
 │   │   └── SharedDataService    — App Groups 동기화
 │   ├── ViewModels/
 │   │   ├── TodayViewModel           — 경기 목록 + 라이브 폴링

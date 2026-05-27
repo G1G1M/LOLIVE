@@ -97,6 +97,11 @@ struct TodayView: View {
             .onAppear {
                 proxy.scrollTo(cal.startOfDay(for: Date()), anchor: .center)
             }
+            .onChange(of: selectedDate) { _, newDate in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    proxy.scrollTo(newDate, anchor: .center)
+                }
+            }
         }
     }
 
@@ -200,8 +205,10 @@ struct TodayView: View {
     private var groupsForSelectedDate: [LeagueMatchGroup] {
         let isToday = cal.isDateInToday(selectedDate)
         var byLeague: [String: (League, [(Match, Bool)])] = [:]
+        var addedMatchIds = Set<String>()
 
         func add(_ match: Match, isLive: Bool) {
+            guard addedMatchIds.insert(match.id).inserted else { return }
             let lid = match.league.id
             if byLeague[lid] == nil { byLeague[lid] = (match.league, []) }
             byLeague[lid]!.1.append((match, isLive))

@@ -52,8 +52,14 @@ final class AppPreloadService {
 
         let primaryLeagues = leagues.filter { primaryLeagueIDs.contains($0.id) }
 
-        // 2. 리그별 일정 로드 후 완료 경기 프리로드
-        for league in primaryLeagues {
+        // 2. 경기 상세 프리로드 + Leaguepedia 스탯 프리로드 병렬 시작
+        async let matchPreload: Void = preloadMatchDetails(primaryLeagues, service: service)
+        async let statsPreload: Void = preloadLeaguepediaStats(primaryLeagues)
+        _ = await (matchPreload, statsPreload)
+    }
+
+    private func preloadMatchDetails(_ leagues: [League], service: RiotEsportsService) async {
+        for league in leagues {
             let schedule: [Match]
             if let cached: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) {
                 schedule = cached
@@ -61,14 +67,18 @@ final class AppPreloadService {
                 guard let fetched = try? await service.fetchSchedule(league: league) else { continue }
                 schedule = fetched
             }
-
             let completed = schedule
                 .filter { $0.state == .completed }
                 .sorted { $0.startTime > $1.startTime }
-
             for match in completed.prefix(8) {
                 MatchDetailViewModel.preload(match: match)
             }
+        }
+    }
+
+    private func preloadLeaguepediaStats(_ leagues: [League]) async {
+        for league in leagues {
+            await LeaguepediaService.shared.preloadLeagueStats(for: league)
         }
     }
 }

@@ -105,6 +105,7 @@ final class TournamentDetailViewModel {
 
     private let league: League
     private let service: RiotEsportsServiceProtocol
+    private var historicalLoadTask: Task<Void, Never>?
 
     init(league: League, service: RiotEsportsServiceProtocol = RiotEsportsService()) {
         self.league = league
@@ -114,6 +115,7 @@ final class TournamentDetailViewModel {
     // MARK: - Public
 
     func load() async {
+        guard !isLoading && allMatches.isEmpty else { return }
         isLoading = true
         loadFailed = false
 
@@ -202,8 +204,9 @@ final class TournamentDetailViewModel {
                   Calendar.current.component(.year, from: $0.startTime) == year
               })
         else { return }
+        historicalLoadTask?.cancel()
         isLoadingHistoricalMatches = true
-        Task { await loadHistoricalYear(year) }
+        historicalLoadTask = Task { await loadHistoricalYear(year) }
     }
 
     private func loadHistoricalYear(_ year: Int) async {

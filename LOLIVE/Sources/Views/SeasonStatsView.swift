@@ -6,11 +6,8 @@
 import SwiftUI
 
 struct SeasonStatsView: View {
-    let player: Player
-    let league: League
-
-    @State private var stats: PlayerSeasonStats?
-    @State private var isLoading = true
+    let stats: PlayerSeasonStats?
+    let isLoading: Bool
 
     var body: some View {
         Group {
@@ -38,13 +35,6 @@ struct SeasonStatsView: View {
                 .background(Color(.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             }
-        }
-        .task {
-            stats = await LeaguepediaService.shared.playerSeasonStats(
-                summonerName: player.summonerName,
-                league: league
-            )
-            isLoading = false
         }
     }
 

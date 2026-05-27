@@ -83,6 +83,7 @@ final class TodayViewModel {
 
     private let service: RiotEsportsServiceProtocol
     private var pollingTask: Task<Void, Never>?
+    private var syncTask: Task<Void, Never>?
     private var cachedLeagues: [League] = []
 
     private let calendar: Calendar = {
@@ -175,8 +176,9 @@ final class TodayViewModel {
     /// 즐겨찾기 변경 시 폴링 주기를 기다리지 않고 즉시 Live Activity 동기화.
     /// 최신 라이브 데이터를 직접 fetch해서 liveMatches가 오래됐거나 비어 있어도 정확히 동작.
     func syncLiveActivitiesNow() {
+        syncTask?.cancel()
         let svc = service
-        Task {
+        syncTask = Task {
             if let fresh = try? await svc.fetchLive() {
                 let enriched = enrich(fresh)
                 liveMatches = enriched

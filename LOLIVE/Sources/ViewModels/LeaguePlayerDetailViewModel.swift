@@ -40,6 +40,7 @@ final class LeaguePlayerDetailViewModel {
 
     var recentResults: [MatchResult] = []
     var championStats: [ChampionStat] = []
+    var seasonStats: PlayerSeasonStats? = nil
     var isLoadingStats = false
 
     // MARK: - Private
@@ -47,6 +48,7 @@ final class LeaguePlayerDetailViewModel {
     private let player: Player
     private let league: League
     private let service: RiotEsportsServiceProtocol
+    private var hasStartedLoad = false
 
     // MARK: - Init
 
@@ -60,17 +62,20 @@ final class LeaguePlayerDetailViewModel {
     // MARK: - Public
 
     func load() async {
-        isLoadingStats = true
-        defer { isLoadingStats = false }
+        guard !hasStartedLoad else { return }
+        hasStartedLoad = true
 
+        // 세 요청 동시 시작
         async let scheduleTask = service.fetchSchedule(league: league)
+        async let seasonStatsTask = LeaguepediaService.shared.playerSeasonStats(
+            summonerName: player.summonerName, league: league
+        )
         async let picksTask = LeaguepediaService.shared.playerChampionPicks(
             summonerName: player.summonerName, league: league
         )
 
+        // 스케줄은 빠른 Riot API → 완료 즉시 최근 경기 표시 (Leaguepedia 대기 없음)
         let allMatches = (try? await scheduleTask) ?? []
-
-        // 선수가 속한 팀의 완료된 경기 (최근 5경기)
         let teamMatches = allMatches
             .filter {
                 ($0.teamA.id == player.teamId || $0.teamA.code == player.teamCode ||
@@ -80,8 +85,6 @@ final class LeaguePlayerDetailViewModel {
             .sorted { $0.startTime > $1.startTime }
             .prefix(5)
             .map { $0 }
-
-        // 최근 경기 결과 생성
         recentResults = teamMatches.map { match in
             let isTeamA = match.teamA.id == player.teamId || match.teamA.code == player.teamCode
             let opponent = isTeamA ? match.teamB : match.teamA
@@ -90,6 +93,12 @@ final class LeaguePlayerDetailViewModel {
             return MatchResult(id: match.id, match: match, opponent: opponent, won: my > opp,
                                myScore: my, oppScore: opp, date: match.startTime)
         }
+
+        // Leaguepedia는 이미 병렬 실행 중 — 완료되면 순서대로 반영
+        isLoadingStats = true
+        defer { isLoadingStats = false }
+
+        seasonStats = await seasonStatsTask
 
         let picks = await picksTask
         if let picks = picks, !picks.isEmpty {

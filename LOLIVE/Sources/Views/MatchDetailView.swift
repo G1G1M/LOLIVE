@@ -42,6 +42,8 @@ struct MatchDetailView: View {
                         .padding(16)
                         .background(Color(.secondarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
+                    } else if match.state == .unstarted && viewModel.eventDetail == nil {
+                        upcomingCard
                     } else if let detail = viewModel.eventDetail {
                         if detail.games.filter({ $0.state != .unneeded }).count > 1 {
                             gameSeriesPicker(detail: detail)
@@ -204,9 +206,15 @@ struct MatchDetailView: View {
                             .fontWeight(viewModel.selectedGameId == game.gameId ? .bold : .regular)
                             .foregroundStyle(viewModel.selectedGameId == game.gameId ? .primary : .secondary)
 
-                        Circle()
-                            .fill(stateColor(game.state))
-                            .frame(width: 5, height: 5)
+                        if game.state == .unstarted {
+                            Text("예정")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            Circle()
+                                .fill(stateColor(game.state))
+                                .frame(width: 5, height: 5)
+                        }
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -421,6 +429,29 @@ struct MatchDetailView: View {
             .padding(.horizontal, 16).padding(.vertical, 8)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Upcoming Card
+
+    private var upcomingCard: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "clock")
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+            Text("경기 예정")
+                .font(.subheadline).fontWeight(.medium)
+                .foregroundStyle(.secondary)
+            Text(match.startTime.formatted(
+                .dateTime.month().day().weekday().hour().minute()
+                .locale(Locale(identifier: "ko_KR"))
+            ))
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Draft Waiting Card

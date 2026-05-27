@@ -28,19 +28,27 @@ struct LeaguePlayerDetailView: View {
                 VStack(spacing: 16) {
                     profileCard
 
-                    SeasonStatsView(player: player, league: league)
+                    SeasonStatsView(stats: viewModel.seasonStats, isLoading: viewModel.isLoadingStats)
 
-                    if viewModel.isLoadingStats {
+                    // 챔피언 통계: Leaguepedia 로딩 중이면 플레이스홀더
+                    if viewModel.isLoadingStats && viewModel.championStats.isEmpty {
                         HStack(spacing: 8) {
                             ProgressView()
-                            Text("통계 불러오는 중...")
+                            Text("챔피언 통계 불러오는 중...")
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 24)
                         .background(Color(.secondarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
-                    } else if viewModel.championStats.isEmpty && viewModel.recentResults.isEmpty {
+                    } else if !viewModel.championStats.isEmpty {
+                        championCard
+                    }
+
+                    // 최근 경기: 스케줄 완료 즉시 표시 (Leaguepedia 대기 없음)
+                    if !viewModel.recentResults.isEmpty {
+                        recentMatchesCard
+                    } else if !viewModel.isLoadingStats {
                         HStack(spacing: 8) {
                             Image(systemName: "chart.bar.xaxis")
                                 .foregroundStyle(.secondary)
@@ -51,13 +59,6 @@ struct LeaguePlayerDetailView: View {
                         .padding(.vertical, 24)
                         .background(Color(.secondarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
-                    } else {
-                        if !viewModel.championStats.isEmpty {
-                            championCard
-                        }
-                        if !viewModel.recentResults.isEmpty {
-                            recentMatchesCard
-                        }
                     }
                 }
                 .padding(16)
