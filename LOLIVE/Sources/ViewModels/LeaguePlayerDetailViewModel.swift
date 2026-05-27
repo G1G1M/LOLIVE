@@ -41,7 +41,7 @@ final class LeaguePlayerDetailViewModel {
     var recentResults: [MatchResult] = []
     var championStats: [ChampionStat] = []
     var seasonStats: PlayerSeasonStats? = nil
-    var isLoadingStats = false
+    var isLoadingStats = true
 
     // MARK: - Private
 
@@ -95,7 +95,6 @@ final class LeaguePlayerDetailViewModel {
         }
 
         // Leaguepedia는 이미 병렬 실행 중 — 완료되면 순서대로 반영
-        isLoadingStats = true
         defer { isLoadingStats = false }
 
         seasonStats = await seasonStatsTask

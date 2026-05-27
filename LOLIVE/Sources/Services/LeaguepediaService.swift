@@ -86,7 +86,6 @@ struct LeaguepediaService: Sendable {
 
         guard let overviewPage = await currentOverviewPage(leagueName: leagueName) else { return nil }
         guard let allStats = await allPlayerStats(overviewPage: overviewPage) else {
-            await LeaguepediaCache.shared.setSeasonStats(nil, key: cacheKey)
             return nil
         }
 
