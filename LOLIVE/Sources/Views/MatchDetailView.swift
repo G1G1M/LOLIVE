@@ -195,114 +195,53 @@ struct MatchDetailView: View {
     // MARK: - Game Series Picker
 
     private func gameSeriesPicker(detail: EventDetailInfo) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(detail.games.filter { $0.state != .unneeded }) { game in
-                    gameCard(game)
+        let games = detail.games.filter { $0.state != .unneeded }
+        return HStack(spacing: 0) {
+            ForEach(games) { game in
+                let isSelected = viewModel.selectedGameId == game.gameId
+                let isLive     = game.state == .inProgress
+
+                Button {
+                    viewModel.selectedGameId = game.gameId
+                } label: {
+                    VStack(spacing: 4) {
+                        Text("G\(game.number)")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(isSelected ? .white : Color(.label))
+
+                        if isLive {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 5, height: 5)
+                                .scaleEffect(isPulsing ? 1.4 : 1.0)
+                                .animation(
+                                    .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
+                                    value: isPulsing
+                                )
+                        } else if game.state == .unstarted {
+                            Text("예정")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Circle()
+                                .fill(isSelected ? Color.white.opacity(0.7) : Color.accentColor)
+                                .frame(width: 5, height: 5)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(isSelected ? Color.accentColor : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
         }
+        .padding(6)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
-    private func gameCard(_ game: GameInfo) -> some View {
-        let isSelected = viewModel.selectedGameId == game.gameId
-        let isLive     = game.state == .inProgress
-        let window     = viewModel.gameWindows[game.gameId]
-        let blueTeam   = teamFor(windowTeamId: game.blueTeamId)
-        let redTeam    = teamFor(windowTeamId: game.redTeamId)
-        let blueKills  = window?.blueTeamStats.totalKills ?? 0
-        let redKills   = window?.redTeamStats.totalKills  ?? 0
 
-        return Button {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                viewModel.selectedGameId = game.gameId
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 5) {
-                // 게임 번호 + 상태 인디케이터
-                HStack(spacing: 0) {
-                    Text("G\(game.number)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(isSelected ? .white : .secondary)
-                    Spacer()
-                    if isLive {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 5, height: 5)
-                            .scaleEffect(isPulsing ? 1.4 : 1.0)
-                            .animation(
-                                .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
-                                value: isPulsing
-                            )
-                    } else if game.state == .completed {
-                        Circle()
-                            .fill(isSelected ? .white.opacity(0.5) : Color.accentColor.opacity(0.8))
-                            .frame(width: 5, height: 5)
-                    }
-                }
-
-                if let window {
-                    // 블루 사이드 킬
-                    HStack(spacing: 4) {
-                        Circle().fill(Color.blue.opacity(0.7)).frame(width: 4, height: 4)
-                        Text(blueTeam?.code ?? "BLU")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(isSelected ? .white.opacity(0.75) : .secondary)
-                            .lineLimit(1)
-                        Spacer(minLength: 4)
-                        Text("\(window.blueTeamStats.totalKills)")
-                            .font(.system(size: 11, weight: blueKills >= redKills ? .bold : .regular))
-                            .foregroundStyle(
-                                isSelected
-                                    ? (blueKills >= redKills ? .white : .white.opacity(0.6))
-                                    : (blueKills >= redKills ? Color(.label) : .secondary)
-                            )
-                    }
-                    // 레드 사이드 킬
-                    HStack(spacing: 4) {
-                        Circle().fill(Color.red.opacity(0.7)).frame(width: 4, height: 4)
-                        Text(redTeam?.code ?? "RED")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(isSelected ? .white.opacity(0.75) : .secondary)
-                            .lineLimit(1)
-                        Spacer(minLength: 4)
-                        Text("\(window.redTeamStats.totalKills)")
-                            .font(.system(size: 11, weight: redKills > blueKills ? .bold : .regular))
-                            .foregroundStyle(
-                                isSelected
-                                    ? (redKills > blueKills ? .white : .white.opacity(0.6))
-                                    : (redKills > blueKills ? Color(.label) : .secondary)
-                            )
-                    }
-                } else {
-                    Text(game.state == .unstarted ? "예정" : "—")
-                        .font(.system(size: 10))
-                        .foregroundStyle(isSelected ? .white.opacity(0.6) : Color.secondary.opacity(0.45))
-                        .padding(.top, 2)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
-            .frame(width: 84)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(isSelected ? Color.accentColor : Color(.tertiarySystemGroupedBackground))
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func stateColor(_ state: GameInfoState) -> Color {
-        switch state {
-        case .completed:  return .blue
-        case .inProgress: return .red
-        default:          return Color.secondary.opacity(0.4)
-        }
-    }
 
     // MARK: - Ban Card
 
@@ -361,16 +300,21 @@ struct MatchDetailView: View {
     // MARK: - Team Stats Card
 
     private func teamStatsCard(window: GameWindow) -> some View {
-        let blueTeam = teamFor(windowTeamId: window.blueTeamId)
-        let redTeam  = teamFor(windowTeamId: window.redTeamId)
+        let blueTeam   = teamFor(windowTeamId: window.blueTeamId)
+        let redTeam    = teamFor(windowTeamId: window.redTeamId)
+        let isFinished = viewModel.selectedGame?.state == .completed
+        let blueWon    = isFinished && window.blueTeamStats.totalKills > window.redTeamStats.totalKills
+        let redWon     = isFinished && window.redTeamStats.totalKills > window.blueTeamStats.totalKills
 
         return VStack(spacing: 0) {
             HStack {
                 Text(blueTeam?.code ?? "Blue")
                     .font(.subheadline).fontWeight(.semibold)
+                    .foregroundStyle(blueWon ? Color.accentColor : (redWon ? .secondary : Color(.label)))
                 Spacer()
                 Text(redTeam?.code ?? "Red")
                     .font(.subheadline).fontWeight(.semibold)
+                    .foregroundStyle(redWon ? Color.accentColor : (blueWon ? .secondary : Color(.label)))
             }
             .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 8)
 
