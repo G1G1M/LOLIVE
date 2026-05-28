@@ -232,6 +232,7 @@ struct MatchDetailView: View {
                     .padding(.vertical, 10)
                     .background(isSelected ? Color.accentColor : Color.clear)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -299,12 +300,22 @@ struct MatchDetailView: View {
 
     // MARK: - Team Stats Card
 
+    private func blueTeamWon(_ window: GameWindow) -> Bool? {
+        guard viewModel.selectedGame?.state == .completed else { return nil }
+        let b = window.blueTeamStats, r = window.redTeamStats
+        if b.inhibitors != r.inhibitors { return b.inhibitors > r.inhibitors }
+        if b.towers     != r.towers     { return b.towers     > r.towers     }
+        if b.totalGold  != r.totalGold  { return b.totalGold  > r.totalGold  }
+        if b.totalKills != r.totalKills { return b.totalKills > r.totalKills }
+        return nil
+    }
+
     private func teamStatsCard(window: GameWindow) -> some View {
-        let blueTeam   = teamFor(windowTeamId: window.blueTeamId)
-        let redTeam    = teamFor(windowTeamId: window.redTeamId)
-        let isFinished = viewModel.selectedGame?.state == .completed
-        let blueWon    = isFinished && window.blueTeamStats.totalKills > window.redTeamStats.totalKills
-        let redWon     = isFinished && window.redTeamStats.totalKills > window.blueTeamStats.totalKills
+        let blueTeam  = teamFor(windowTeamId: window.blueTeamId)
+        let redTeam   = teamFor(windowTeamId: window.redTeamId)
+        let wonResult = blueTeamWon(window)
+        let blueWon   = wonResult == true
+        let redWon    = wonResult == false
 
         return VStack(spacing: 0) {
             HStack {
