@@ -252,7 +252,9 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
             let state = GameInfoState(rawValue: game.state) ?? .unstarted
             let blueBans = blueTeamDTO?.bans?.map { $0.championId } ?? []
             let redBans  = redTeamDTO?.bans?.map  { $0.championId } ?? []
-            let winnerTeamId = game.teams.first { $0.result?.outcome == "win" }?.id
+            let winnerTeamId = game.teams.first {
+                $0.outcome == "win" || $0.result?.outcome == "win"
+            }?.id
             return GameInfo(
                 number: game.number, gameId: game.id, state: state,
                 blueTeamId: blueTeamDTO?.id ?? "",

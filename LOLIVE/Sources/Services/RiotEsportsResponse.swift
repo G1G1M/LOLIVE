@@ -135,7 +135,8 @@ struct GameTeamSideDTO: Decodable {
     let id: String
     let side: String
     let bans: [BanDTO]?
-    let result: GameTeamResultDTO?
+    let outcome: String?           // 직접 노출되는 경우: "win" | "loss"
+    let result: GameTeamResultDTO? // 중첩 구조인 경우
 }
 
 struct GameTeamResultDTO: Decodable {

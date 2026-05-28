@@ -177,10 +177,17 @@ struct MatchDetailView: View {
             }
 
         case .completed:
-            Text("경기 종료")
-                .font(.caption).fontWeight(.medium).foregroundStyle(.secondary)
-                .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(Color.secondary.opacity(0.15)).clipShape(Capsule())
+            VStack(spacing: 4) {
+                Text("경기 종료")
+                    .font(.caption).fontWeight(.medium).foregroundStyle(.secondary)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(Color.secondary.opacity(0.15)).clipShape(Capsule())
+                Text(match.startTime.formatted(
+                    .dateTime.year().month().day().locale(Locale(identifier: "ko_KR"))
+                ))
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+            }
 
         case .unstarted:
             Text(match.startTime.formatted(

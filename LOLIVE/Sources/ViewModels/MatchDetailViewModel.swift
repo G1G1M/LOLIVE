@@ -146,7 +146,7 @@ final class MatchDetailViewModel {
 
             // 완료 경기는 디스크에 저장 (다음 진입 시 즉시 표시)
             if match.state == .completed {
-                AppDiskCache.set(key: "event_detail_\(match.id)", value: detail)
+                AppDiskCache.set(key: "event_detail_v2_\(match.id)", value: detail)
             }
 
             await fetchLeaguepediaBans(for: playableGames.filter { $0.state == .completed })
@@ -161,7 +161,7 @@ final class MatchDetailViewModel {
     /// 이미 캐시된 경기는 건너뜀.
     static func preload(match: Match) {
         guard match.state == .completed else { return }
-        let detailKey = "event_detail_\(match.id)"
+        let detailKey = "event_detail_v2_\(match.id)"
         guard (AppDiskCache.get(key: detailKey, maxAge: 30 * 24 * 3600) as EventDetailInfo?) == nil else { return }
 
         Task.detached(priority: .background) {
@@ -206,7 +206,7 @@ final class MatchDetailViewModel {
     // MARK: - Cache helpers
 
     private func tryLoadFromCache() async -> Bool {
-        guard let detail: EventDetailInfo = AppDiskCache.get(key: "event_detail_\(match.id)", maxAge: 30 * 24 * 3600)
+        guard let detail: EventDetailInfo = AppDiskCache.get(key: "event_detail_v2_\(match.id)", maxAge: 30 * 24 * 3600)
         else { return false }
 
         eventDetail = detail
