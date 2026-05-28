@@ -656,7 +656,12 @@ struct LeaguepediaService: Sendable {
     // MARK: - Network
 
     private func cargoData(url: URL) async -> Data? {
-        await LeaguepediaRateLimiter.shared.claimSlot()
+        // .background / .utility 우선순위 = AppPreloadService → 느린 rate limiter
+        // .userInitiated 이상 = 사용자 직접 요청 → 빠른 rate limiter
+        let rateLimiter = Task.currentPriority <= .utility
+            ? LeaguepediaRateLimiter.background
+            : LeaguepediaRateLimiter.foreground
+        await rateLimiter.claimSlot()
         guard !Task.isCancelled else { return nil }
 
         var request = URLRequest(url: url)
@@ -669,7 +674,7 @@ struct LeaguepediaService: Sendable {
                 let wait = http?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 12.0
                 try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
                 guard !Task.isCancelled else { return nil }
-                await LeaguepediaRateLimiter.shared.claimSlot()
+                await rateLimiter.claimSlot()
                 guard !Task.isCancelled else { return nil }
                 (data, response) = try await Self.session.data(for: request)
                 retries += 1
@@ -702,9 +707,15 @@ struct LeaguepediaService: Sendable {
 // MARK: - Rate Limiter (1.5초 간격)
 
 private actor LeaguepediaRateLimiter {
-    static let shared = LeaguepediaRateLimiter()
+    /// 사용자 요청 (선수 상세 등 포그라운드): 0.3초 간격
+    static let foreground = LeaguepediaRateLimiter(interval: 0.3)
+    /// AppPreloadService 등 백그라운드 선로딩: 2.5초 간격
+    static let background  = LeaguepediaRateLimiter(interval: 2.5)
+
     private var nextSlotTime = Date.distantPast
-    private let slotInterval: TimeInterval = 2.5
+    private let slotInterval: TimeInterval
+
+    init(interval: TimeInterval) { slotInterval = interval }
 
     func claimSlot() async {
         guard !Task.isCancelled else { return }

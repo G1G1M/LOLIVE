@@ -35,8 +35,8 @@ final class AppPreloadService {
     }
 
     private func run() async {
-        // UI가 완전히 렌더링된 후 시작
-        try? await Task.sleep(for: .seconds(3))
+        // UI 초기 렌더링 후 시작
+        try? await Task.sleep(for: .seconds(1))
 
         let service = RiotEsportsService()
 
