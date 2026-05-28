@@ -301,7 +301,12 @@ struct MatchDetailView: View {
     // MARK: - Team Stats Card
 
     private func blueTeamWon(_ window: GameWindow) -> Bool? {
-        guard viewModel.selectedGame?.state == .completed else { return nil }
+        guard let game = viewModel.selectedGame, game.state == .completed else { return nil }
+        // API가 승자 ID를 직접 제공하면 최우선 사용
+        if let winnerId = game.winnerTeamId, !winnerId.isEmpty {
+            return window.blueTeamId == winnerId
+        }
+        // fallback: 통계 계층 (inhibitors > towers > gold > kills)
         let b = window.blueTeamStats, r = window.redTeamStats
         if b.inhibitors != r.inhibitors { return b.inhibitors > r.inhibitors }
         if b.towers     != r.towers     { return b.towers     > r.towers     }

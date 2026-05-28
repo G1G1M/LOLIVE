@@ -23,6 +23,7 @@ struct GameInfo: Identifiable, Codable {
     let redTeamId: String
     let blueBans: [String]
     let redBans: [String]
+    let winnerTeamId: String?   // API에서 제공하는 실제 승리 팀 ID (nil이면 미완료 or 데이터 없음)
 }
 
 enum GameInfoState: String, Codable {

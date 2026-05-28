@@ -135,6 +135,11 @@ struct GameTeamSideDTO: Decodable {
     let id: String
     let side: String
     let bans: [BanDTO]?
+    let result: GameTeamResultDTO?
+}
+
+struct GameTeamResultDTO: Decodable {
+    let outcome: String?   // "win" | "loss"
 }
 
 struct BanDTO: Decodable {
