@@ -281,7 +281,7 @@ struct MatchDetailView: View {
                 } else {
                     Text(game.state == .unstarted ? "예정" : "—")
                         .font(.system(size: 10))
-                        .foregroundStyle(isSelected ? .white.opacity(0.6) : .tertiary)
+                        .foregroundStyle(isSelected ? .white.opacity(0.6) : Color.secondary.opacity(0.45))
                         .padding(.top, 2)
                 }
             }
