@@ -308,13 +308,25 @@ struct MatchDetailView: View {
 
         return VStack(spacing: 0) {
             HStack {
-                Text(blueTeam?.code ?? "Blue")
-                    .font(.subheadline).fontWeight(.semibold)
-                    .foregroundStyle(blueWon ? Color.accentColor : (redWon ? .secondary : Color(.label)))
+                HStack(spacing: 5) {
+                    Text(blueTeam?.code ?? "Blue")
+                        .font(.subheadline).fontWeight(.semibold)
+                    if blueWon || redWon {
+                        Text(blueWon ? "win" : "lose")
+                            .font(.caption2).fontWeight(.bold)
+                            .foregroundStyle(blueWon ? Color.accentColor : .secondary)
+                    }
+                }
                 Spacer()
-                Text(redTeam?.code ?? "Red")
-                    .font(.subheadline).fontWeight(.semibold)
-                    .foregroundStyle(redWon ? Color.accentColor : (blueWon ? .secondary : Color(.label)))
+                HStack(spacing: 5) {
+                    if blueWon || redWon {
+                        Text(redWon ? "win" : "lose")
+                            .font(.caption2).fontWeight(.bold)
+                            .foregroundStyle(redWon ? Color.accentColor : .secondary)
+                    }
+                    Text(redTeam?.code ?? "Red")
+                        .font(.subheadline).fontWeight(.semibold)
+                }
             }
             .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 8)
 
