@@ -81,17 +81,20 @@
 
 ### 선수 상세
 - 최근 경기 결과: Riot API 완료 즉시 표시 (Leaguepedia 대기 없음)
-- 시즌 스탯 / 챔피언 풀: Leaguepedia 로딩 중 스피너, 완료 시 순차 표시
+- 시즌 스탯 / 챔피언 풀: Leaguepedia 로딩 중 스피너, 완료 시 순차 표시 (초기값 `isLoadingStats = true`로 "없음" 플래시 방지)
 - 시즌 스탯: 승률, KDA, CS/분, 평균 킬/데스/어시스트
 - most픽 챔피언 (최근 5경기 기준) + 챔피언 이미지
 - 최근 경기 결과 탭 → 경기 상세 이동
 
 ### 경기 상세
 - 실시간 팀 스탯 (킬 / 골드 / 타워 / 드래곤 / 바론)
+- 팀 스탯 카드 헤더에 win / lose 라벨 표시 (승팀 파랑, 패팀 회색)
+- 승패 판정: `getEventDetails` API의 `outcome` 필드 우선 사용 → 없으면 inhibitors > towers > gold > kills 계층 fallback
 - 게임별 선수 KDA, 골드, CS + 챔피언 이미지
 - 밴 카드: 게임별 blue/red 사이드 밴 챔피언 표시 (Riot API 데이터)
 - 미시작 경기: 로딩 스피너 없이 "경기 예정" 카드 + 시작 시간 표시
-- 게임 시리즈 픽커: 미시작 게임은 "예정" 텍스트 라벨로 표시
+- 게임 시리즈 픽커: G1/G2 텍스트 + 상태 점 (라이브 빨간 점 / 완료 파란 점 / 예정 텍스트), 선택 시 전체 버튼 영역 터치 가능
+- 경기 종료 배지 아래 경기 날짜 표시
 - 팀 로고 탭 → 팀 상세 페이지 이동
 
 ### Favorites
@@ -166,6 +169,7 @@ TournamentDetailViewModel.load()
 | 팀 로스터 | `roster_{teamId}` | 12h | AppDiskCache |
 | 선수 목록 전체 | `players_all` | 12h | AppDiskCache |
 | 검색 데이터 | `search_teams` / `search_players` | 12h | AppDiskCache |
+| 경기 상세 | `event_detail_v2_{matchId}` | 30일 | AppDiskCache |
 | 이미지 | SHA256 해시 파일명 | 영구 | ~/Library/Caches/image_cache/ |
 | OverviewPage | `overview_pages.json` | 24h | LeaguepediaStats/ |
 | 시즌 스탯 전체 | `{overviewPage}.json` | 24h | LeaguepediaStats/ |
@@ -177,7 +181,7 @@ TournamentDetailViewModel.load()
 
 ```
 앱 실행
-    ├─ AppPreloadService.start()  — 경기 상세 + Leaguepedia 스탯 병렬 프리로드 (3초 지연)
+    ├─ AppPreloadService.start()  — 경기 상세 + Leaguepedia 스탯 병렬 프리로드 (1초 지연)
     └─ 각 ViewModel.load()
            ├─ preloadFromCache() → 디스크 캐시 즉시 표시 (스피너 없음)
            └─ 백그라운드 API fetch → 조용히 갱신
@@ -219,10 +223,12 @@ Leaguepedia rate limit(API 호출 간 2.5초 대기) 이슈를 배치 로딩으�
            └─ seasonStats / picks 완료 → 순차 반영 (배치 캐시 히트 시 즉시)
 ```
 
-- 앱 시작 시 AppPreloadService가 Leaguepedia 스탯을 백그라운드 선로딩 → 선수 상세 진입 시 캐시 히트로 즉시 표시
+- 앱 시작 1초 후 AppPreloadService가 Leaguepedia 스탯을 백그라운드 선로딩 → 선수 상세 진입 시 캐시 히트로 즉시 표시
 - 리그 전체 스탯·픽을 배치 1회 요청으로 수집 → 선수별 개별 API 호출 제거
 - 앱 재실행 시 디스크 캐시로 API 호출 없이 즉시 반환
-- `OverviewPage`도 디스크 캐시 → cold start 시 2.5초 rate limit 대기 제거
+- `OverviewPage`도 디스크 캐시 → cold start 시 rate limit 대기 제거
+- Rate limiter 2단계 분리: foreground 0.3s (사용자 트리거), background 2.5s (AppPreloadService)
+- API 실패·취소 시 nil 캐싱 방지 → 재진입 시 재요청 정상 동작
 
 ## GameWindow 캐시 아키텍처
 
