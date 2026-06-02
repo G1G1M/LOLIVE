@@ -100,7 +100,7 @@ extension PlayerStats {
 
 // MARK: - Kill Event
 
-struct KillEvent: Identifiable {
+struct KillEvent: Identifiable, Codable {
     let id: UUID
     let gameTimeMs: Int
     let killerParticipantId: Int

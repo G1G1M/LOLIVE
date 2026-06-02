@@ -20,6 +20,7 @@ final class MatchDetailViewModel {
     var selectedGameId: String? = nil
     var currentGameTime: Int? = nil   // 인게임 경과 시간 (초)
     var lastPolledAt: Date? = nil     // 마지막 폴링 시각
+    var killTimelines: [String: [KillEvent]] = [:]
 
     // MARK: - Computed
 
@@ -144,6 +145,8 @@ final class MatchDetailViewModel {
                 selectedGameId = lastPlayable.gameId
             }
 
+            await loadKillTimelines(for: playableGames, liveStats: liveStats)
+
             // 완료 경기는 디스크에 저장 (다음 진입 시 즉시 표시)
             if match.state == .completed {
                 AppDiskCache.set(key: "event_detail_v2_\(match.id)", value: detail)
@@ -219,8 +222,39 @@ final class MatchDetailViewModel {
             }
         }
 
+        for game in detail.games.filter({ $0.state.isPlayable }) {
+            if let cached: [KillEvent] = AppDiskCache.get(
+                key: "kill_timeline_\(game.gameId)", maxAge: 30 * 24 * 3600) {
+                killTimelines[game.gameId] = cached
+            }
+        }
+
         await fetchLeaguepediaBans(for: detail.games.filter { $0.state == .completed })
         return true
+    }
+
+    private func loadKillTimelines(for games: [GameInfo], liveStats: LiveStatsServiceProtocol) async {
+        await withTaskGroup(of: (String, [KillEvent]).self) { group in
+            for game in games {
+                let gameId = game.gameId
+                let isCompleted = game.state == .completed
+                group.addTask {
+                    if isCompleted,
+                       let cached: [KillEvent] = AppDiskCache.get(
+                           key: "kill_timeline_\(gameId)", maxAge: 30 * 24 * 3600) {
+                        return (gameId, cached)
+                    }
+                    let events = (try? await liveStats.fetchKillTimeline(gameId: gameId)) ?? []
+                    if !events.isEmpty && isCompleted {
+                        AppDiskCache.set(key: "kill_timeline_\(gameId)", value: events)
+                    }
+                    return (gameId, events)
+                }
+            }
+            for await (gameId, events) in group {
+                if !events.isEmpty { killTimelines[gameId] = events }
+            }
+        }
     }
 
     private func fetchLeaguepediaBans(for games: [GameInfo]) async {

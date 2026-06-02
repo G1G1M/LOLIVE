@@ -11,11 +11,15 @@ struct MatchDetailView: View {
 
     @State private var viewModel: MatchDetailViewModel
     @State private var isPulsing = false
+    @State private var teamALoader: RecentMatchesLoader
+    @State private var teamBLoader: RecentMatchesLoader
 
     init(match: Match, liveMatch: LiveMatch? = nil) {
         self.match = match
         self.liveMatch = liveMatch
         self._viewModel = State(initialValue: MatchDetailViewModel(match: match))
+        self._teamALoader = State(initialValue: RecentMatchesLoader(team: match.teamA, league: match.league))
+        self._teamBLoader = State(initialValue: RecentMatchesLoader(team: match.teamB, league: match.league))
     }
 
     var body: some View {
@@ -67,8 +71,15 @@ struct MatchDetailView: View {
                                 playerListCard(window: window)
                                 noStatsCard
                             }
+                            let kills = viewModel.selectedGame.flatMap { viewModel.killTimelines[$0.gameId] } ?? []
+                            if !kills.isEmpty {
+                                killTimelineCard(window: window, kills: kills)
+                            }
                         }
                     }
+
+                    teamRecentCard(team: match.teamA, loader: teamALoader)
+                    teamRecentCard(team: match.teamB, loader: teamBLoader)
 
                     infoCard
                 }
@@ -80,6 +91,9 @@ struct MatchDetailView: View {
         .task {
             await viewModel.load()
             viewModel.startPolling()
+            async let a: () = teamALoader.load()
+            async let b: () = teamBLoader.load()
+            _ = await (a, b)
         }
         .onDisappear {
             viewModel.stopPolling()
@@ -325,31 +339,13 @@ struct MatchDetailView: View {
     private func teamStatsCard(window: GameWindow) -> some View {
         let blueTeam  = teamFor(windowTeamId: window.blueTeamId)
         let redTeam   = teamFor(windowTeamId: window.redTeamId)
-        let wonResult = blueTeamWon(window)
-        let blueWon   = wonResult == true
-        let redWon    = wonResult == false
-
         return VStack(spacing: 0) {
             HStack {
-                HStack(spacing: 5) {
-                    Text(blueTeam?.code ?? "Blue")
-                        .font(.subheadline).fontWeight(.semibold)
-                    if blueWon || redWon {
-                        Text(blueWon ? "win" : "lose")
-                            .font(.caption2).fontWeight(.bold)
-                            .foregroundStyle(blueWon ? Color.accentColor : .secondary)
-                    }
-                }
+                Text(blueTeam?.code ?? "Blue")
+                    .font(.subheadline).fontWeight(.semibold)
                 Spacer()
-                HStack(spacing: 5) {
-                    if blueWon || redWon {
-                        Text(redWon ? "win" : "lose")
-                            .font(.caption2).fontWeight(.bold)
-                            .foregroundStyle(redWon ? Color.accentColor : .secondary)
-                    }
-                    Text(redTeam?.code ?? "Red")
-                        .font(.subheadline).fontWeight(.semibold)
-                }
+                Text(redTeam?.code ?? "Red")
+                    .font(.subheadline).fontWeight(.semibold)
             }
             .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 8)
 
@@ -529,6 +525,162 @@ struct MatchDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
+    // MARK: - Kill Timeline Card
+
+    private func killTimelineCard(window: GameWindow, kills: [KillEvent]) -> some View {
+        let blueIds = Set(window.bluePlayers.map(\.participantId))
+        let blueKills = kills.filter { isBlueKill($0, blueIds: blueIds, blueTeamId: window.blueTeamId) }
+        let redKills  = kills.filter { !isBlueKill($0, blueIds: blueIds, blueTeamId: window.blueTeamId) }
+        let blueTeam  = teamFor(windowTeamId: window.blueTeamId)
+        let redTeam   = teamFor(windowTeamId: window.redTeamId)
+        let maxMs     = max(kills.map(\.gameTimeMs).max() ?? 0, 20 * 60 * 1000)
+
+        return VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text("킬 타임라인")
+                    .font(.headline)
+                Spacer()
+                HStack(spacing: 4) {
+                    Circle().fill(Color.blue).frame(width: 7, height: 7)
+                    Text("\(blueTeam?.code ?? "Blue")  \(blueKills.count)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 4) {
+                    Circle().fill(Color.red).frame(width: 7, height: 7)
+                    Text("\(redTeam?.code ?? "Red")  \(redKills.count)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+
+            Divider().padding(.horizontal, 16)
+
+            GeometryReader { geo in
+                let w = geo.size.width - 32
+                ZStack(alignment: .topLeading) {
+                    // 중앙 축
+                    Rectangle()
+                        .fill(Color(.separator))
+                        .frame(width: w, height: 0.5)
+                        .offset(x: 16, y: 34)
+
+                    // Blue 킬 점
+                    ForEach(Array(blueKills.enumerated()), id: \.offset) { _, kill in
+                        Circle()
+                            .fill(Color.blue.opacity(0.85))
+                            .frame(width: 8, height: 8)
+                            .offset(x: 16 + killXPos(kill.gameTimeMs, maxMs: maxMs, width: w) - 4,
+                                    y: 22)
+                    }
+
+                    // Red 킬 점
+                    ForEach(Array(redKills.enumerated()), id: \.offset) { _, kill in
+                        Circle()
+                            .fill(Color.red.opacity(0.85))
+                            .frame(width: 8, height: 8)
+                            .offset(x: 16 + killXPos(kill.gameTimeMs, maxMs: maxMs, width: w) - 4,
+                                    y: 44)
+                    }
+
+                    // 분 단위 레이블
+                    ForEach(killTimeMarkers(maxMs: maxMs), id: \.self) { min in
+                        Text(min == 0 ? "0" : "\(min)m")
+                            .font(.system(size: 8))
+                            .foregroundStyle(.tertiary)
+                            .offset(x: 16 + killXPos(min * 60_000, maxMs: maxMs, width: w) - 6,
+                                    y: 48)
+                    }
+                }
+            }
+            .frame(height: 72)
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func isBlueKill(_ kill: KillEvent, blueIds: Set<Int>, blueTeamId: String) -> Bool {
+        if !kill.killerTeamId.isEmpty { return kill.killerTeamId == blueTeamId }
+        return blueIds.contains(kill.killerParticipantId)
+    }
+
+    private func killXPos(_ ms: Int, maxMs: Int, width: CGFloat) -> CGFloat {
+        guard maxMs > 0 else { return 0 }
+        return CGFloat(ms) / CGFloat(maxMs) * width
+    }
+
+    private func killTimeMarkers(maxMs: Int) -> [Int] {
+        let maxMin = maxMs / 60_000
+        let step = maxMin > 45 ? 15 : maxMin > 30 ? 10 : 5
+        return Array(stride(from: 0, through: maxMin, by: step))
+    }
+
+    // MARK: - Team Recent Matches Card
+
+    private func teamRecentCard(team: Team, loader: RecentMatchesLoader) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
+                    .frame(width: 20, height: 20)
+                    .clipShape(Circle())
+                Text("\(team.code) 최근 기록")
+                    .font(.headline)
+                Spacer()
+                if loader.isLoading {
+                    ProgressView().scaleEffect(0.7)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+
+            if !loader.matches.isEmpty {
+                Divider().padding(.horizontal, 16)
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(loader.matches) { m in
+                        let isTeamA  = m.teamA.id == team.id || m.teamA.code == team.code
+                        let myScore  = isTeamA ? m.scoreA : m.scoreB
+                        let oppScore = isTeamA ? m.scoreB : m.scoreA
+                        let opponent = isTeamA ? m.teamB : m.teamA
+                        let won      = myScore > oppScore
+
+                        NavigationLink(destination: MatchDetailView(match: m)) {
+                            matchRecordCell(myTeam: team, opponent: opponent,
+                                            myScore: myScore, oppScore: oppScore, won: won)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+            }
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func matchRecordCell(myTeam: Team, opponent: Team,
+                                 myScore: Int, oppScore: Int, won: Bool) -> some View {
+        HStack(spacing: 0) {
+            CachedAsyncImage(url: URL(string: myTeam.imageURL ?? ""))
+                .frame(width: 32, height: 32)
+                .clipShape(Circle())
+
+            Spacer(minLength: 6)
+
+            Text("\(myScore) - \(oppScore)")
+                .font(.callout).fontWeight(.bold)
+                .foregroundStyle(.white)
+                .frame(minWidth: 62)
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .background(won ? Color.green : Color.red)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            Spacer(minLength: 6)
+
+            CachedAsyncImage(url: URL(string: opponent.imageURL ?? ""))
+                .frame(width: 32, height: 32)
+                .clipShape(Circle())
+        }
+    }
+
     // MARK: - Info Card
 
     private var infoCard: some View {
@@ -587,6 +739,48 @@ struct MatchDetailView: View {
 
     private func formatGold(_ gold: Int) -> String {
         gold >= 1000 ? String(format: "%.1fk", Double(gold) / 1000) : "\(gold)"
+    }
+}
+
+// MARK: - Recent Matches Loader
+
+@MainActor
+@Observable
+private final class RecentMatchesLoader {
+    var matches: [Match] = []
+    var isLoading = false
+
+    private let team: Team
+    private let league: League
+    private let service: RiotEsportsServiceProtocol
+
+    init(team: Team, league: League,
+         service: RiotEsportsServiceProtocol = RiotEsportsService()) {
+        self.team = team
+        self.league = league
+        self.service = service
+    }
+
+    func load() async {
+        if let cached: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) {
+            let filtered = filter(cached)
+            if !filtered.isEmpty { matches = filtered; return }
+        }
+        isLoading = true
+        defer { isLoading = false }
+        if let all = try? await service.fetchSchedule(league: league) {
+            matches = filter(all)
+        }
+    }
+
+    private func filter(_ all: [Match]) -> [Match] {
+        all.filter {
+            ($0.teamA.id == team.id || $0.teamA.code == team.code ||
+             $0.teamB.id == team.id || $0.teamB.code == team.code) &&
+            $0.state == .completed
+        }
+        .sorted { $0.startTime > $1.startTime }
+        .prefix(6).map { $0 }
     }
 }
 

@@ -228,6 +228,7 @@ struct TournamentDetailView: View {
         fmt.dateFormat = "yyyy년 M월 d일"
         return fmt.string(from: date)
     }
+
 }
 
 #Preview {

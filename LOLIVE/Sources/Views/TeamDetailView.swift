@@ -245,51 +245,49 @@ struct TeamDetailView: View {
 
             Divider().padding(.horizontal, 16)
 
-            ForEach(viewModel.recentMatches) { match in
-                let isTeamA = match.teamA.id == team.id || match.teamA.code == team.code
-                let myScore  = isTeamA ? match.scoreA : match.scoreB
-                let oppScore = isTeamA ? match.scoreB : match.scoreA
-                let opponent = isTeamA ? match.teamB : match.teamA
-                let won = myScore > oppScore
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                ForEach(viewModel.recentMatches) { match in
+                    let isTeamA  = match.teamA.id == team.id || match.teamA.code == team.code
+                    let myScore  = isTeamA ? match.scoreA : match.scoreB
+                    let oppScore = isTeamA ? match.scoreB : match.scoreA
+                    let opponent = isTeamA ? match.teamB : match.teamA
+                    let won      = myScore > oppScore
 
-                NavigationLink(destination: MatchDetailView(match: match)) {
-                    HStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(won ? Color.blue : Color.red)
-                            .frame(width: 3, height: 32)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("vs \(opponent.name)")
-                                .font(.subheadline).fontWeight(.medium)
-                                .lineLimit(1)
-                            Text(match.startTime, style: .date)
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Text("\(myScore)-\(oppScore)")
-                            .font(.subheadline).fontWeight(.semibold)
-                            .foregroundStyle(won ? .primary : .secondary)
-
-                        Text(won ? "승" : "패")
-                            .font(.caption2).fontWeight(.bold)
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background((won ? Color.blue : Color.red).opacity(0.15))
-                            .foregroundStyle(won ? .blue : .red)
-                            .clipShape(Capsule())
+                    NavigationLink(destination: MatchDetailView(match: match)) {
+                        recentMatchCell(opponent: opponent, myScore: myScore,
+                                        oppScore: oppScore, won: won)
                     }
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                }
-                .buttonStyle(.plain)
-
-                if match.id != viewModel.recentMatches.last?.id {
-                    Divider().padding(.leading, 16)
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, 16).padding(.vertical, 12)
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func recentMatchCell(opponent: Team, myScore: Int, oppScore: Int, won: Bool) -> some View {
+        HStack(spacing: 0) {
+            CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
+                .frame(width: 32, height: 32)
+                .clipShape(Circle())
+
+            Spacer(minLength: 6)
+
+            Text("\(myScore) - \(oppScore)")
+                .font(.callout).fontWeight(.bold)
+                .foregroundStyle(.white)
+                .frame(minWidth: 62)
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .background(won ? Color.green : Color.red)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            Spacer(minLength: 6)
+
+            CachedAsyncImage(url: URL(string: opponent.imageURL ?? ""))
+                .frame(width: 32, height: 32)
+                .clipShape(Circle())
+        }
     }
 
     // MARK: - Helpers
