@@ -63,7 +63,7 @@ final class TeamDetailViewModel {
             $0.state == .completed
         }.sorted { $0.startTime > $1.startTime }
 
-        recentMatches = Array(completed.prefix(10))
+        recentMatches = Array(completed.prefix(30))
         h2hRecords = buildH2H(from: completed)
     }
 
@@ -79,7 +79,7 @@ final class TeamDetailViewModel {
                  $0.teamB.id == team.id || $0.teamB.code == team.code) &&
                 $0.state == .completed
             }.sorted { $0.startTime > $1.startTime }
-            recentMatches = Array(completed.prefix(10))
+            recentMatches = Array(completed.prefix(30))
             h2hRecords = buildH2H(from: completed)
             hadAny = true
         }

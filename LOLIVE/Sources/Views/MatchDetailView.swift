@@ -11,15 +11,11 @@ struct MatchDetailView: View {
 
     @State private var viewModel: MatchDetailViewModel
     @State private var isPulsing = false
-    @State private var teamALoader: RecentMatchesLoader
-    @State private var teamBLoader: RecentMatchesLoader
 
     init(match: Match, liveMatch: LiveMatch? = nil) {
         self.match = match
         self.liveMatch = liveMatch
         self._viewModel = State(initialValue: MatchDetailViewModel(match: match))
-        self._teamALoader = State(initialValue: RecentMatchesLoader(team: match.teamA, league: match.league))
-        self._teamBLoader = State(initialValue: RecentMatchesLoader(team: match.teamB, league: match.league))
     }
 
     var body: some View {
@@ -78,9 +74,6 @@ struct MatchDetailView: View {
                         }
                     }
 
-                    teamRecentCard(team: match.teamA, loader: teamALoader)
-                    teamRecentCard(team: match.teamB, loader: teamBLoader)
-
                     infoCard
                 }
                 .padding()
@@ -91,9 +84,6 @@ struct MatchDetailView: View {
         .task {
             await viewModel.load()
             viewModel.startPolling()
-            async let a: () = teamALoader.load()
-            async let b: () = teamBLoader.load()
-            _ = await (a, b)
         }
         .onDisappear {
             viewModel.stopPolling()
@@ -614,73 +604,6 @@ struct MatchDetailView: View {
         return Array(stride(from: 0, through: maxMin, by: step))
     }
 
-    // MARK: - Team Recent Matches Card
-
-    private func teamRecentCard(team: Team, loader: RecentMatchesLoader) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                    .frame(width: 20, height: 20)
-                    .clipShape(Circle())
-                Text("\(team.code) 최근 기록")
-                    .font(.headline)
-                Spacer()
-                if loader.isLoading {
-                    ProgressView().scaleEffect(0.7)
-                }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 12)
-
-            if !loader.matches.isEmpty {
-                Divider().padding(.horizontal, 16)
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    ForEach(loader.matches) { m in
-                        let isTeamA  = m.teamA.id == team.id || m.teamA.code == team.code
-                        let myScore  = isTeamA ? m.scoreA : m.scoreB
-                        let oppScore = isTeamA ? m.scoreB : m.scoreA
-                        let opponent = isTeamA ? m.teamB : m.teamA
-                        let won      = myScore > oppScore
-
-                        NavigationLink(destination: MatchDetailView(match: m)) {
-                            matchRecordCell(myTeam: team, opponent: opponent,
-                                            myScore: myScore, oppScore: oppScore, won: won)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16).padding(.vertical, 12)
-            }
-        }
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func matchRecordCell(myTeam: Team, opponent: Team,
-                                 myScore: Int, oppScore: Int, won: Bool) -> some View {
-        HStack(spacing: 0) {
-            CachedAsyncImage(url: URL(string: myTeam.imageURL ?? ""))
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
-
-            Spacer(minLength: 6)
-
-            Text("\(myScore) - \(oppScore)")
-                .font(.callout).fontWeight(.bold)
-                .foregroundStyle(.white)
-                .frame(minWidth: 62)
-                .padding(.horizontal, 10).padding(.vertical, 8)
-                .background(won ? Color.green : Color.red)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            Spacer(minLength: 6)
-
-            CachedAsyncImage(url: URL(string: opponent.imageURL ?? ""))
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
-        }
-    }
-
     // MARK: - Info Card
 
     private var infoCard: some View {
@@ -742,47 +665,6 @@ struct MatchDetailView: View {
     }
 }
 
-// MARK: - Recent Matches Loader
-
-@MainActor
-@Observable
-private final class RecentMatchesLoader {
-    var matches: [Match] = []
-    var isLoading = false
-
-    private let team: Team
-    private let league: League
-    private let service: RiotEsportsServiceProtocol
-
-    init(team: Team, league: League,
-         service: RiotEsportsServiceProtocol = RiotEsportsService()) {
-        self.team = team
-        self.league = league
-        self.service = service
-    }
-
-    func load() async {
-        if let cached: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) {
-            let filtered = filter(cached)
-            if !filtered.isEmpty { matches = filtered; return }
-        }
-        isLoading = true
-        defer { isLoading = false }
-        if let all = try? await service.fetchSchedule(league: league) {
-            matches = filter(all)
-        }
-    }
-
-    private func filter(_ all: [Match]) -> [Match] {
-        all.filter {
-            ($0.teamA.id == team.id || $0.teamA.code == team.code ||
-             $0.teamB.id == team.id || $0.teamB.code == team.code) &&
-            $0.state == .completed
-        }
-        .sorted { $0.startTime > $1.startTime }
-        .prefix(6).map { $0 }
-    }
-}
 
 #Preview {
     let league = League(id: "1", slug: "lck", name: "LCK", region: "Korea", imageURL: nil)

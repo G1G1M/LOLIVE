@@ -13,7 +13,14 @@ struct TeamDetailView: View {
 
     @State private var viewModel: TeamDetailViewModel
     @State private var isFavorited = false
+    @State private var selectedTab: TeamTab = .roster
     @Environment(\.modelContext) private var modelContext
+
+    private enum TeamTab: String, CaseIterable {
+        case roster  = "선수단"
+        case h2h     = "상대 전적"
+        case recent  = "최근경기"
+    }
 
     init(team: Team, league: League, standing: Standing? = nil) {
         self.team = team
@@ -26,26 +33,23 @@ struct TeamDetailView: View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
-            if viewModel.isLoading {
-                ProgressView("불러오는 중...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if viewModel.loadFailed {
-                fetchErrorView { Task { await viewModel.load() } }
-            } else {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        headerCard
-                        if !viewModel.players.isEmpty {
-                            rosterCard
-                        }
-                        if !viewModel.h2hRecords.isEmpty {
-                            h2hCard
-                        }
-                        if !viewModel.recentMatches.isEmpty {
-                            recentMatchesCard
-                        }
+            VStack(spacing: 0) {
+                teamHeader
+                Divider()
+                tabBar
+                Divider()
+
+                if viewModel.isLoading {
+                    ProgressView("불러오는 중...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if viewModel.loadFailed {
+                    fetchErrorView { Task { await viewModel.load() } }
+                } else {
+                    ScrollView {
+                        tabContent
+                            .padding(16)
+                            .animation(.easeInOut(duration: 0.15), value: selectedTab)
                     }
-                    .padding(16)
                 }
             }
         }
@@ -65,6 +69,102 @@ struct TeamDetailView: View {
         }
     }
 
+    // MARK: - Header
+
+    private var teamHeader: some View {
+        HStack(spacing: 16) {
+            CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
+                .frame(width: 60, height: 60)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(team.name)
+                    .font(.title2).fontWeight(.bold)
+                Text(team.code)
+                    .font(.subheadline).foregroundStyle(.secondary)
+
+                if let s = standing {
+                    HStack(spacing: 10) {
+                        Label("#\(s.rank)", systemImage: "trophy")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("\(s.wins)승 \(s.losses)패")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(String(format: "%.0f%%", s.winRate * 100))
+                            .font(.caption).fontWeight(.semibold)
+                            .foregroundStyle(s.winRate >= 0.5 ? Color.blue : Color.secondary)
+                    }
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16).padding(.vertical, 14)
+        .background(Color(.systemBackground))
+    }
+
+    // MARK: - Tab Bar
+
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            ForEach(TeamTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { selectedTab = tab }
+                } label: {
+                    VStack(spacing: 0) {
+                        Text(tab.rawValue)
+                            .font(.subheadline)
+                            .fontWeight(selectedTab == tab ? .semibold : .regular)
+                            .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                        Rectangle()
+                            .fill(selectedTab == tab ? Color.accentColor : Color.clear)
+                            .frame(height: 2)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(Color(.systemBackground))
+    }
+
+    // MARK: - Tab Content
+
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .roster:
+            if viewModel.players.isEmpty {
+                emptyState(icon: "person.3", message: "선수 정보가 없습니다")
+            } else {
+                rosterCard
+            }
+        case .h2h:
+            if viewModel.h2hRecords.isEmpty {
+                emptyState(icon: "arrow.left.arrow.right", message: "맞대결 기록이 없습니다")
+            } else {
+                h2hCard
+            }
+        case .recent:
+            if viewModel.recentMatches.isEmpty {
+                emptyState(icon: "calendar.badge.clock", message: "최근 경기 기록이 없습니다")
+            } else {
+                recentMatchesCard
+            }
+        }
+    }
+
+    private func emptyState(icon: String, message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 32))
+                .foregroundStyle(.secondary)
+            Text(message)
+                .font(.subheadline).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+    }
+
     // MARK: - Error
 
     private func fetchErrorView(_ retry: @escaping () -> Void) -> some View {
@@ -73,8 +173,7 @@ struct TeamDetailView: View {
                 .font(.system(size: 36))
                 .foregroundStyle(.secondary)
             Text("데이터를 불러올 수 없습니다")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(.secondary)
             Button("다시 시도", action: retry)
                 .buttonStyle(.bordered)
         }
@@ -101,55 +200,10 @@ struct TeamDetailView: View {
         }
     }
 
-    // MARK: - Header Card
-
-    private var headerCard: some View {
-        HStack(spacing: 16) {
-            CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                .frame(width: 72, height: 72)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(team.name)
-                    .font(.title3).fontWeight(.bold)
-                Text(team.code)
-                    .font(.subheadline).foregroundStyle(.secondary)
-
-                if let s = standing {
-                    HStack(spacing: 12) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "trophy")
-                                .font(.caption)
-                            Text("#\(s.rank)")
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.secondary)
-
-                        Text("\(s.wins)승 \(s.losses)패")
-                            .font(.caption).foregroundStyle(.secondary)
-
-                        Text(String(format: "%.0f%%", s.winRate * 100))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            Spacer()
-        }
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
     // MARK: - Roster Card
 
     private var rosterCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("선수단")
-                .font(.headline)
-                .padding(.horizontal, 16).padding(.vertical, 12)
-
-            Divider().padding(.horizontal, 16)
-
             ForEach(viewModel.players) { player in
                 NavigationLink {
                     LeaguePlayerDetailView(player: player, league: league)
@@ -198,12 +252,6 @@ struct TeamDetailView: View {
 
     private var h2hCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("맞대결 전적")
-                .font(.headline)
-                .padding(.horizontal, 16).padding(.vertical, 12)
-
-            Divider().padding(.horizontal, 16)
-
             ForEach(viewModel.h2hRecords) { record in
                 HStack(spacing: 12) {
                     CachedAsyncImage(url: URL(string: record.opponent.imageURL ?? ""))
@@ -239,55 +287,61 @@ struct TeamDetailView: View {
 
     private var recentMatchesCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("최근 경기")
-                .font(.headline)
-                .padding(.horizontal, 16).padding(.vertical, 12)
+            ForEach(Array(viewModel.recentMatches.enumerated()), id: \.element.id) { idx, match in
+                let isTeamA  = match.teamA.id == team.id || match.teamA.code == team.code
+                let myScore  = isTeamA ? match.scoreA : match.scoreB
+                let oppScore = isTeamA ? match.scoreB : match.scoreA
+                let opponent = isTeamA ? match.teamB : match.teamA
+                let won      = myScore > oppScore
 
-            Divider().padding(.horizontal, 16)
+                NavigationLink(destination: MatchDetailView(match: match)) {
+                    recentMatchRow(opponent: opponent, myScore: myScore,
+                                   oppScore: oppScore, won: won, date: match.startTime)
+                }
+                .buttonStyle(.plain)
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                ForEach(viewModel.recentMatches) { match in
-                    let isTeamA  = match.teamA.id == team.id || match.teamA.code == team.code
-                    let myScore  = isTeamA ? match.scoreA : match.scoreB
-                    let oppScore = isTeamA ? match.scoreB : match.scoreA
-                    let opponent = isTeamA ? match.teamB : match.teamA
-                    let won      = myScore > oppScore
-
-                    NavigationLink(destination: MatchDetailView(match: match)) {
-                        recentMatchCell(opponent: opponent, myScore: myScore,
-                                        oppScore: oppScore, won: won)
-                    }
-                    .buttonStyle(.plain)
+                if idx < viewModel.recentMatches.count - 1 {
+                    Divider().padding(.leading, 16)
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 12)
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    private func recentMatchCell(opponent: Team, myScore: Int, oppScore: Int, won: Bool) -> some View {
-        HStack(spacing: 0) {
-            CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
-
-            Spacer(minLength: 6)
-
-            Text("\(myScore) - \(oppScore)")
-                .font(.callout).fontWeight(.bold)
+    private func recentMatchRow(opponent: Team, myScore: Int, oppScore: Int,
+                                won: Bool, date: Date) -> some View {
+        HStack(spacing: 12) {
+            Text(won ? "W" : "L")
+                .font(.caption2).fontWeight(.bold)
                 .foregroundStyle(.white)
-                .frame(minWidth: 62)
-                .padding(.horizontal, 10).padding(.vertical, 8)
-                .background(won ? Color.green : Color.red)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            Spacer(minLength: 6)
+                .frame(width: 24, height: 24)
+                .background(won ? Color.blue : Color.red)
+                .clipShape(RoundedRectangle(cornerRadius: 5))
 
             CachedAsyncImage(url: URL(string: opponent.imageURL ?? ""))
                 .frame(width: 32, height: 32)
-                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("vs \(opponent.name)")
+                    .font(.subheadline).fontWeight(.medium)
+                    .lineLimit(1)
+                Text(date.formatted(.dateTime
+                    .month(.abbreviated).day()
+                    .locale(Locale(identifier: "ko_KR"))))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text("\(myScore) - \(oppScore)")
+                .font(.subheadline).fontWeight(.semibold)
+                .foregroundStyle(won ? .primary : .secondary)
+
+            Image(systemName: "chevron.right")
+                .font(.caption2).foregroundStyle(.tertiary)
         }
+        .padding(.horizontal, 16).padding(.vertical, 10)
     }
 
     // MARK: - Helpers

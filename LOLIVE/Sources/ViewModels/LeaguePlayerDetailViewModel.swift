@@ -20,6 +20,7 @@ final class LeaguePlayerDetailViewModel {
         var kills: Int = 0
         var deaths: Int = 0
         var assists: Int = 0
+        var entries: [ChampionPickEntry] = []
         var kda: Double {
             deaths == 0 ? Double(kills + assists) : Double(kills + assists) / Double(deaths)
         }
@@ -115,16 +116,22 @@ final class LeaguePlayerDetailViewModel {
                 if pick.won { champWins[pick.champion, default: 0] += 1 }
             }
 
+            var champEntries: [String: [ChampionPickEntry]] = [:]
+            for pick in picks { champEntries[pick.champion, default: []].append(pick) }
+
             championStats = champGames.keys
                 .sorted { (champGames[$0] ?? 0) > (champGames[$1] ?? 0) }
                 .map {
                     ChampionStat(
                         championId: $0,
-                        games:   champGames[$0]   ?? 0,
-                        wins:    champWins[$0]    ?? 0,
-                        kills:   champKills[$0]   ?? 0,
-                        deaths:  champDeaths[$0]  ?? 0,
-                        assists: champAssists[$0] ?? 0
+                        games:      champGames[$0]   ?? 0,
+                        wins:       champWins[$0]    ?? 0,
+                        kills:      champKills[$0]   ?? 0,
+                        deaths:     champDeaths[$0]  ?? 0,
+                        assists:    champAssists[$0] ?? 0,
+                        entries:    (champEntries[$0] ?? []).sorted {
+                            ($0.date ?? .distantPast) < ($1.date ?? .distantPast)
+                        }
                     )
                 }
         }

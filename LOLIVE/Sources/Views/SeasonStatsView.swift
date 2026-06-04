@@ -106,9 +106,55 @@ struct SeasonStatsView: View {
                 statColumn(value: String(format: "%.1f", stats.avgAssists), label: "어시스트")
             }
             .padding(.vertical, 10)
+
+            Divider().padding(.horizontal, 16)
+
+            kdaProportionBar(stats)
+                .padding(.horizontal, 16).padding(.vertical, 12)
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func kdaProportionBar(_ stats: PlayerSeasonStats) -> some View {
+        let k = stats.avgKills
+        let d = stats.avgDeaths
+        let a = stats.avgAssists
+        let total = k + d + a
+        guard total > 0 else { return AnyView(EmptyView()) }
+        let kRatio = k / total
+        let dRatio = d / total
+
+        return AnyView(VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { geo in
+                HStack(spacing: 2) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.blue.opacity(0.8))
+                        .frame(width: max(4, geo.size.width * kRatio))
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.red.opacity(0.8))
+                        .frame(width: max(4, geo.size.width * dRatio))
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.green.opacity(0.8))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 8)
+
+            HStack(spacing: 12) {
+                legendDot(color: .blue, label: "킬", value: String(format: "%.1f", k))
+                legendDot(color: .red, label: "데스", value: String(format: "%.1f", d))
+                legendDot(color: .green, label: "어시", value: String(format: "%.1f", a))
+            }
+            .font(.caption2).foregroundStyle(.secondary)
+        })
+    }
+
+    private func legendDot(color: Color, label: String, value: String) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color.opacity(0.8)).frame(width: 7, height: 7)
+            Text("\(label) \(value)")
+        }
     }
 
     private func statColumn(value: String, label: String,

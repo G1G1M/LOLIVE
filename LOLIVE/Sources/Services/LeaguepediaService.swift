@@ -18,6 +18,13 @@ struct LeaguepediaService: Sendable {
         return URLSession(configuration: cfg)
     }()
 
+    private static let utcDateFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
     // MARK: - Public
 
     /// 선수 시즌 스탯 반환.
@@ -42,7 +49,7 @@ struct LeaguepediaService: Sendable {
                 .init(name: "action",  value: "cargoquery"),
                 .init(name: "tables",  value: "ScoreboardPlayers,ScoreboardGames"),
                 .init(name: "join_on", value: "ScoreboardGames.GameId=ScoreboardPlayers.GameId"),
-                .init(name: "fields",  value: "ScoreboardPlayers.Link=L,ScoreboardPlayers.Champion=Champion,ScoreboardPlayers.Kills=K,ScoreboardPlayers.Deaths=D,ScoreboardPlayers.Assists=A,ScoreboardGames.Winner=W,ScoreboardGames.Team1=T1,ScoreboardGames.Team2=T2,ScoreboardPlayers.Team=MyTeam"),
+                .init(name: "fields",  value: "ScoreboardPlayers.Link=L,ScoreboardPlayers.Champion=Champion,ScoreboardPlayers.Kills=K,ScoreboardPlayers.Deaths=D,ScoreboardPlayers.Assists=A,ScoreboardGames.Winner=W,ScoreboardGames.Team1=T1,ScoreboardGames.Team2=T2,ScoreboardPlayers.Team=MyTeam,ScoreboardGames.DateTime_UTC=DT"),
                 .init(name: "where",   value: "ScoreboardPlayers.OverviewPage='\(escapeSql(overviewPage))'"),
                 .init(name: "offset",  value: "\(offset)"),
                 .init(name: "limit",   value: "\(batchSize)"),
@@ -69,7 +76,8 @@ struct LeaguepediaService: Sendable {
             let t1     = row["T1"] ?? ""
             let t2     = row["T2"] ?? ""
             let won = (winner == "1" && myTeam == t1) || (winner == "2" && myTeam == t2)
-            result[link, default: []].append(ChampionPickEntry(champion: champion, kills: k, deaths: d, assists: a, won: won))
+            let date = Self.utcDateFmt.date(from: row["DT"] ?? "")
+            result[link, default: []].append(ChampionPickEntry(champion: champion, kills: k, deaths: d, assists: a, won: won, date: date))
         }
         await LeaguepediaCache.shared.setAllChampionPicksBatch(result, for: overviewPage)
         return result.isEmpty ? nil : result
@@ -84,25 +92,60 @@ struct LeaguepediaService: Sendable {
             return cached
         }
 
-        guard let overviewPage = await currentOverviewPage(leagueName: leagueName) else { return nil }
-        guard let allStats = await allPlayerStats(overviewPage: overviewPage) else {
-            return nil
-        }
-
-        if let stats = allStats[summonerName], stats.games > 0 {
-            await LeaguepediaCache.shared.setSeasonStats(stats, key: cacheKey)
-            return stats
-        }
-
-        let prefix = "\(summonerName) ("
-        if let canonical = allStats.keys.first(where: { $0.hasPrefix(prefix) }),
-           let stats = allStats[canonical], stats.games > 0 {
-            await LeaguepediaCache.shared.setSeasonStats(stats, key: cacheKey)
-            return stats
+        // 최근 페이지를 순서대로 시도 — 신시즌 초반엔 직전 시즌 데이터로 fallback
+        let pages = await candidateOverviewPages(leagueName: leagueName)
+        for page in pages {
+            guard let allStats = await allPlayerStats(overviewPage: page) else { continue }
+            let prefix = "\(summonerName) ("
+            let stats = allStats[summonerName]
+                ?? allStats.first(where: { $0.key.hasPrefix(prefix) })?.value
+            if let stats, stats.games > 0 {
+                await LeaguepediaCache.shared.setSeasonStats(stats, key: cacheKey)
+                return stats
+            }
         }
 
         await LeaguepediaCache.shared.setSeasonStats(nil, key: cacheKey)
         return nil
+    }
+
+    /// 해당 리그의 최근 OverviewPage를 최대 3개 반환 (최신 → 오래된 순).
+    /// 종료일이 없는 토너먼트(진행 중)를 우선 반환.
+    private func candidateOverviewPages(leagueName: String) async -> [String] {
+        var c = URLComponents(string: baseURL)!
+        c.queryItems = [
+            .init(name: "action",   value: "cargoquery"),
+            .init(name: "tables",   value: "Tournaments,Leagues"),
+            .init(name: "join_on",  value: "Tournaments.League=Leagues.League"),
+            .init(name: "fields",   value: "Tournaments.OverviewPage,Tournaments.DateStart,Tournaments.Date"),
+            .init(name: "where",    value: "Leagues.League_Short='\(escapeSql(leagueName))'"),
+            .init(name: "order_by", value: "Tournaments.DateStart DESC"),
+            .init(name: "limit",    value: "6"),
+            .init(name: "format",   value: "json"),
+        ]
+        guard let url = c.url,
+              let data = await cargoData(url: url),
+              let resp = try? JSONDecoder().decode(CargoResp.self, from: data) else { return [] }
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+        var active: [String] = []
+        var past:   [String] = []
+        for row in resp.cargoquery {
+            guard let page  = row.title["OverviewPage"],
+                  let start = row.title["DateStart"].flatMap({ fmt.date(from: $0) }),
+                  start <= now else { continue }
+            if let endStr = row.title["Date"], !endStr.isEmpty,
+               let end = fmt.date(from: endStr), now > end {
+                past.append(page)
+            } else {
+                active.append(page)  // 종료일 없음(진행 중) 또는 종료일 미래
+            }
+        }
+        let ordered = active + past
+        if let first = ordered.first {
+            await LeaguepediaCache.shared.setOverviewPage(first, for: leagueName)
+        }
+        return Array(ordered.prefix(3))
     }
 
     /// 게임 벤 데이터 반환. team1Bans = Team1(첫 번째 팀), team2Bans = Team2(두 번째 팀).
@@ -172,7 +215,7 @@ struct LeaguepediaService: Sendable {
             .init(name: "action",  value: "cargoquery"),
             .init(name: "tables",  value: "ScoreboardPlayers,ScoreboardGames"),
             .init(name: "join_on", value: "ScoreboardGames.GameId=ScoreboardPlayers.GameId"),
-            .init(name: "fields",  value: "ScoreboardPlayers.Champion=Champion,ScoreboardPlayers.Kills=K,ScoreboardPlayers.Deaths=D,ScoreboardPlayers.Assists=A,ScoreboardGames.Winner=W,ScoreboardGames.Team1=T1,ScoreboardGames.Team2=T2,ScoreboardPlayers.Team=MyTeam"),
+            .init(name: "fields",  value: "ScoreboardPlayers.Champion=Champion,ScoreboardPlayers.Kills=K,ScoreboardPlayers.Deaths=D,ScoreboardPlayers.Assists=A,ScoreboardGames.Winner=W,ScoreboardGames.Team1=T1,ScoreboardGames.Team2=T2,ScoreboardPlayers.Team=MyTeam,ScoreboardGames.DateTime_UTC=DT"),
             .init(name: "where",   value: "ScoreboardPlayers.OverviewPage='\(escapeSql(overviewPage))' AND ScoreboardPlayers.Link='\(escapeSql(summonerName))'"),
             .init(name: "limit",   value: "500"),
             .init(name: "format",  value: "json"),
@@ -191,8 +234,9 @@ struct LeaguepediaService: Sendable {
             let t1     = row.title["T1"] ?? ""
             let t2     = row.title["T2"] ?? ""
             let myTeam = row.title["MyTeam"] ?? ""
-            let won = (winner == "1" && myTeam == t1) || (winner == "2" && myTeam == t2)
-            return ChampionPickEntry(champion: champion, kills: k, deaths: d, assists: a, won: won)
+            let won  = (winner == "1" && myTeam == t1) || (winner == "2" && myTeam == t2)
+            let date = Self.utcDateFmt.date(from: row.title["DT"] ?? "")
+            return ChampionPickEntry(champion: champion, kills: k, deaths: d, assists: a, won: won, date: date)
         }
 
         await LeaguepediaCache.shared.setChampionPicks(picks, key: cacheKey)
@@ -571,43 +615,7 @@ struct LeaguepediaService: Sendable {
 
     private func currentOverviewPage(leagueName: String) async -> String? {
         if let cached = await LeaguepediaCache.shared.overviewPage(for: leagueName) { return cached }
-
-        var c = URLComponents(string: baseURL)!
-        c.queryItems = [
-            .init(name: "action",   value: "cargoquery"),
-            .init(name: "tables",   value: "Tournaments,Leagues"),
-            .init(name: "join_on",  value: "Tournaments.League=Leagues.League"),
-            .init(name: "fields",   value: "Tournaments.OverviewPage,Tournaments.DateStart,Tournaments.Date"),
-            .init(name: "where",    value: "Leagues.League_Short='\(escapeSql(leagueName))'"),
-            .init(name: "order_by", value: "Tournaments.DateStart DESC"),
-            .init(name: "limit",    value: "10"),
-            .init(name: "format",   value: "json"),
-        ]
-        guard let url = c.url,
-              let data = await cargoData(url: url),
-              let resp = try? JSONDecoder().decode(CargoResp.self, from: data) else { return nil }
-
-        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-        let now = Date()
-
-        var result: String?
-        for row in resp.cargoquery {
-            guard let page  = row.title["OverviewPage"],
-                  let start = row.title["DateStart"].flatMap({ fmt.date(from: $0) }),
-                  let end   = row.title["Date"].flatMap({ fmt.date(from: $0) }),
-                  now >= start, now <= end else { continue }
-            result = page; break
-        }
-        if result == nil {
-            result = resp.cargoquery.first(where: {
-                guard let s = fmt.date(from: $0.title["DateStart"] ?? "") else { return false }
-                return s <= now
-            })?.title["OverviewPage"]
-        }
-        result = result ?? resp.cargoquery.last?.title["OverviewPage"]
-
-        if let result { await LeaguepediaCache.shared.setOverviewPage(result, for: leagueName) }
-        return result
+        return await candidateOverviewPages(leagueName: leagueName).first
     }
 
     // MARK: - playerNames helpers
