@@ -65,6 +65,21 @@ final class OnboardingLoader {
         if let gameId = cached.gameId {
             Task {
                 gameWindow = await GameWindowCache.shared.window(for: gameId)
+                // 이전 캐시에 이미지 URL이 없으면 재시도
+                guard playerImageURLs.isEmpty,
+                      let window = gameWindow,
+                      let currentMatch = match else { return }
+                let leaguepedia = LeaguepediaService.shared
+                let targets = [window.bluePlayers.first, window.redPlayers.first].compactMap { $0 }
+                var urls: [String: URL] = [:]
+                for player in targets {
+                    if let url = await leaguepedia.fetchPlayerImageURL(summonerName: player.summonerName) {
+                        urls[player.summonerName] = url
+                    }
+                }
+                guard !urls.isEmpty else { return }
+                playerImageURLs = urls
+                saveCache(match: currentMatch, gameId: gameId, playerImageURLs: urls)
             }
         }
     }
@@ -174,7 +189,7 @@ struct OnboardingView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(accentColors[currentPage])
+                        .background(Color.blue)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
@@ -562,9 +577,15 @@ struct OnboardingView: View {
 
     private func favPlayerRowLive(player: PlayerStats) -> some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(url: loader.playerImageURLs[player.summonerName])
-                .frame(width: 36, height: 36)
-                .clipShape(Circle())
+            Group {
+                if let url = loader.playerImageURLs[player.summonerName] {
+                    CachedAsyncImage(url: url)
+                        .frame(width: 36, height: 36)
+                } else {
+                    ChampionImageView(championId: player.championId, size: 36)
+                }
+            }
+            .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(player.summonerName)
