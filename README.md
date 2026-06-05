@@ -131,6 +131,11 @@
            └─ 온보딩 완료  → ContentView
 ```
 
+### 온보딩 선수 이미지 로딩
+
+- 디스크 캐시 복원 시 `playerImageURLs`가 비어있으면 Leaguepedia에서 재시도 후 캐시 갱신
+- 이미지 URL 없을 때 `ChampionImageView`로 폴백 (챔피언 아이콘 표시)
+
 ## 대회 일정 아키텍처 (Worlds / MSI)
 
 Riot API는 2023년 이후 데이터만 제공하므로, 과거 대회는 Leaguepedia Cargo API로 보완합니다.
