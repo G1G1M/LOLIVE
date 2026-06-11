@@ -14,7 +14,7 @@
 |------|------|
 | 플랫폼 | iOS 17+ |
 | 언어 | Swift 6.0 |
-| UI | SwiftUI |
+| UI | SwiftUI (다크모드 고정) |
 | 아키텍처 | MVVM + `@Observable` |
 | 네트워크 | URLSession + async/await |
 | 로컬 저장 | SwiftData |
