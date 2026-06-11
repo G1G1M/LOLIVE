@@ -110,6 +110,7 @@ struct LOLIVEApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.35), value: phase)
+            .preferredColorScheme(.dark)
         }
         .modelContainer(for: [FavoriteTeam.self, FavoritePlayer.self])
     }
