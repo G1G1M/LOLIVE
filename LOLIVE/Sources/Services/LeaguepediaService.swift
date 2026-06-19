@@ -92,7 +92,19 @@ struct LeaguepediaService: Sendable {
             return cached
         }
 
-        // 최근 페이지를 순서대로 시도 — 신시즌 초반엔 직전 시즌 데이터로 fallback
+        // 1단계: 캐시된 overviewPage로 먼저 시도 (API 호출 없음)
+        if let cachedPage = await LeaguepediaCache.shared.overviewPage(for: leagueName),
+           let allStats = await allPlayerStats(overviewPage: cachedPage) {
+            let prefix = "\(summonerName) ("
+            let stats = allStats[summonerName]
+                ?? allStats.first(where: { $0.key.hasPrefix(prefix) })?.value
+            if let stats, stats.games > 0 {
+                await LeaguepediaCache.shared.setSeasonStats(stats, key: cacheKey)
+                return stats
+            }
+        }
+
+        // 2단계: 캐시 미스 — 후보 페이지 목록 API 조회 후 순서대로 시도
         let pages = await candidateOverviewPages(leagueName: leagueName)
         for page in pages {
             guard let allStats = await allPlayerStats(overviewPage: page) else { continue }
@@ -112,6 +124,7 @@ struct LeaguepediaService: Sendable {
     /// 해당 리그의 최근 OverviewPage를 최대 3개 반환 (최신 → 오래된 순).
     /// 종료일이 없는 토너먼트(진행 중)를 우선 반환.
     private func candidateOverviewPages(leagueName: String) async -> [String] {
+        if let cached = await LeaguepediaCache.shared.candidatePages(for: leagueName) { return cached }
         var c = URLComponents(string: baseURL)!
         c.queryItems = [
             .init(name: "action",   value: "cargoquery"),
@@ -142,14 +155,20 @@ struct LeaguepediaService: Sendable {
             }
         }
         let ordered = active + past
-        if let first = ordered.first {
+        let result = Array(ordered.prefix(3))
+        if let first = result.first {
             await LeaguepediaCache.shared.setOverviewPage(first, for: leagueName)
         }
-        return Array(ordered.prefix(3))
+        await LeaguepediaCache.shared.setCandidatePages(result, for: leagueName)
+        return result
     }
 
     /// 게임 벤 데이터 반환. team1Bans = Team1(첫 번째 팀), team2Bans = Team2(두 번째 팀).
     func fetchBans(riotGameId: String) async -> (team1Bans: [String], team2Bans: [String])? {
+        let cacheKey = "lp_bans_\(riotGameId)"
+        if let cached: BansCacheEntry = AppDiskCache.get(key: cacheKey, maxAge: 30 * 24 * 3600) {
+            return (team1Bans: cached.team1Bans, team2Bans: cached.team2Bans)
+        }
         var c = URLComponents(string: baseURL)!
         c.queryItems = [
             .init(name: "action", value: "cargoquery"),
@@ -166,11 +185,16 @@ struct LeaguepediaService: Sendable {
         let t1 = parseBans(row["Team1Bans"] ?? "")
         let t2 = parseBans(row["Team2Bans"] ?? "")
         guard !t1.isEmpty || !t2.isEmpty else { return nil }
+        AppDiskCache.set(key: cacheKey, value: BansCacheEntry(team1Bans: t1, team2Bans: t2))
         return (team1Bans: t1, team2Bans: t2)
     }
 
     /// 소환사명으로 Leaguepedia Players 테이블에서 선수 프로필 이미지 URL 반환.
     func fetchPlayerImageURL(summonerName: String) async -> URL? {
+        let cacheKey = "lp_playerimg_\(summonerName)"
+        if let cached: String = AppDiskCache.get(key: cacheKey, maxAge: 7 * 24 * 3600) {
+            return cached.isEmpty ? nil : URL(string: cached)
+        }
         var c = URLComponents(string: baseURL)!
         c.queryItems = [
             .init(name: "action", value: "cargoquery"),
@@ -183,10 +207,15 @@ struct LeaguepediaService: Sendable {
         guard let url = c.url,
               let data = await cargoData(url: url),
               let resp = try? JSONDecoder().decode(CargoResp.self, from: data),
-              let photo = resp.cargoquery.first?.title["Photo"], !photo.isEmpty else { return nil }
+              let photo = resp.cargoquery.first?.title["Photo"], !photo.isEmpty else {
+            AppDiskCache.set(key: cacheKey, value: "")
+            return nil
+        }
         let encoded = photo.replacingOccurrences(of: " ", with: "_")
             .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? photo
-        return URL(string: "https://lol.fandom.com/wiki/Special:FilePath/\(encoded)")
+        let urlString = "https://lol.fandom.com/wiki/Special:FilePath/\(encoded)"
+        AppDiskCache.set(key: cacheKey, value: urlString)
+        return URL(string: urlString)
     }
 
     /// 선수의 이번 시즌 챔피언 픽 목록 (게임별 KDA + 승패).
@@ -664,12 +693,7 @@ struct LeaguepediaService: Sendable {
     // MARK: - Network
 
     private func cargoData(url: URL) async -> Data? {
-        // .background / .utility 우선순위 = AppPreloadService → 느린 rate limiter
-        // .userInitiated 이상 = 사용자 직접 요청 → 빠른 rate limiter
-        let rateLimiter = Task.currentPriority <= .utility
-            ? LeaguepediaRateLimiter.background
-            : LeaguepediaRateLimiter.foreground
-        await rateLimiter.claimSlot()
+        await LeaguepediaRateLimiter.shared.claimSlot()
         guard !Task.isCancelled else { return nil }
 
         var request = URLRequest(url: url)
@@ -682,7 +706,7 @@ struct LeaguepediaService: Sendable {
                 let wait = http?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 12.0
                 try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
                 guard !Task.isCancelled else { return nil }
-                await rateLimiter.claimSlot()
+                await LeaguepediaRateLimiter.shared.claimSlot()
                 guard !Task.isCancelled else { return nil }
                 (data, response) = try await Self.session.data(for: request)
                 retries += 1
@@ -712,13 +736,12 @@ struct LeaguepediaService: Sendable {
     }
 }
 
-// MARK: - Rate Limiter (1.5초 간격)
+// MARK: - Rate Limiter (0.5초 단일 공유 큐)
+// foreground/background 분리 시 두 큐가 독립 동작해 동시 호출 → 서버 rate limit 유발.
+// 단일 actor로 모든 Leaguepedia 호출을 직렬화해 최대 2 req/s로 제한.
 
 private actor LeaguepediaRateLimiter {
-    /// 사용자 요청 (선수 상세 등 포그라운드): 0.3초 간격
-    static let foreground = LeaguepediaRateLimiter(interval: 0.3)
-    /// AppPreloadService 등 백그라운드 선로딩: 2.5초 간격
-    static let background  = LeaguepediaRateLimiter(interval: 2.5)
+    static let shared = LeaguepediaRateLimiter(interval: 0.5)
 
     private var nextSlotTime = Date.distantPast
     private let slotInterval: TimeInterval
@@ -743,6 +766,7 @@ private actor LeaguepediaCache {
     static let shared = LeaguepediaCache()
 
     private var overviewPages:          [String: String]                               = [:]
+    private var candidatePagesDic:      [String: [String]]                             = [:]
     private var playerNameSets:         [String: Set<String>]                          = [:]
     private var seasonStats:            [String: PlayerSeasonStats?]                   = [:]
     private var allPlayerStatsDic:      [String: [String: PlayerSeasonStats]]          = [:]
@@ -784,6 +808,8 @@ private actor LeaguepediaCache {
     }
 
     func overviewPage(for leagueName: String) -> String? { overviewPages[leagueName] }
+    func candidatePages(for leagueName: String) -> [String]? { candidatePagesDic[leagueName] }
+    func setCandidatePages(_ pages: [String], for leagueName: String) { candidatePagesDic[leagueName] = pages }
     func setOverviewPage(_ page: String, for leagueName: String) {
         overviewPages[leagueName] = page
         let wrapper = OverviewPagesDiskWrapper(savedAt: Date(), pages: overviewPages)
@@ -792,8 +818,23 @@ private actor LeaguepediaCache {
         }
     }
 
-    func playerNames(for leagueName: String) -> Set<String>? { playerNameSets[leagueName] }
-    func setPlayerNames(_ names: Set<String>, for leagueName: String) { playerNameSets[leagueName] = names }
+    func playerNames(for leagueName: String) -> Set<String>? {
+        if let mem = playerNameSets[leagueName] { return mem }
+        let file = Self.playerNamesFile(for: leagueName)
+        guard let data = try? Data(contentsOf: file),
+              let wrapper = try? JSONDecoder().decode(PlayerNamesDiskWrapper.self, from: data),
+              Date().timeIntervalSince(wrapper.savedAt) < Self.maxAge else { return nil }
+        playerNameSets[leagueName] = wrapper.names
+        return wrapper.names
+    }
+
+    func setPlayerNames(_ names: Set<String>, for leagueName: String) {
+        playerNameSets[leagueName] = names
+        let wrapper = PlayerNamesDiskWrapper(savedAt: Date(), names: names)
+        if let data = try? JSONEncoder().encode(wrapper) {
+            try? data.write(to: Self.playerNamesFile(for: leagueName), options: .atomic)
+        }
+    }
 
     func cachedSeasonStats(key: String) -> PlayerSeasonStats?? { seasonStats[key] }
     func setSeasonStats(_ stats: PlayerSeasonStats?, key: String) { seasonStats[key] = .some(stats) }
@@ -906,6 +947,16 @@ private actor LeaguepediaCache {
 
     private static let overviewPagesDiskFile = cacheDir.appendingPathComponent("overview_pages.json")
 
+    private static func playerNamesFile(for leagueName: String) -> URL {
+        let safe = leagueName.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: " ", with: "_")
+        return cacheDir.appendingPathComponent("playernames_\(safe).json")
+    }
+
+    private struct PlayerNamesDiskWrapper: Codable {
+        let savedAt: Date
+        let names: Set<String>
+    }
+
     private struct OverviewPagesDiskWrapper: Codable {
         let savedAt: Date
         let pages: [String: String]
@@ -959,6 +1010,11 @@ private actor LeaguepediaCache {
 }
 
 // MARK: - Leaguepedia Internal Types
+
+private struct BansCacheEntry: Codable {
+    let team1Bans: [String]
+    let team2Bans: [String]
+}
 
 private struct LPTournamentEntry: Codable {
     let page: String

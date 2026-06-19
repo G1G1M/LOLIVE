@@ -71,7 +71,7 @@ final class AppPreloadService {
                 .filter { $0.state == .completed }
                 .sorted { $0.startTime > $1.startTime }
             for match in completed.prefix(8) {
-                MatchDetailViewModel.preload(match: match)
+                await MainActor.run { MatchDetailViewModel.preload(match: match) }
             }
         }
     }

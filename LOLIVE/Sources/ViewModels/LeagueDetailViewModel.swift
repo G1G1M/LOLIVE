@@ -170,6 +170,7 @@ final class LeagueDetailViewModel {
             let r0 = RoleStyle.order($0.role), r1 = RoleStyle.order($1.role)
             return r0 != r1 ? r0 < r1 : $0.summonerName < $1.summonerName
         }
+        AppDiskCache.set(key: "league_players_\(league.id)", value: players)
     }
 
     // MARK: - Private
@@ -187,6 +188,9 @@ final class LeagueDetailViewModel {
            let tournament = activeTournament(from: tournaments),
            let fetched: [Standing] = AppDiskCache.get(key: "standings_\(tournament.id)", maxAge: 3600) {
             standings = applyGD(fetched, schedule: allMatches)
+        }
+        if let cachedPlayers: [Player] = AppDiskCache.get(key: "league_players_\(league.id)", maxAge: 12 * 3600) {
+            players = cachedPlayers
         }
         return true
     }
