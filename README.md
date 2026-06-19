@@ -160,7 +160,7 @@ TournamentDetailViewModel.load()
 - OverviewPage 목록: 24시간 TTL 디스크 캐시
 - 경기 데이터: 30일 TTL 디스크 캐시 (OverviewPage 단위, 캐시 키 `histv2_` prefix)
 - 팀 로고: Leaguepedia Teams 테이블 배치 조회 → `Special:FilePath/` URL 패턴 폴백
-- Rate limit: API 호출 간 2.5초 대기 (actor 기반 순서 보장)
+- Rate limit: 단일 shared actor 0.5s 간격 직렬화 (포그라운드·백그라운드 공유 큐)
 - 빈 결과는 디스크에 저장하지 않아 재시도 가능
 
 ## 디스크 캐시 아키텍처
@@ -180,7 +180,11 @@ TournamentDetailViewModel.load()
 | 검색 데이터 | `search_teams` / `search_players` | 12h | AppDiskCache |
 | 경기 상세 | `event_detail_v2_{matchId}` | 30일 | AppDiskCache |
 | 이미지 | SHA256 해시 파일명 | 영구 | ~/Library/Caches/image_cache/ |
+| 리그 선수 목록 | `league_players_{leagueId}` | 12h | AppDiskCache |
+| 벤 정보 | `lp_bans_{riotGameId}` | 30일 | AppDiskCache |
+| 선수 프로필 이미지 | `lp_playerimg_{name}` | 7일 | AppDiskCache |
 | OverviewPage | `overview_pages.json` | 24h | LeaguepediaStats/ |
+| 선수 이름 목록 | `playernames_{league}.json` | 24h | LeaguepediaStats/ |
 | 시즌 스탯 전체 | `{overviewPage}.json` | 24h | LeaguepediaStats/ |
 | 챔피언 픽 전체 | `champ_batch_{overviewPage}.json` | 24h | LeaguepediaStats/ |
 | 챔피언 픽 (개별) | `champs_{key}.json` | 24h | LeaguepediaStats/ |
@@ -240,7 +244,8 @@ Leaguepedia rate limit(API 호출 간 2.5초 대기) 이슈를 배치 로딩으�
 - 리그 전체 스탯·픽을 배치 1회 요청으로 수집 → 선수별 개별 API 호출 제거
 - 앱 재실행 시 디스크 캐시로 API 호출 없이 즉시 반환
 - `OverviewPage`도 디스크 캐시 → cold start 시 rate limit 대기 제거
-- Rate limiter 2단계 분리: foreground 0.3s (사용자 트리거), background 2.5s (AppPreloadService)
+- Rate limiter 단일 shared actor 0.5s: foreground/background 공유 큐로 동시 호출 방지
+- candidateOverviewPages 결과 메모리 캐시 → 같은 리그 중복 API 호출 제거
 - API 실패·취소 시 nil 캐싱 방지 → 재진입 시 재요청 정상 동작
 
 ## GameWindow 캐시 아키텍처
