@@ -112,6 +112,7 @@
 - 경기 알림 시간 설정 (Picker: 1분 / 5분 / 10분 / 30분 / 1시간 전)
 - 알림 변경 시 즐겨찾기 팀 전체 알림 자동 재스케줄링
 - 앱 설정 페이지 이동 (이용약관, 개인정보처리방침, 앱 사용 설명서, 버전 정보)
+- 앱 설정 하단 법적 고지 — Riot Games 비제휴 팬 앱 명시 (한/영)
 
 ### 홈 화면 위젯 (LOLIVEWidgets)
 - 즐겨찾기한 팀의 다음 경기 일정 표시
@@ -160,6 +161,7 @@ TournamentDetailViewModel.load()
 - OverviewPage 목록: 24시간 TTL 디스크 캐시
 - 경기 데이터: 30일 TTL 디스크 캐시 (OverviewPage 단위, 캐시 키 `histv2_` prefix)
 - 팀 로고: Leaguepedia Teams 테이블 배치 조회 → `Special:FilePath/` URL 패턴 폴백
+- `TournamentDTO.endDate` Optional 처리 — 진행 중인 토너먼트는 API가 null 반환 → 시작일 이후 경기 전체 표시
 - Rate limit: 단일 shared actor 0.5s 간격 직렬화 (포그라운드·백그라운드 공유 큐)
 - 빈 결과는 디스크에 저장하지 않아 재시도 가능
 
