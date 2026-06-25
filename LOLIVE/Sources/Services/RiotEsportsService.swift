@@ -180,7 +180,7 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         let data = try await request(path: "/getTournamentsForLeague", queryItems: query)
         let response = try decode(TournamentsResponse.self, from: data)
         let tournaments = response.data.leagues.flatMap { $0.tournaments }.map {
-            Tournament(id: $0.id, slug: $0.slug, startDate: $0.startDate, endDate: $0.endDate)
+            Tournament(id: $0.id, slug: $0.slug, startDate: $0.startDate, endDate: $0.endDate ?? "")
         }
         AppDiskCache.set(key: key, value: tournaments)
         return tournaments

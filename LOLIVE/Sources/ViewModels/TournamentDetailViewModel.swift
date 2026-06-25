@@ -65,8 +65,12 @@ final class TournamentDetailViewModel {
 
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
-        guard let start = fmt.date(from: t.startDate),
-              let end   = fmt.date(from: t.endDate) else { return [] }
+        guard let start = fmt.date(from: t.startDate) else { return [] }
+        if t.endDate.isEmpty {
+            // endDate 없음 = 진행 중 토너먼트 → 시작일 이후 경기 전체 포함
+            return allMatches.filter { $0.startTime >= start }
+        }
+        guard let end = fmt.date(from: t.endDate) else { return [] }
         let endExtended = Calendar.current.date(byAdding: .day, value: 1, to: end) ?? end
         return allMatches.filter { $0.startTime >= start && $0.startTime < endExtended }
     }
@@ -279,8 +283,11 @@ final class TournamentDetailViewModel {
         }
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
-        guard let start = fmt.date(from: tournament.startDate),
-              let end   = fmt.date(from: tournament.endDate) else { return [] }
+        guard let start = fmt.date(from: tournament.startDate) else { return [] }
+        if tournament.endDate.isEmpty {
+            return matches.filter { $0.startTime >= start }
+        }
+        guard let end = fmt.date(from: tournament.endDate) else { return [] }
         let endExtended = Calendar.current.date(byAdding: .day, value: 1, to: end) ?? end
         return matches.filter { $0.startTime >= start && $0.startTime < endExtended }
     }

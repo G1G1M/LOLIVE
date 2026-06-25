@@ -30,7 +30,9 @@ func activeTournament(from tournaments: [Tournament]) -> Tournament? {
             || s.contains("cup") || s.contains("invitational") || s.contains("showdown")
     }
     func isActive(_ t: Tournament) -> Bool {
-        guard let s = fmt.date(from: t.startDate), let e = fmt.date(from: t.endDate) else { return false }
+        guard let s = fmt.date(from: t.startDate) else { return false }
+        if t.endDate.isEmpty { return now >= s }   // endDate 없음 = 진행 중
+        guard let e = fmt.date(from: t.endDate) else { return false }
         return now >= s && now <= e
     }
     if let t = sorted.first(where: { isActive($0) && !isSpecial($0) }) { return t }

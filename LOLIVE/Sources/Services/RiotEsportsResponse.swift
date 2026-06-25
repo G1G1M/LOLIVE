@@ -164,7 +164,7 @@ struct TournamentDTO: Decodable {
     let id: String
     let slug: String
     let startDate: String
-    let endDate: String
+    let endDate: String?   // 진행 중인 토너먼트는 null 반환 가능
 }
 
 // MARK: - Standings

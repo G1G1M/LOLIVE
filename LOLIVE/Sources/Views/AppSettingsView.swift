@@ -43,6 +43,13 @@ struct AppSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            // MARK: - 법적 고지
+            Section {
+                Text("LOLIVE는 Riot Games의 공식 앱이 아닌 팬 제작 앱입니다. League of Legends 및 관련 상표는 Riot Games, Inc.의 재산입니다.\n\nThis app is not affiliated with or endorsed by Riot Games. League of Legends and all related trademarks are properties of Riot Games, Inc.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("앱 설정")
@@ -91,6 +98,14 @@ LOLIVE 이용약관
 
 제6조 (준거법 및 관할법원)
 본 약관은 대한민국 법률에 따라 해석되며, 분쟁 발생 시 서울중앙지방법원을 전속 관할법원으로 합니다.
+
+---
+
+법적 고지 / Legal Notice
+
+LOLIVE는 Riot Games의 공식 앱이 아닌 팬 제작 앱입니다. League of Legends 및 관련 상표는 Riot Games, Inc.의 재산입니다.
+
+This app is not affiliated with or endorsed by Riot Games. League of Legends and all related trademarks are properties of Riot Games, Inc.
 """
 
 private let privacyPolicy = """
