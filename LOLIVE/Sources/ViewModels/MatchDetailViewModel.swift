@@ -78,8 +78,13 @@ final class MatchDetailViewModel {
     // MARK: - Public
 
     func load() async {
-        // 예정 경기: 게임 데이터 없음 → 즉시 반환 (폴링이 시작 후 자동 감지)
-        guard match.state != .unstarted else { return }
+        // 예정 경기: 게임 데이터는 없지만 팀 esports ID 확보를 위해 eventDetails 조회
+        if match.state == .unstarted {
+            if let detail = try? await esportsService.fetchEventDetails(matchId: match.id) {
+                eventDetail = detail
+            }
+            return
+        }
 
         // 완료된 경기: 디스크 캐시 먼저 확인 → 있으면 로딩 없이 즉시 표시
         if match.state == .completed, await tryLoadFromCache() { return }

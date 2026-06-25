@@ -143,12 +143,6 @@ struct LeaguesView: View {
                 .fontWeight(isInternational ? .semibold : .medium)
 
             Spacer()
-
-            if isInternational {
-                Image(systemName: "globe")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
         }
         .padding(.vertical, 4)
     }

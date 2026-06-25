@@ -443,16 +443,20 @@ struct MatchDetailView: View {
                     Text("\(player.kills)/\(player.deaths)/\(player.assists)")
                         .font(.caption).fontWeight(.medium)
                         .foregroundStyle(player.deaths == 0 ? .primary : .secondary)
+                        .frame(width: 68, alignment: .trailing)
+                        .lineLimit(1)
 
                     Text(formatGold(player.totalGold))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .frame(width: 40, alignment: .trailing)
+                        .frame(width: 42, alignment: .trailing)
+                        .lineLimit(1)
 
                     Text("\(player.creepScore)CS")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .frame(width: 38, alignment: .trailing)
+                        .frame(width: 42, alignment: .trailing)
+                        .lineLimit(1)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 8)

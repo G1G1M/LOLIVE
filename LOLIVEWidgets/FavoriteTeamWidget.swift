@@ -399,6 +399,8 @@ struct FavoriteTeamWidgetView: View {
                     .fontWeight(.bold)
                     .foregroundStyle(.orange)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .frame(minWidth: compact ? 44 : 72, alignment: .center)
                 Text("후 시작").font(.system(size: 9)).foregroundStyle(.secondary)
             }
         } else if compact {
@@ -421,6 +423,8 @@ struct FavoriteTeamWidgetView: View {
             Text(match.startTime, style: .timer)
                 .font(.caption2).fontWeight(.semibold).foregroundStyle(.orange)
                 .monospacedDigit()
+                .lineLimit(1)
+                .frame(minWidth: 44, alignment: .trailing)
         } else {
             Text(timeText(match.startTime, isLive: match.isLive))
                 .font(.caption2).foregroundStyle(.secondary)
@@ -516,4 +520,24 @@ struct FavoriteTeamWidgetView: View {
         if cal.isDateInTomorrow(date) { return "내일" }
         return date.formatted(.dateTime.month().day())
     }
+}
+
+// MARK: - Preview
+
+#Preview("Small", as: .systemSmall) {
+    FavoriteTeamWidget()
+} timeline: {
+    FavoriteTeamEntry.placeholder
+}
+
+#Preview("Medium", as: .systemMedium) {
+    FavoriteTeamWidget()
+} timeline: {
+    FavoriteTeamEntry.placeholder
+}
+
+#Preview("Large", as: .systemLarge) {
+    FavoriteTeamWidget()
+} timeline: {
+    FavoriteTeamEntry.placeholder
 }
