@@ -55,12 +55,24 @@ struct FavoriteTeamEntry: TimelineEntry {
     // 전체 팀 목록 (Large)
     let allTeams: [TeamRowInfo]
 
-    static let placeholder = FavoriteTeamEntry(
-        date: .now, teamId: "", teamName: "T1", teamCode: "T1",
-        teamImageData: nil, leagueName: "LCK", nextMatch: nil,
-        opponentImageData: nil, currentIndex: 0, totalTeams: 1, isConfigured: true,
-        allTeams: []
-    )
+    static let placeholder: FavoriteTeamEntry = {
+        let sampleMatch = WidgetNetworkService.NextMatchInfo(
+            opponentName: "Gen.G",
+            opponentCode: "GEN",
+            opponentImageURL: nil,
+            startTime: .now.addingTimeInterval(1800),
+            isLive: false
+        )
+        let row1 = TeamRowInfo(teamCode: "T1",  teamName: "T1",    leagueName: "LCK", teamImageData: nil, nextMatch: sampleMatch, opponentImageData: nil)
+        let row2 = TeamRowInfo(teamCode: "GEN", teamName: "Gen.G", leagueName: "LCK", teamImageData: nil, nextMatch: nil,         opponentImageData: nil)
+        let row3 = TeamRowInfo(teamCode: "DRX", teamName: "DRX",   leagueName: "LCK", teamImageData: nil, nextMatch: nil,         opponentImageData: nil)
+        return FavoriteTeamEntry(
+            date: .now, teamId: "t1", teamName: "T1", teamCode: "T1",
+            teamImageData: nil, leagueName: "LCK", nextMatch: sampleMatch,
+            opponentImageData: nil, currentIndex: 0, totalTeams: 3, isConfigured: true,
+            allTeams: [row1, row2, row3]
+        )
+    }()
 }
 
 // MARK: - Provider
@@ -180,7 +192,10 @@ struct FavoriteTeamWidget: Widget {
         }
         .configurationDisplayName("즐겨찾기 팀")
         .description("즐겨찾기한 팀의 다음 경기 일정을 표시합니다.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([
+            .systemSmall, .systemMedium, .systemLarge,
+            .accessoryCircular, .accessoryRectangular, .accessoryInline
+        ])
     }
 }
 
@@ -199,11 +214,106 @@ struct FavoriteTeamWidgetView: View {
                 largeView
             } else if family == .systemMedium {
                 mediumView
+            } else if family == .accessoryCircular {
+                accessoryCircularView
+            } else if family == .accessoryRectangular {
+                accessoryRectangularView
+            } else if family == .accessoryInline {
+                accessoryInlineView
             } else {
                 smallView
             }
         }
         .widgetURL(URL(string: "lolive://team/\(entry.teamId)"))
+    }
+
+    // MARK: - Accessory (잠금화면)
+
+    /// 원형: 팀 로고 + 팀 코드
+    private var accessoryCircularView: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            if let data = entry.teamImageData, let img = UIImage(data: data) {
+                Image(uiImage: img)
+                    .resizable().scaledToFit()
+                    .padding(6)
+            } else {
+                Text(entry.teamCode)
+                    .font(.caption2).fontWeight(.bold)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    /// 직사각형: 팀 vs 상대 + 경기 시간
+    private var accessoryRectangularView: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(entry.teamCode)
+                    .font(.caption).fontWeight(.bold)
+                if let match = entry.nextMatch {
+                    Text("vs \(match.opponentCode)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .lineLimit(1)
+
+            if let match = entry.nextMatch {
+                if match.isLive {
+                    Text("● LIVE")
+                        .font(.caption2).fontWeight(.semibold)
+                } else {
+                    let timeToMatch = match.startTime.timeIntervalSinceNow
+                    if timeToMatch > 0, timeToMatch <= 3600 {
+                        Text(match.startTime, style: .timer)
+                            .font(.caption2).fontWeight(.semibold)
+                            .monospacedDigit().lineLimit(1)
+                    } else {
+                        Text(accessoryTimeText(match.startTime))
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                Text("경기 없음")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+
+            Text(entry.leagueName)
+                .font(.system(size: 9)).foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 인라인 (잠금화면 시계 위/아래 한 줄)
+    private var accessoryInlineView: some View {
+        Group {
+            if let match = entry.nextMatch {
+                if match.isLive {
+                    Text("\(entry.teamCode) vs \(match.opponentCode) · LIVE")
+                } else {
+                    let timeToMatch = match.startTime.timeIntervalSinceNow
+                    if timeToMatch > 0, timeToMatch <= 3600 {
+                        Text("\(entry.teamCode) vs \(match.opponentCode) · ") +
+                        Text(match.startTime, style: .timer)
+                    } else {
+                        Text("\(entry.teamCode) vs \(match.opponentCode) · \(accessoryTimeText(match.startTime))")
+                    }
+                }
+            } else {
+                Text("\(entry.teamCode) · 예정된 경기 없음")
+            }
+        }
+        .lineLimit(1)
+    }
+
+    private func accessoryTimeText(_ date: Date) -> String {
+        let cal = Calendar.current
+        let time = date.formatted(date: .omitted, time: .shortened)
+        if cal.isDateInToday(date)    { return "오늘 \(time)" }
+        if cal.isDateInTomorrow(date) { return "내일 \(time)" }
+        return date.formatted(.dateTime.month().day()) + " \(time)"
     }
 
     // MARK: - Unconfigured
@@ -336,7 +446,7 @@ struct FavoriteTeamWidgetView: View {
                 Text("즐겨찾기 팀")
                     .font(.caption2).foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
+            .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 8)
 
             ForEach(Array(entry.allTeams.prefix(5).enumerated()), id: \.offset) { i, info in
                 if i > 0 {
@@ -383,7 +493,7 @@ struct FavoriteTeamWidgetView: View {
                     .font(.caption2).foregroundStyle(.tertiary)
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 16).padding(.vertical, 8)
     }
 
     // MARK: - Time Views
@@ -393,16 +503,14 @@ struct FavoriteTeamWidgetView: View {
         let timeToMatch = match.startTime.timeIntervalSinceNow
         if !match.isLive, timeToMatch > 0, timeToMatch <= 3600 {
             // 1시간 이내: 라이브 카운트다운
-            VStack(spacing: 1) {
-                Text(match.startTime, style: .timer)
-                    .font(compact ? .caption2 : .title3)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.orange)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .frame(minWidth: compact ? 44 : 72, alignment: .center)
-                Text("후 시작").font(.system(size: 9)).foregroundStyle(.secondary)
-            }
+            Text(match.startTime, style: .timer)
+                .font(compact ? .caption2 : .title3)
+                .fontWeight(.bold)
+                .foregroundStyle(.orange)
+                .monospacedDigit()
+                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
         } else if compact {
             Text(timeText(match.startTime, isLive: match.isLive))
                 .font(.caption2).foregroundStyle(.secondary)
@@ -537,6 +645,24 @@ struct FavoriteTeamWidgetView: View {
 }
 
 #Preview("Large", as: .systemLarge) {
+    FavoriteTeamWidget()
+} timeline: {
+    FavoriteTeamEntry.placeholder
+}
+
+#Preview("Lock Circular", as: .accessoryCircular) {
+    FavoriteTeamWidget()
+} timeline: {
+    FavoriteTeamEntry.placeholder
+}
+
+#Preview("Lock Rectangular", as: .accessoryRectangular) {
+    FavoriteTeamWidget()
+} timeline: {
+    FavoriteTeamEntry.placeholder
+}
+
+#Preview("Lock Inline", as: .accessoryInline) {
     FavoriteTeamWidget()
 } timeline: {
     FavoriteTeamEntry.placeholder

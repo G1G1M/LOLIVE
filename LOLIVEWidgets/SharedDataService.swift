@@ -39,8 +39,8 @@ enum SharedDataService {
     }
 
     static func loadTeamImageData(teamCode: String) -> Data? {
-        guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else { return nil }
-        let url = container.appendingPathComponent("teamImg_\(teamCode).dat")
-        return try? Data(contentsOf: url)
+        let defaults = UserDefaults(suiteName: appGroupId)
+        defaults?.synchronize()  // 메인 앱이 쓴 최신 값을 강제로 읽어옴
+        return defaults?.data(forKey: "teamImg_\(teamCode)")
     }
 }

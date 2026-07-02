@@ -78,13 +78,8 @@ final class MatchDetailViewModel {
     // MARK: - Public
 
     func load() async {
-        // 예정 경기: 게임 데이터는 없지만 팀 esports ID 확보를 위해 eventDetails 조회
-        if match.state == .unstarted {
-            if let detail = try? await esportsService.fetchEventDetails(matchId: match.id) {
-                eventDetail = detail
-            }
-            return
-        }
+        // 예정 경기: API 호출 없이 즉시 반환 (rate limit 방지)
+        if match.state == .unstarted { return }
 
         // 완료된 경기: 디스크 캐시 먼저 확인 → 있으면 로딩 없이 즉시 표시
         if match.state == .completed, await tryLoadFromCache() { return }
@@ -96,6 +91,7 @@ final class MatchDetailViewModel {
         do {
             let detail = try await esportsService.fetchEventDetails(matchId: match.id)
             eventDetail = detail
+            isLoading = false  // eventDetail 확보 즉시 화면 표시, 게임 윈도우는 백그라운드 로딩
 
             let liveStats = liveStatsService
             let matchStartTime = match.startTime

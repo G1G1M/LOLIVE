@@ -23,9 +23,13 @@ enum SharedDataService {
     private static let favTeamsKey = "sharedFavoriteTeams"
 
     static func saveTeamImageData(_ data: Data, teamCode: String) {
-        guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else { return }
-        let url = container.appendingPathComponent("teamImg_\(teamCode).dat")
-        try? data.write(to: url, options: .atomic)
+        let defaults = UserDefaults(suiteName: appGroupId)
+        defaults?.set(data, forKey: "teamImg_\(teamCode)")
+        defaults?.synchronize()  // 위젯 Extension이 즉시 읽을 수 있도록 강제 flush
+    }
+
+    static func loadTeamImageData(teamCode: String) -> Data? {
+        UserDefaults(suiteName: appGroupId)?.data(forKey: "teamImg_\(teamCode)")
     }
 
     static func saveFavoriteTeams(_ teams: [FavoriteTeam]) {

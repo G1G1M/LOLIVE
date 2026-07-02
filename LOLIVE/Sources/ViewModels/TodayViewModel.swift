@@ -240,9 +240,8 @@ final class TodayViewModel {
     private func classify(matches: [Match]) {
         let now = Date()
         let todayStart = calendar.startOfDay(for: now)
-        guard let todayEnd      = calendar.date(byAdding: .day, value:  1, to: todayStart),
-              let fiveDaysAhead = calendar.date(byAdding: .day, value:  6, to: todayStart),
-              let fiveDaysAgo   = calendar.date(byAdding: .day, value: -5, to: todayStart)
+        guard let todayEnd    = calendar.date(byAdding: .day, value:  1, to: todayStart),
+              let fiveDaysAgo = calendar.date(byAdding: .day, value: -5, to: todayStart)
         else { return }
 
         // 오늘 아직 시작 안 한 경기
@@ -250,9 +249,9 @@ final class TodayViewModel {
             $0.startTime >= todayStart && $0.startTime < todayEnd && $0.state == .unstarted
         }.sorted { $0.startTime < $1.startTime }
 
-        // 내일~5일 후 예정 경기 (날짜 스트립 +5일 대응)
+        // 내일 이후 모든 예정 경기 — 날짜 제한 없음
         upcomingMatches = matches.filter {
-            $0.startTime >= todayEnd && $0.startTime < fiveDaysAhead && $0.state == .unstarted
+            $0.startTime >= todayEnd && $0.state == .unstarted
         }.sorted { $0.startTime < $1.startTime }
 
         // 5일 전~오늘 완료 경기 (날짜 스트립 -5일 대응)

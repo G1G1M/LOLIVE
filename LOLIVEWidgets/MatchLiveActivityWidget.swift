@@ -18,11 +18,32 @@ struct MatchLiveActivityWidget: Widget {
             .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
-                DynamicIslandExpandedRegion(.center) {
-                    DynamicIslandExpandedView(
-                        attributes: context.attributes,
-                        state: context.state
+                DynamicIslandExpandedRegion(.leading) {
+                    expandedTeamView(
+                        imageData: context.attributes.teamAImageData,
+                        code: context.attributes.teamACode,
+                        imageURL: context.attributes.teamAImageURL,
+                        score: context.state.scoreA,
+                        alignment: .leading
                     )
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    expandedTeamView(
+                        imageData: context.attributes.teamBImageData,
+                        code: context.attributes.teamBCode,
+                        imageURL: context.attributes.teamBImageURL,
+                        score: context.state.scoreB,
+                        alignment: .trailing
+                    )
+                }
+                DynamicIslandExpandedRegion(.center) {
+                    VStack(spacing: 1) {
+                        Text("Game \(context.state.currentGame)")
+                            .font(.caption2).fontWeight(.semibold)
+                        Text(context.attributes.leagueName)
+                            .font(.system(size: 9)).foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     HStack(spacing: 4) {
@@ -37,7 +58,10 @@ struct MatchLiveActivityWidget: Widget {
                 }
             } compactLeading: {
                 HStack(spacing: 3) {
-                    teamLogoInline(teamCode: context.attributes.teamACode, size: 14)
+                    teamLogoView(imageData: context.attributes.teamAImageData,
+                                 teamCode: context.attributes.teamACode,
+                                 imageURL: context.attributes.teamAImageURL,
+                                 size: 14)
                     Text("\(context.state.scoreA)")
                         .font(.caption2).fontWeight(.bold)
                 }
@@ -45,7 +69,10 @@ struct MatchLiveActivityWidget: Widget {
                 HStack(spacing: 3) {
                     Text("\(context.state.scoreB)")
                         .font(.caption2).fontWeight(.bold)
-                    teamLogoInline(teamCode: context.attributes.teamBCode, size: 14)
+                    teamLogoView(imageData: context.attributes.teamBImageData,
+                                 teamCode: context.attributes.teamBCode,
+                                 imageURL: context.attributes.teamBImageURL,
+                                 size: 14)
                 }
             } minimal: {
                 Text("\(context.state.scoreA)-\(context.state.scoreB)")
@@ -54,35 +81,65 @@ struct MatchLiveActivityWidget: Widget {
         }
     }
 
-    private func teamLogoInline(teamCode: String, size: CGFloat) -> some View {
-        Group {
-            if let data = SharedDataService.loadTeamImageData(teamCode: teamCode),
-               let img = UIImage(data: data) {
-                Image(uiImage: img).resizable().scaledToFit()
-            } else {
-                Text(String(teamCode.prefix(1)))
-                    .font(.system(size: size * 0.75, weight: .bold))
-                    .foregroundStyle(.white)
+    // MARK: - Logo helper
+
+    @ViewBuilder
+    func teamLogoView(imageData: Data?, teamCode: String, imageURL: String?, size: CGFloat) -> some View {
+        if let data = imageData, let img = UIImage(data: data) {
+            Image(uiImage: img)
+                .resizable().scaledToFit()
+                .frame(width: size, height: size)
+        } else if let urlStr = imageURL, let url = URL(string: urlStr) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image): image.resizable().scaledToFit()
+                default: logoFallback(code: teamCode, size: size)
+                }
             }
+            .frame(width: size, height: size)
+        } else {
+            logoFallback(code: teamCode, size: size)
+                .frame(width: size, height: size)
         }
-        .frame(width: size, height: size)
+    }
+
+    private func logoFallback(code: String, size: CGFloat) -> some View {
+        Text(String(code.prefix(1)))
+            .font(.system(size: size * 0.7, weight: .bold))
+            .foregroundStyle(.white)
+    }
+
+    // MARK: - Dynamic Island expanded helper
+
+    private func expandedTeamView(imageData: Data?, code: String, imageURL: String?, score: Int, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 3) {
+            teamLogoView(imageData: imageData, teamCode: code, imageURL: imageURL, size: 24)
+            Text(code)
+                .font(.caption2).fontWeight(.bold)
+                .lineLimit(1)
+            Text("\(score)")
+                .font(.subheadline).fontWeight(.bold)
+                .foregroundStyle(score > 0 ? Color.orange : Color.secondary)
+        }
+        .padding(.horizontal, 4).padding(.vertical, 4)
     }
 }
 
-// MARK: - Lock Screen (FotMob style)
+// MARK: - Lock Screen (이전 디자인 복원)
 
 struct LockScreenLiveActivityView: View {
     let attributes: MatchActivityAttributes
     let state: MatchActivityAttributes.ContentState
 
-    private var imgA: Data? { SharedDataService.loadTeamImageData(teamCode: attributes.teamACode) }
-    private var imgB: Data? { SharedDataService.loadTeamImageData(teamCode: attributes.teamBCode) }
-
     var body: some View {
         HStack(spacing: 0) {
+
             // ── 팀 A ─────────────────────
             HStack(spacing: 8) {
-                teamLogo(data: imgA, code: attributes.teamACode, size: 38)
+                teamLogo(imageData: attributes.teamAImageData,
+                         teamCode: attributes.teamACode,
+                         imageURL: attributes.teamAImageURL,
+                         size: 38)
                 Text(attributes.teamACode)
                     .font(.subheadline).fontWeight(.bold)
                     .foregroundStyle(.white)
@@ -119,8 +176,7 @@ struct LockScreenLiveActivityView: View {
                     .foregroundStyle(.white.opacity(0.3))
                     .lineLimit(1)
             }
-            .padding(.horizontal, 14)
-            .fixedSize()
+            .padding(.horizontal, 12)
 
             // ── 팀 B ─────────────────────
             HStack(spacing: 8) {
@@ -128,7 +184,10 @@ struct LockScreenLiveActivityView: View {
                     .font(.subheadline).fontWeight(.bold)
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                teamLogo(data: imgB, code: attributes.teamBCode, size: 38)
+                teamLogo(imageData: attributes.teamBImageData,
+                         teamCode: attributes.teamBCode,
+                         imageURL: attributes.teamBImageURL,
+                         size: 38)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -136,98 +195,33 @@ struct LockScreenLiveActivityView: View {
         .padding(.vertical, 12)
     }
 
-    private func teamLogo(data: Data?, code: String, size: CGFloat) -> some View {
-        Group {
-            if let data, let img = UIImage(data: data) {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFit()
-            } else {
-                // 이미지 없을 때 팀 코드 뱃지로 대체
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.white.opacity(0.1))
-                    .overlay(
-                        Text(String(code.prefix(3)))
-                            .font(.system(size: size * 0.28, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.6))
-                    )
-            }
-        }
-        .frame(width: size, height: size)
-    }
-}
-
-// MARK: - Dynamic Island Expanded
-
-struct DynamicIslandExpandedView: View {
-    let attributes: MatchActivityAttributes
-    let state: MatchActivityAttributes.ContentState
-
-    var body: some View {
-        HStack(spacing: 0) {
-            teamChip(
-                code: attributes.teamACode,
-                imageData: SharedDataService.loadTeamImageData(teamCode: attributes.teamACode),
-                score: state.scoreA,
-                isLeading: true
-            )
-
-            Spacer()
-
-            VStack(spacing: 1) {
-                Text("Game \(state.currentGame)")
-                    .font(.caption2).fontWeight(.semibold)
-                Text(attributes.leagueName)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            teamChip(
-                code: attributes.teamBCode,
-                imageData: SharedDataService.loadTeamImageData(teamCode: attributes.teamBCode),
-                score: state.scoreB,
-                isLeading: false
-            )
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 4)
-    }
-
-    private func teamChip(code: String, imageData: Data?, score: Int, isLeading: Bool) -> some View {
-        HStack(spacing: 5) {
-            if isLeading {
-                teamLogo(data: imageData, code: code, size: 22)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(code).font(.caption2).fontWeight(.bold)
-                    Text("\(score)").font(.caption2).fontWeight(.semibold).foregroundStyle(.blue)
+    @ViewBuilder
+    private func teamLogo(imageData: Data?, teamCode: String, imageURL: String?, size: CGFloat) -> some View {
+        if let data = imageData, let img = UIImage(data: data) {
+            Image(uiImage: img)
+                .resizable().scaledToFit()
+                .frame(width: size, height: size)
+        } else if let urlStr = imageURL, let url = URL(string: urlStr) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image): image.resizable().scaledToFit()
+                default: logoPlaceholder(code: teamCode, size: size)
                 }
-            } else {
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(code).font(.caption2).fontWeight(.bold)
-                    Text("\(score)").font(.caption2).fontWeight(.semibold).foregroundStyle(.red)
-                }
-                teamLogo(data: imageData, code: code, size: 22)
             }
+            .frame(width: size, height: size)
+        } else {
+            logoPlaceholder(code: teamCode, size: size)
+                .frame(width: size, height: size)
         }
     }
 
-    private func teamLogo(data: Data?, code: String, size: CGFloat) -> some View {
-        Group {
-            if let data, let img = UIImage(data: data) {
-                Image(uiImage: img).resizable().scaledToFit()
-            } else {
-                Circle()
-                    .fill(Color.white.opacity(0.12))
-                    .overlay(
-                        Text(String(code.prefix(1)))
-                            .font(.system(size: size * 0.5, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.5))
-                    )
-            }
-        }
-        .frame(width: size, height: size)
+    private func logoPlaceholder(code: String, size: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Color.white.opacity(0.1))
+            .overlay(
+                Text(String(code.prefix(3)))
+                    .font(.system(size: size * 0.28, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.6))
+            )
     }
 }

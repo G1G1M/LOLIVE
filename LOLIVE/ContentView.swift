@@ -50,6 +50,7 @@ struct ContentView: View {
         }
         .task {
             syncFavoritedTeamIds()
+            todayViewModel.startLivePolling()   // favoritedTeamIds 설정 직후 시작
             SharedDataService.saveFavoriteTeams(favoriteTeams)
             WidgetCenter.shared.reloadAllTimelines()
             await MatchNotificationService.shared.requestPermission()

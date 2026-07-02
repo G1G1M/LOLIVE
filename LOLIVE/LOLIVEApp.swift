@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import ActivityKit
 
 // MARK: - App Phase
 
@@ -59,6 +60,7 @@ struct LOLIVEApp: App {
     @State private var todayViewModel = TodayViewModel()
     @State private var deepLinkTeam: TeamDeepLinkItem?
     @State private var deepLinkMatch: MatchDeepLinkInfo?
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         UNUserNotificationCenter.current().delegate = LOLIVENotificationDelegate.shared
@@ -111,6 +113,11 @@ struct LOLIVEApp: App {
             }
             .animation(.easeInOut(duration: 0.35), value: phase)
             .preferredColorScheme(.dark)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            // 포그라운드 복귀 시 즉시 폴링 재시작 → 백그라운드 중 시작된 경기도 즉각 감지
+            guard phase == .main, newPhase == .active else { return }
+            todayViewModel.startLivePolling()
         }
         .modelContainer(for: [FavoriteTeam.self, FavoritePlayer.self])
     }

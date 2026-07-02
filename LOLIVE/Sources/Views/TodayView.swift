@@ -12,10 +12,14 @@ struct TodayView: View {
 
     private let cal = Calendar.current
 
-    // 오늘 기준 ±5일 (총 11일)
+    // 과거 5일 ~ upcoming 마지막 경기 날짜 (없으면 +5일)
     private var dateRange: [Date] {
         let today = cal.startOfDay(for: Date())
-        return (-5...5).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
+        let lastUpcomingDay = viewModel.upcomingMatches.last.map { cal.startOfDay(for: $0.startTime) }
+        let minEnd = cal.date(byAdding: .day, value: 5, to: today)!
+        let end = max(lastUpcomingDay ?? minEnd, minEnd)
+        let endDays = cal.dateComponents([.day], from: today, to: end).day ?? 5
+        return (-5...endDays).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
     }
 
     var body: some View {
@@ -55,9 +59,7 @@ struct TodayView: View {
         }
         .task {
             await viewModel.loadTodayMatches()
-            viewModel.startLivePolling()
         }
-        .onDisappear { viewModel.stopPolling() }
     }
 
     // MARK: - Fixed: Title

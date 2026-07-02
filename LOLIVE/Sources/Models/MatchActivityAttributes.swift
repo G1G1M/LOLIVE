@@ -24,8 +24,10 @@ struct MatchActivityAttributes: ActivityAttributes {
     let teamAName: String
     let teamACode: String
     let teamAImageURL: String?
+    let teamAImageData: Data?   // 30×30 PNG 썸네일 — ActivityKit이 위젯 Extension에 직접 전달
     let teamBName: String
     let teamBCode: String
     let teamBImageURL: String?
+    let teamBImageData: Data?   // 30×30 PNG 썸네일 — ActivityKit이 위젯 Extension에 직접 전달
     let leagueName: String
 }

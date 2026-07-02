@@ -1,10 +1,10 @@
 //
 //  LiveActivityService.swift
 //  LOLIVE
-//
 
 import ActivityKit
 import Foundation
+import UIKit
 
 @MainActor
 final class LiveActivityService {
@@ -22,9 +22,33 @@ final class LiveActivityService {
 
     // MARK: - Private
 
-    private func fetchImageData(_ urlString: String?) async -> Data? {
-        guard let str = urlString, let url = URL(string: str) else { return nil }
-        return try? await URLSession.shared.data(from: url).0
+    /// URL에서 이미지를 fetch해 30×30 PNG 썸네일로 변환 후 반환.
+    /// 반환된 Data는 MatchActivityAttributes에 직접 포함되어 ActivityKit이 위젯 Extension에 전달.
+    private func fetchThumbnail(urlString: String?, teamCode: String) async -> Data? {
+        guard let str = urlString, let url = URL(string: str) else {
+            print("🖼️ [\(teamCode)] URL 없음")
+            return nil
+        }
+        guard let (data, _) = try? await URLSession.shared.data(from: url) else {
+            print("🖼️ [\(teamCode)] 네트워크 fetch 실패")
+            return nil
+        }
+        guard let original = UIImage(data: data) else {
+            print("🖼️ [\(teamCode)] UIImage 변환 실패")
+            return nil
+        }
+        // 30×30으로 리사이즈해 PNG 크기를 최소화
+        let size = CGSize(width: 30, height: 30)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let thumbnail = renderer.image { _ in
+            original.draw(in: CGRect(origin: .zero, size: size))
+        }
+        guard let png = thumbnail.pngData() else {
+            print("🖼️ [\(teamCode)] PNG 변환 실패")
+            return nil
+        }
+        print("🖼️ [\(teamCode)] ✅ 썸네일 준비: \(png.count) bytes (30×30 PNG)")
+        return png
     }
 
     // MARK: - Public
@@ -32,7 +56,13 @@ final class LiveActivityService {
     /// 폴링 결과로 liveMatches가 갱신될 때마다 호출
     /// — 즐겨찾기 팀의 경기 Live Activity를 시작/업데이트/종료
     func syncActivities(_ liveMatches: [LiveMatch], favoritedTeamIds: Set<String>) async {
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let authInfo = ActivityAuthorizationInfo()
+        guard authInfo.areActivitiesEnabled else {
+            #if DEBUG
+            print("⚠️ [LiveActivity] 비활성화됨 — 설정 > LOLIVE > 실시간 활동에서 켜주세요")
+            #endif
+            return
+        }
 
         let relevant = liveMatches.filter {
             favoritedTeamIds.contains($0.match.teamA.id) ||
@@ -58,31 +88,41 @@ final class LiveActivityService {
             )
 
             if let activity = activities[liveMatch.match.id] {
+                // 기존 Activity 업데이트
                 await activity.update(.init(state: state, staleDate: nil))
             } else {
-                // Live Activity 시작 전 팀 로고를 App Group에 캐시 (Live Activity는 AsyncImage 불가)
-                async let imgATask = fetchImageData(liveMatch.match.teamA.imageURL)
-                async let imgBTask = fetchImageData(liveMatch.match.teamB.imageURL)
-                let (imgA, imgB) = await (imgATask, imgBTask)
-                if let imgA { SharedDataService.saveTeamImageData(imgA, teamCode: liveMatch.match.teamA.code) }
-                if let imgB { SharedDataService.saveTeamImageData(imgB, teamCode: liveMatch.match.teamB.code) }
+                // 두 팀 썸네일을 병렬로 fetch
+                async let thumbA = fetchThumbnail(urlString: liveMatch.match.teamA.imageURL, teamCode: liveMatch.match.teamA.code)
+                async let thumbB = fetchThumbnail(urlString: liveMatch.match.teamB.imageURL, teamCode: liveMatch.match.teamB.code)
+                let (teamAImageData, teamBImageData) = await (thumbA, thumbB)
 
                 let attrs = MatchActivityAttributes(
                     matchId: liveMatch.match.id,
                     teamAName: liveMatch.match.teamA.name,
                     teamACode: liveMatch.match.teamA.code,
                     teamAImageURL: liveMatch.match.teamA.imageURL,
+                    teamAImageData: teamAImageData,
                     teamBName: liveMatch.match.teamB.name,
                     teamBCode: liveMatch.match.teamB.code,
                     teamBImageURL: liveMatch.match.teamB.imageURL,
+                    teamBImageData: teamBImageData,
                     leagueName: liveMatch.match.league.name
                 )
-                let activity = try? Activity.request(
-                    attributes: attrs,
-                    content: .init(state: state, staleDate: nil)
-                )
-                if let activity {
+                do {
+                    let activity = try Activity.request(
+                        attributes: attrs,
+                        content: .init(state: state, staleDate: nil),
+                        pushType: nil
+                    )
                     activities[liveMatch.match.id] = activity
+                    #if DEBUG
+                    print("✅ [LiveActivity] 시작: \(liveMatch.match.teamA.code) vs \(liveMatch.match.teamB.code) id=\(activity.id)")
+                    print("   imgA=\(teamAImageData?.count ?? 0)B  imgB=\(teamBImageData?.count ?? 0)B")
+                    #endif
+                } catch {
+                    #if DEBUG
+                    print("❌ [LiveActivity] request 실패: \(error)")
+                    #endif
                 }
             }
         }
