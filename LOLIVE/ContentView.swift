@@ -59,14 +59,48 @@ struct ContentView: View {
         .onChange(of: favoriteTeams) { _, newValue in
             syncFavoritedTeamIds()
             SharedDataService.saveFavoriteTeams(newValue)
-            WidgetCenter.shared.reloadAllTimelines()
+            saveWidgetNextMatches()
             todayViewModel.syncLiveActivitiesNow()
             Task { await MatchNotificationService.shared.reschedule(for: newValue) }
+        }
+        .onChange(of: todayViewModel.upcomingMatches) { _, _ in
+            saveWidgetNextMatches()
+        }
+        .onChange(of: todayViewModel.liveMatches) { _, _ in
+            saveWidgetNextMatches()
         }
     }
 
     private func syncFavoritedTeamIds() {
         todayViewModel.favoritedTeamIds = Set(favoriteTeams.flatMap { [$0.teamId, $0.teamCode] })
+    }
+
+    private func saveWidgetNextMatches() {
+        let allMatches = todayViewModel.liveMatches.map { $0.match }
+            + todayViewModel.todayMatches
+            + todayViewModel.upcomingMatches
+
+        var nextMatchMap: [String: SharedNextMatch] = [:]
+        for fav in favoriteTeams {
+            let code = fav.teamCode.lowercased()
+            guard let match = allMatches.first(where: {
+                $0.teamA.code.lowercased() == code || $0.teamB.code.lowercased() == code
+            }) else { continue }
+            let isTeamA = match.teamA.code.lowercased() == code
+            let opponent = isTeamA ? match.teamB : match.teamA
+            let isLive = todayViewModel.liveMatches.contains { $0.match.id == match.id }
+            nextMatchMap[fav.teamCode.uppercased()] = SharedNextMatch(
+                opponentName: opponent.name,
+                opponentCode: opponent.code,
+                opponentImageURL: opponent.imageURL,
+                startTime: match.startTime,
+                isLive: isLive,
+                leagueName: match.league.name,
+                savedAt: Date()
+            )
+        }
+        SharedDataService.saveNextMatches(nextMatchMap)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 

@@ -15,6 +15,7 @@ struct TeamDetailView: View {
     @State private var isFavorited = false
     @State private var selectedTab: TeamTab = .roster
     @Environment(\.modelContext) private var modelContext
+    @Environment(TodayViewModel.self) private var todayViewModel
 
     private enum TeamTab: String, CaseIterable {
         case roster  = "선수단"
@@ -64,6 +65,7 @@ struct TeamDetailView: View {
             }
         }
         .task {
+            viewModel.updateLeague(resolvedHomeLeague)
             await viewModel.load()
             checkFavoriteStatus()
         }
@@ -183,21 +185,43 @@ struct TeamDetailView: View {
     // MARK: - Favorite
 
     private func checkFavoriteStatus() {
-        let id = team.id
-        let descriptor = FetchDescriptor<FavoriteTeam>(predicate: #Predicate { $0.teamId == id })
+        let code = team.code
+        let descriptor = FetchDescriptor<FavoriteTeam>(predicate: #Predicate { $0.teamCode == code })
         isFavorited = (try? modelContext.fetch(descriptor))?.isEmpty == false
     }
 
     private func toggleFavorite() {
-        let id = team.id
-        let descriptor = FetchDescriptor<FavoriteTeam>(predicate: #Predicate { $0.teamId == id })
+        let code = team.code
+        let descriptor = FetchDescriptor<FavoriteTeam>(predicate: #Predicate { $0.teamCode == code })
         if let existing = try? modelContext.fetch(descriptor), !existing.isEmpty {
             existing.forEach { modelContext.delete($0) }
             isFavorited = false
         } else {
-            modelContext.insert(FavoriteTeam(team: team, league: league))
+            modelContext.insert(FavoriteTeam(team: team, league: resolvedHomeLeague))
             isFavorited = true
         }
+    }
+
+    // 국제 대회 컨텍스트(MSI/Worlds)에서 즐겨찾기 시 홈 리그로 저장
+    private var resolvedHomeLeague: League {
+        let name = league.name.lowercased()
+        let region = league.region.lowercased()
+        let isIntl = name.contains("msi") || name.contains("worlds") || name.contains("월드") ||
+                     region.contains("international") || region.contains("국제")
+        guard isIntl else { return league }
+        let allMatches = todayViewModel.completedMatches + todayViewModel.todayMatches + todayViewModel.upcomingMatches
+        for match in allMatches {
+            let ml = match.league.name.lowercased()
+            let mr = match.league.region.lowercased()
+            let isMatchIntl = ml.contains("msi") || ml.contains("worlds") || ml.contains("월드") ||
+                              mr.contains("international") || mr.contains("국제")
+            guard !isMatchIntl else { continue }
+            if match.teamA.code.uppercased() == team.code.uppercased() ||
+               match.teamB.code.uppercased() == team.code.uppercased() {
+                return match.league
+            }
+        }
+        return league
     }
 
     // MARK: - Roster Card

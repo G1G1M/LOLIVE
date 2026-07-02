@@ -78,8 +78,13 @@ final class MatchDetailViewModel {
     // MARK: - Public
 
     func load() async {
-        // 예정 경기: API 호출 없이 즉시 반환 (rate limit 방지)
-        if match.state == .unstarted { return }
+        // 예정 경기: game window 폴링 불필요, eventDetail만 fetch (TeamDetailView 로스터용 실제 team ID 확보)
+        if match.state == .unstarted {
+            if eventDetail == nil {
+                eventDetail = try? await esportsService.fetchEventDetails(matchId: match.id)
+            }
+            return
+        }
 
         // 완료된 경기: 디스크 캐시 먼저 확인 → 있으면 로딩 없이 즉시 표시
         if match.state == .completed, await tryLoadFromCache() { return }

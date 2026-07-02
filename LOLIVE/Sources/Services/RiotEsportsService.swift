@@ -58,12 +58,38 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
     func fetchSchedule(league: League) async throws -> [Match] {
         let key = "schedule_\(league.id)"
         if let cached: [Match] = AppDiskCache.get(key: key, maxAge: 15 * 60) { return cached }
+
+        var allMatches: [Match] = []
+        var seen = Set<String>()
+
+        // 첫 페이지 (오늘 기준)
         let query = [URLQueryItem(name: "leagueId", value: league.id)]
         let data = try await request(path: "/getSchedule", queryItems: query)
         let response = try decode(ScheduleResponse.self, from: data)
-        let matches = response.data.schedule.events.compactMap { mapEventToMatch($0, fallbackLeague: league) }
-        AppDiskCache.set(key: key, value: matches)
-        return matches
+        for m in response.data.schedule.events.compactMap({ mapEventToMatch($0, fallbackLeague: league) }) {
+            if seen.insert(m.id).inserted { allMatches.append(m) }
+        }
+
+        // 미래 경기 페이지 (newer) 최대 3페이지 추가
+        var newerToken = response.data.schedule.pages?.newer
+        var newerCount = 0
+        while let token = newerToken, newerCount < 3 {
+            var q = [URLQueryItem(name: "leagueId", value: league.id),
+                     URLQueryItem(name: "pageToken", value: token)]
+            if let d = try? await request(path: "/getSchedule", queryItems: q),
+               let r = try? decode(ScheduleResponse.self, from: d) {
+                for m in r.data.schedule.events.compactMap({ mapEventToMatch($0, fallbackLeague: league) }) {
+                    if seen.insert(m.id).inserted { allMatches.append(m) }
+                }
+                newerToken = r.data.schedule.pages?.newer
+            } else {
+                break
+            }
+            newerCount += 1
+        }
+
+        AppDiskCache.set(key: key, value: allMatches)
+        return allMatches
     }
 
     // 국제 대회(Worlds/MSI) 전용: 모든 페이지를 순회하여 전체 경기 목록 반환

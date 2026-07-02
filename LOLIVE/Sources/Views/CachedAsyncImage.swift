@@ -60,7 +60,11 @@ struct CachedAsyncImage: View {
 
         // 3. 네트워크 다운로드
         uiImage = nil
-        guard let (data, _) = try? await URLSession.shared.data(from: url),
+        var request = URLRequest(url: url)
+        if url.host?.contains("fandom.com") == true || url.host?.contains("wikia") == true {
+            request.setValue("https://lol.fandom.com", forHTTPHeaderField: "Referer")
+        }
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
               let img = UIImage(data: data) else { return }
 
         Self.memCache.setObject(img, forKey: key)

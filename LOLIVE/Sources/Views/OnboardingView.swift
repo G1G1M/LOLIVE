@@ -582,7 +582,21 @@ struct OnboardingView: View {
                     CachedAsyncImage(url: url)
                         .frame(width: 36, height: 36)
                 } else {
-                    ChampionImageView(championId: player.championId, size: 36)
+                    ZStack {
+                        Circle().fill(Color.secondary.opacity(0.2))
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(width: 36, height: 36)
+                    .task {
+                        let name = player.summonerName
+                        guard loader.playerImageURLs[name] == nil else { return }
+                        AppDiskCache.clear(key: "lp_playerimg_\(name)")
+                        if let url = await LeaguepediaService.shared.fetchPlayerImageURL(summonerName: name) {
+                            loader.playerImageURLs[name] = url
+                        }
+                    }
                 }
             }
             .clipShape(Circle())

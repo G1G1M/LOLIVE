@@ -234,9 +234,15 @@ struct MatchDetailView: View {
                                 .font(.system(size: 9))
                                 .foregroundStyle(.secondary)
                         } else {
-                            Circle()
-                                .fill(isSelected ? Color.white.opacity(0.7) : Color.accentColor)
-                                .frame(width: 5, height: 5)
+                            if let code = gameWinnerCode(game: game, detail: detail) {
+                                Text(code)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(isSelected ? .white.opacity(0.9) : Color.accentColor)
+                            } else {
+                                Circle()
+                                    .fill(isSelected ? Color.white.opacity(0.7) : Color.accentColor)
+                                    .frame(width: 5, height: 5)
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -382,22 +388,31 @@ struct MatchDetailView: View {
     private func playerListCard(window: GameWindow) -> some View {
         let blueTeam = teamFor(windowTeamId: window.blueTeamId)
         let redTeam  = teamFor(windowTeamId: window.redTeamId)
+        let blueWon  = blueTeamWon(window)
 
         return VStack(spacing: 0) {
-            playerSection(team: blueTeam, sideLabel: "Blue", players: window.bluePlayers, color: .blue)
+            playerSection(team: blueTeam, sideLabel: "Blue", players: window.bluePlayers, color: .blue, isWinner: blueWon.map { $0 })
             Divider().padding(.horizontal, 16)
-            playerSection(team: redTeam, sideLabel: "Red", players: window.redPlayers, color: .red)
+            playerSection(team: redTeam, sideLabel: "Red", players: window.redPlayers, color: .red, isWinner: blueWon.map { !$0 })
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    private func playerSection(team: Team?, sideLabel: String, players: [PlayerStats], color: Color) -> some View {
+    private func playerSection(team: Team?, sideLabel: String, players: [PlayerStats], color: Color, isWinner: Bool? = nil) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Circle().fill(color).frame(width: 6, height: 6)
                 Text(team?.code ?? sideLabel)
                     .font(.subheadline).fontWeight(.semibold)
+                if let isWinner {
+                    Text(isWinner ? "WIN" : "LOSE")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(isWinner ? Color.blue : Color.secondary)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(isWinner ? Color.blue.opacity(0.15) : Color.secondary.opacity(0.1))
+                        .clipShape(Capsule())
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -660,6 +675,13 @@ struct MatchDetailView: View {
         let esportsId = (team.code == match.teamA.code) ? detail.teamAEsportsId : detail.teamBEsportsId
         guard !esportsId.isEmpty, esportsId != team.id else { return team }
         return Team(id: esportsId, name: team.name, code: team.code, imageURL: team.imageURL)
+    }
+
+    private func gameWinnerCode(game: GameInfo, detail: EventDetailInfo) -> String? {
+        guard let winnerId = game.winnerTeamId, !winnerId.isEmpty else { return nil }
+        if winnerId == detail.teamAEsportsId { return match.teamA.code }
+        if winnerId == detail.teamBEsportsId { return match.teamB.code }
+        return teamFor(windowTeamId: winnerId)?.code
     }
 
     private func roleLabel(_ role: String) -> String { RoleStyle.label(role) }

@@ -244,14 +244,17 @@ final class TodayViewModel {
               let fiveDaysAgo = calendar.date(byAdding: .day, value: -5, to: todayStart)
         else { return }
 
-        // 오늘 아직 시작 안 한 경기
+
+        // 오늘 아직 시작 안 한 경기 (inProgress여도 미래 startTime이면 포함 — MSI 등 진행 중 토너먼트 대응)
         todayMatches = matches.filter {
-            $0.startTime >= todayStart && $0.startTime < todayEnd && $0.state == .unstarted
+            $0.startTime >= now && $0.startTime < todayEnd &&
+            ($0.state == .unstarted || $0.state == .inProgress)
         }.sorted { $0.startTime < $1.startTime }
 
-        // 내일 이후 모든 예정 경기 — 날짜 제한 없음
+        // 내일 이후 모든 예정 경기 — inProgress여도 미래면 upcoming (MSI 토너먼트 블록 대응)
         upcomingMatches = matches.filter {
-            $0.startTime >= todayEnd && $0.state == .unstarted
+            $0.startTime >= todayEnd &&
+            ($0.state == .unstarted || $0.state == .inProgress)
         }.sorted { $0.startTime < $1.startTime }
 
         // 5일 전~오늘 완료 경기 (날짜 스트립 -5일 대응)
@@ -262,6 +265,7 @@ final class TodayViewModel {
         for match in completedMatches.prefix(8) {
             MatchDetailViewModel.preload(match: match)
         }
+
     }
 
     private func errorDescription(_ error: Error) -> String {

@@ -18,6 +18,16 @@ struct SharedFavoriteTeam: Codable {
     let leagueImageURL: String?
 }
 
+struct SharedNextMatch: Codable {
+    let opponentName: String
+    let opponentCode: String
+    let opponentImageURL: String?
+    let startTime: Date
+    let isLive: Bool
+    let leagueName: String
+    let savedAt: Date
+}
+
 enum SharedDataService {
     static let appGroupId = "group.lolive"
     private static let favTeamsKey = "sharedFavoriteTeams"
@@ -30,6 +40,15 @@ enum SharedDataService {
 
     static func loadTeamImageData(teamCode: String) -> Data? {
         UserDefaults(suiteName: appGroupId)?.data(forKey: "teamImg_\(teamCode)")
+    }
+
+    static func saveNextMatches(_ matches: [String: SharedNextMatch]) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let defaults = UserDefaults(suiteName: appGroupId),
+              let data = try? encoder.encode(matches) else { return }
+        defaults.set(data, forKey: "nextMatches")
+        defaults.synchronize()
     }
 
     static func saveFavoriteTeams(_ teams: [FavoriteTeam]) {

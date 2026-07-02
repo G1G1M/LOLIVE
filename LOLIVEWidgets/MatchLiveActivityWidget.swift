@@ -225,3 +225,32 @@ struct LockScreenLiveActivityView: View {
             )
     }
 }
+
+// MARK: - Previews
+
+#Preview("잠금화면 Live Activity", as: .content, using: MatchActivityAttributes(
+    matchId: "preview",
+    teamAName: "T1", teamACode: "T1",
+    teamAImageURL: nil, teamAImageData: nil,
+    teamBName: "Gen.G", teamBCode: "GEN",
+    teamBImageURL: nil, teamBImageData: nil,
+    leagueName: "LCK"
+)) {
+    MatchLiveActivityWidget()
+} contentStates: {
+    MatchActivityAttributes.ContentState(scoreA: 1, scoreB: 0, currentGame: 2, isLive: true)
+    MatchActivityAttributes.ContentState(scoreA: 2, scoreB: 1, currentGame: 3, isLive: true)
+}
+
+#Preview("Dynamic Island", as: .dynamicIsland(.expanded), using: MatchActivityAttributes(
+    matchId: "preview",
+    teamAName: "T1", teamACode: "T1",
+    teamAImageURL: nil, teamAImageData: nil,
+    teamBName: "Gen.G", teamBCode: "GEN",
+    teamBImageURL: nil, teamBImageData: nil,
+    leagueName: "LCK"
+)) {
+    MatchLiveActivityWidget()
+} contentStates: {
+    MatchActivityAttributes.ContentState(scoreA: 1, scoreB: 0, currentGame: 2, isLive: true)
+}

@@ -87,15 +87,21 @@ struct LOLIVEApp: App {
                         .environment(todayViewModel)
                         .onAppear { AppPreloadService.shared.start() }
                         .onOpenURL { url in
-                            guard url.scheme == "lolive",
-                                  url.host == "team",
-                                  let teamId = url.pathComponents.dropFirst().first,
-                                  !teamId.isEmpty
-                            else { return }
-                            deepLinkTeam = TeamDeepLinkItem(id: teamId)
+                            guard url.scheme == "lolive", !url.pathComponents.isEmpty else { return }
+                            if url.host == "match",
+                               let teamCode = url.pathComponents.dropFirst().first,
+                               !teamCode.isEmpty {
+                                // 위젯 탭: 해당 팀의 다음 경기로 이동
+                                deepLinkTeam = TeamDeepLinkItem(id: teamCode.uppercased())
+                            } else if url.host == "team",
+                                      let teamCode = url.pathComponents.dropFirst().first,
+                                      !teamCode.isEmpty {
+                                deepLinkTeam = TeamDeepLinkItem(id: teamCode.uppercased())
+                            }
                         }
                         .sheet(item: $deepLinkTeam) { item in
-                            TeamDeepLinkSheet(teamId: item.id)
+                            WidgetMatchDeepLinkSheet(teamCode: item.id)
+                                .environment(todayViewModel)
                         }
                         .sheet(item: $deepLinkMatch) { info in
                             NavigationStack {
@@ -175,23 +181,41 @@ struct MatchDeepLinkInfo: Identifiable {
 }
 
 struct TeamDeepLinkItem: Identifiable {
-    let id: String  // Riot team ID
+    let id: String  // teamCode (대문자)
 }
 
-struct TeamDeepLinkSheet: View {
-    let teamId: String
-    @Query private var favoriteTeams: [FavoriteTeam]
+/// 위젯 탭 → 해당 팀의 다음/진행 중 경기 상세로 이동
+struct WidgetMatchDeepLinkSheet: View {
+    let teamCode: String
+    @Environment(TodayViewModel.self) private var todayViewModel
+
+    private var match: Match? {
+        let code = teamCode.uppercased()
+        let allMatches = todayViewModel.liveMatches.map { $0.match }
+            + todayViewModel.todayMatches
+            + todayViewModel.upcomingMatches
+        return allMatches.first {
+            $0.teamA.code.uppercased() == code || $0.teamB.code.uppercased() == code
+        }
+    }
 
     var body: some View {
-        if let fav = favoriteTeams.first(where: { $0.teamId == teamId }) {
+        if todayViewModel.isLoading && match == nil {
+            ProgressView("경기 정보 불러오는 중...")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let match {
             NavigationStack {
-                TeamDetailView(team: fav.asTeam, league: fav.asLeague)
+                MatchDetailView(
+                    match: match,
+                    liveMatch: todayViewModel.liveMatches.first { $0.match.id == match.id }
+                )
+                .navigationBarTitleDisplayMode(.inline)
             }
         } else {
             ContentUnavailableView(
-                "팀 정보 없음",
-                systemImage: "star.slash",
-                description: Text("즐겨찾기에 등록된 팀을 찾을 수 없습니다.")
+                "경기 없음",
+                systemImage: "calendar.badge.exclamationmark",
+                description: Text("현재 예정된 경기가 없습니다.")
             )
         }
     }

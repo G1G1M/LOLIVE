@@ -123,15 +123,31 @@ struct FavoriteTeamProvider: TimelineProvider {
         idx = max(0, min(idx, teams.count - 1))
         let fav = teams[idx]
 
-        async let matchTask   = WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
+        // App Group에 저장된 다음 경기 우선 (MSI/Worlds 포함 전체 리그 커버)
+        // 없거나 1시간 초과 시 홈 리그 API fallback
+        let sharedMatch = SharedDataService.loadNextMatch(teamCode: fav.teamCode)
+        async let matchTask = sharedMatch != nil
+            ? nil
+            : WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
         async let teamImgTask = fetchImageData(fav.teamImageURL)
-        let (match, teamImg)  = await (matchTask, teamImgTask)
-        // 상대팀 이미지: 네트워크 fetch 실패 시 App Group 캐시에서 폴백
+        let (apiMatch, teamImg) = await (matchTask, teamImgTask)
+        let match = sharedMatch.map {
+            WidgetNetworkService.NextMatchInfo(
+                opponentName: $0.opponentName,
+                opponentCode: $0.opponentCode,
+                opponentImageURL: $0.opponentImageURL,
+                startTime: $0.startTime,
+                isLive: $0.isLive
+            )
+        } ?? apiMatch
         let oppImg = await fetchImageData(match?.opponentImageURL)
                    ?? SharedDataService.loadTeamImageData(teamCode: match?.opponentCode ?? "")
 
         // 전체 팀 (Large 위젯)
         let allTeamsData = await loadAllTeams(teams)
+
+        // 실제 경기 리그명 우선 (MSI 경기면 "MSI", LCK면 "LCK")
+        let leagueName = sharedMatch?.leagueName ?? fav.leagueName
 
         return FavoriteTeamEntry(
             date: .now,
@@ -139,7 +155,7 @@ struct FavoriteTeamProvider: TimelineProvider {
             teamName: fav.teamName,
             teamCode: fav.teamCode,
             teamImageData: teamImg,
-            leagueName: fav.leagueName,
+            leagueName: leagueName,
             nextMatch: match,
             opponentImageData: oppImg,
             currentIndex: idx,
@@ -153,15 +169,28 @@ struct FavoriteTeamProvider: TimelineProvider {
         await withTaskGroup(of: (Int, TeamRowInfo).self) { group in
             for (i, fav) in teams.enumerated() {
                 group.addTask {
-                    async let m   = WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
+                    let sharedMatch = SharedDataService.loadNextMatch(teamCode: fav.teamCode)
+                    async let apiMatchTask = sharedMatch != nil
+                        ? nil
+                        : WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
                     async let img = fetchImageData(fav.teamImageURL)
-                    let (match, teamImg) = await (m, img)
+                    let (apiMatch, teamImg) = await (apiMatchTask, img)
+                    let match = sharedMatch.map {
+                        WidgetNetworkService.NextMatchInfo(
+                            opponentName: $0.opponentName,
+                            opponentCode: $0.opponentCode,
+                            opponentImageURL: $0.opponentImageURL,
+                            startTime: $0.startTime,
+                            isLive: $0.isLive
+                        )
+                    } ?? apiMatch
                     let oppImg = await fetchImageData(match?.opponentImageURL)
                                ?? SharedDataService.loadTeamImageData(teamCode: match?.opponentCode ?? "")
+                    let leagueName = sharedMatch?.leagueName ?? fav.leagueName
                     return (i, TeamRowInfo(
                         teamCode: fav.teamCode,
                         teamName: fav.teamName,
-                        leagueName: fav.leagueName,
+                        leagueName: leagueName,
                         teamImageData: teamImg,
                         nextMatch: match,
                         opponentImageData: oppImg
@@ -224,7 +253,7 @@ struct FavoriteTeamWidgetView: View {
                 smallView
             }
         }
-        .widgetURL(URL(string: "lolive://team/\(entry.teamId)"))
+        .widgetURL(URL(string: "lolive://match/\(entry.teamCode.uppercased())"))
     }
 
     // MARK: - Accessory (잠금화면)

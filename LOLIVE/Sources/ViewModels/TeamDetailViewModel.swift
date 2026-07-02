@@ -25,7 +25,7 @@ final class TeamDetailViewModel {
     var loadFailed = false
 
     private let team: Team
-    private let league: League
+    private var league: League
     private let service: RiotEsportsServiceProtocol
 
     init(team: Team, league: League,
@@ -33,6 +33,11 @@ final class TeamDetailViewModel {
         self.team = team
         self.league = league
         self.service = service
+    }
+
+    /// 국제 대회(MSI/Worlds) 컨텍스트에서 홈 리그로 교체 — load() 호출 전에 사용
+    func updateLeague(_ newLeague: League) {
+        league = newLeague
     }
 
     func load() async {
