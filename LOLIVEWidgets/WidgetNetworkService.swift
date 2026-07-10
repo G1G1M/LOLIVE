@@ -37,6 +37,58 @@ enum WidgetNetworkService {
 
     // MARK: - Private
 
+    // MARK: - Live Match Detection
+
+    /// 현재 진행 중인 모든 경기를 teamCode(대문자) → NextMatchInfo 딕셔너리로 반환
+    /// condition == false 이면 네트워크 호출 없이 빈 딕셔너리 즉시 반환
+    static func fetchAllLiveMatchInfo(onlyIf condition: Bool = true) async -> [String: NextMatchInfo] {
+        guard condition else { return [:] }
+        var components = URLComponents(string: baseURL + "/getLive")
+        components?.queryItems = [URLQueryItem(name: "hl", value: "ko-KR")]
+        guard let url = components?.url else { return [:] }
+        var request = URLRequest(url: url)
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        guard let (data, _) = try? await URLSession.shared.data(for: request) else { return [:] }
+        return parseAllLive(data: data)
+    }
+
+    private static func parseAllLive(data: Data) -> [String: NextMatchInfo] {
+        guard
+            let json     = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let dataObj  = json["data"]        as? [String: Any],
+            let schedule = dataObj["schedule"] as? [String: Any],
+            let events   = schedule["events"]  as? [[String: Any]]
+        else { return [:] }
+
+        var result: [String: NextMatchInfo] = [:]
+        let iso = ISO8601DateFormatter()
+
+        for event in events {
+            guard
+                let matchDict = event["match"]     as? [String: Any],
+                let teams     = matchDict["teams"] as? [[String: Any]],
+                teams.count >= 2
+            else { continue }
+
+            let startTime = (event["startTime"] as? String).flatMap { iso.date(from: $0) } ?? Date()
+
+            for i in 0..<2 {
+                guard let code = teams[i]["code"] as? String else { continue }
+                let opp = teams[1 - i]
+                result[code.uppercased()] = NextMatchInfo(
+                    opponentName:     (opp["name"]  as? String) ?? "TBD",
+                    opponentCode:     (opp["code"]  as? String) ?? "TBD",
+                    opponentImageURL: (opp["image"] as? String)?.replacingOccurrences(of: "http://", with: "https://"),
+                    startTime:        startTime,
+                    isLive:           true
+                )
+            }
+        }
+        return result
+    }
+
+    // MARK: - Schedule Parse
+
     private static func parse(data: Data, teamCode: String) -> NextMatchInfo? {
         guard
             let json     = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

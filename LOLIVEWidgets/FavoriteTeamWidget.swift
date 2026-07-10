@@ -89,14 +89,19 @@ struct FavoriteTeamProvider: TimelineProvider {
         Task {
             let entry = await buildEntry()
             let nextUpdate: Date
-            if let match = entry.nextMatch, !match.isLive {
-                let timeToMatch = match.startTime.timeIntervalSinceNow
-                if timeToMatch > 3600 {
-                    nextUpdate = match.startTime.addingTimeInterval(-3600)
-                } else if timeToMatch > 0 {
-                    nextUpdate = .now.addingTimeInterval(300)   // 1시간 이내: 5분마다
+            if let match = entry.nextMatch {
+                if match.isLive {
+                    // 라이브 중: 15분마다 종료 감지
+                    nextUpdate = .now.addingTimeInterval(900)
                 } else {
-                    nextUpdate = .now.addingTimeInterval(900)   // 경기 시작 후: 15분마다
+                    let timeToMatch = match.startTime.timeIntervalSinceNow
+                    if timeToMatch > 5400 {
+                        // 예정 1.5시간 이상 전: 라이브 체크 시작 시점에 갱신
+                        nextUpdate = match.startTime.addingTimeInterval(-5400)
+                    } else {
+                        // 1.5시간 이내 또는 이미 지남: 5분마다 (일찍 시작 즉시 감지)
+                        nextUpdate = .now.addingTimeInterval(300)
+                    }
                 }
             } else {
                 nextUpdate = .now.addingTimeInterval(3600)
@@ -118,20 +123,37 @@ struct FavoriteTeamProvider: TimelineProvider {
             )
         }
 
-        // 현재 선택 팀 (Small / Medium)
         var idx = SharedDataService.loadCurrentTeamIndex()
         idx = max(0, min(idx, teams.count - 1))
         let fav = teams[idx]
 
-        // App Group에 저장된 다음 경기 우선 (MSI/Worlds 포함 전체 리그 커버)
-        // 없거나 1시간 초과 시 홈 리그 API fallback
-        let sharedMatch = SharedDataService.loadNextMatch(teamCode: fav.teamCode)
-        async let matchTask = sharedMatch != nil
-            ? nil
-            : WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
+        // 전체 팀의 sharedMatch를 미리 로드 (Large 위젯과 공유)
+        let allSharedMatches: [String: SharedNextMatch] = Dictionary(
+            uniqueKeysWithValues: teams.compactMap { t -> (String, SharedNextMatch)? in
+                guard let m = SharedDataService.loadNextMatch(teamCode: t.teamCode) else { return nil }
+                return (t.teamCode.uppercased(), m)
+            }
+        )
+        let currentSharedMatch = allSharedMatches[fav.teamCode.uppercased()]
+
+        // 예정 시작 1.5시간 이내인 팀이 있으면 라이브 API 1회 호출 (일찍 시작 감지)
+        let needsLiveCheck = allSharedMatches.values.contains {
+            !$0.isLive && $0.startTime.timeIntervalSinceNow < 5400
+        }
+
+        async let liveInfoTask = WidgetNetworkService.fetchAllLiveMatchInfo(onlyIf: needsLiveCheck)
+        async let apiMatchTask: WidgetNetworkService.NextMatchInfo? = currentSharedMatch == nil
+            ? WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
+            : nil
         async let teamImgTask = fetchImageData(fav.teamImageURL)
-        let (apiMatch, teamImg) = await (matchTask, teamImgTask)
-        let match = sharedMatch.map {
+        let (liveInfo, apiMatch, teamImg) = await (liveInfoTask, apiMatchTask, teamImgTask)
+
+        // 우선순위: 라이브 API 확인 > App Group 데이터 > 스케줄 API fallback
+        let shouldCheckLive = currentSharedMatch.map {
+            !$0.isLive && $0.startTime.timeIntervalSinceNow < 5400
+        } ?? false
+        let liveCheck = shouldCheckLive ? liveInfo[fav.teamCode.uppercased()] : nil
+        let match = liveCheck ?? currentSharedMatch.map {
             WidgetNetworkService.NextMatchInfo(
                 opponentName: $0.opponentName,
                 opponentCode: $0.opponentCode,
@@ -140,14 +162,12 @@ struct FavoriteTeamProvider: TimelineProvider {
                 isLive: $0.isLive
             )
         } ?? apiMatch
+
         let oppImg = await fetchImageData(match?.opponentImageURL)
                    ?? SharedDataService.loadTeamImageData(teamCode: match?.opponentCode ?? "")
 
-        // 전체 팀 (Large 위젯)
-        let allTeamsData = await loadAllTeams(teams)
-
-        // 실제 경기 리그명 우선 (MSI 경기면 "MSI", LCK면 "LCK")
-        let leagueName = sharedMatch?.leagueName ?? fav.leagueName
+        let allTeamsData = await loadAllTeams(teams, liveInfo: liveInfo, sharedMatches: allSharedMatches)
+        let leagueName = currentSharedMatch?.leagueName ?? fav.leagueName
 
         return FavoriteTeamEntry(
             date: .now,
@@ -165,17 +185,27 @@ struct FavoriteTeamProvider: TimelineProvider {
         )
     }
 
-    private func loadAllTeams(_ teams: [SharedFavoriteTeam]) async -> [TeamRowInfo] {
+    private func loadAllTeams(
+        _ teams: [SharedFavoriteTeam],
+        liveInfo: [String: WidgetNetworkService.NextMatchInfo],
+        sharedMatches: [String: SharedNextMatch]
+    ) async -> [TeamRowInfo] {
         await withTaskGroup(of: (Int, TeamRowInfo).self) { group in
             for (i, fav) in teams.enumerated() {
+                let sharedMatch = sharedMatches[fav.teamCode.uppercased()]
+                let shouldCheckLive = sharedMatch.map {
+                    !$0.isLive && $0.startTime.timeIntervalSinceNow < 5400
+                } ?? false
+                let liveCheck = shouldCheckLive ? liveInfo[fav.teamCode.uppercased()] : nil
+
                 group.addTask {
-                    let sharedMatch = SharedDataService.loadNextMatch(teamCode: fav.teamCode)
-                    async let apiMatchTask = sharedMatch != nil
-                        ? nil
-                        : WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
+                    async let apiMatchTask: WidgetNetworkService.NextMatchInfo? = (sharedMatch == nil)
+                        ? WidgetNetworkService.fetchNextMatch(leagueId: fav.leagueId, teamCode: fav.teamCode)
+                        : nil
                     async let img = fetchImageData(fav.teamImageURL)
                     let (apiMatch, teamImg) = await (apiMatchTask, img)
-                    let match = sharedMatch.map {
+
+                    let match = liveCheck ?? sharedMatch.map {
                         WidgetNetworkService.NextMatchInfo(
                             opponentName: $0.opponentName,
                             opponentCode: $0.opponentCode,
@@ -184,6 +214,7 @@ struct FavoriteTeamProvider: TimelineProvider {
                             isLive: $0.isLive
                         )
                     } ?? apiMatch
+
                     let oppImg = await fetchImageData(match?.opponentImageURL)
                                ?? SharedDataService.loadTeamImageData(teamCode: match?.opponentCode ?? "")
                     let leagueName = sharedMatch?.leagueName ?? fav.leagueName
