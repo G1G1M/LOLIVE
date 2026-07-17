@@ -159,7 +159,15 @@ final class TodayViewModel {
                     }
 
                     liveMatches = enrich(live)
-                    await LiveActivityService.shared.syncActivities(liveMatches, favoritedTeamIds: favoritedTeamIds)
+
+                    // 예약 시각이 지났으나 API 미확인 즐겨찾기 경기 (조기 시작 대응 + API 딜레이 브릿징)
+                    let overdueMatches = todayMatches.filter {
+                        $0.startTime <= Date() &&
+                        $0.state == .unstarted &&
+                        favoriteTeamCode(for: $0) != nil &&
+                        !newLiveIds.contains($0.id)
+                    }
+                    await LiveActivityService.shared.syncActivities(liveMatches, overdueMatches: overdueMatches, favoritedTeamIds: favoritedTeamIds)
                 } catch {
                     // 폴링 중 에러는 무시 (기존 데이터 유지)
                 }
@@ -182,7 +190,14 @@ final class TodayViewModel {
             if let fresh = try? await svc.fetchLive() {
                 let enriched = enrich(fresh)
                 liveMatches = enriched
-                await LiveActivityService.shared.syncActivities(enriched, favoritedTeamIds: favoritedTeamIds)
+                let liveIds = Set(enriched.map { $0.match.id })
+                let overdueMatches = todayMatches.filter {
+                    $0.startTime <= Date() &&
+                    $0.state == .unstarted &&
+                    favoriteTeamCode(for: $0) != nil &&
+                    !liveIds.contains($0.id)
+                }
+                await LiveActivityService.shared.syncActivities(enriched, overdueMatches: overdueMatches, favoritedTeamIds: favoritedTeamIds)
             } else {
                 await LiveActivityService.shared.syncActivities(liveMatches, favoritedTeamIds: favoritedTeamIds)
             }

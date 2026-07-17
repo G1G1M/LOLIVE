@@ -63,8 +63,11 @@ enum SharedDataService {
               let matches = try? decoder.decode([String: SharedNextMatch].self, from: data)
         else { return nil }
         let match = matches[teamCode.uppercased()]
-        // 1시간 이상 지난 캐시는 무시 (위젯 자체 API로 fallback)
-        guard let match, Date().timeIntervalSince(match.savedAt) < 3600 else { return nil }
+        guard let match else { return nil }
+        // 예정 경기(시작 전)는 만료 없이 항상 유효 — 앱을 오래 안 열어도 위젯에 경기 정보 표시
+        if match.startTime > Date() { return match }
+        // 경기 시작 후에는 1시간 TTL (라이브 종료 감지)
+        guard Date().timeIntervalSince(match.savedAt) < 3600 else { return nil }
         return match
     }
 }

@@ -113,6 +113,8 @@
 - Live Activity: 잠금화면 실시간 스코어 (`[로고] 팀명 스코어–스코어 팀명 [로고]`) + Dynamic Island
   - 팀 로고: `MatchActivityAttributes`에 30×30 PNG 썸네일 직접 포함 → 크로스프로세스 파일 공유 불필요
   - 폴링: ContentView 레벨에서 실행 — 탭 전환·앱 재포그라운드 시에도 중단 없이 유지
+  - **예약 시각부터 즉시 표시**: 경기 startTime 도달 시 API 확인 전에도 `isLive: false` pre-live Activity 시작 → "🕐 시작 중..." 표시. API가 inProgress 확인하면 실시간 스코어로 전환
+  - 조기 시작 대응: API 딜레이 없이 예약 시각 기준으로 즉시 잠금화면·Dynamic Island에 대전 정보 표시
 
 ### 앱 메뉴 (AppMenu)
 - 경기 알림 시간 설정 (Picker: 1분 / 5분 / 10분 / 30분 / 1시간 전)
@@ -131,6 +133,8 @@
 - 실제 경기 리그명 표시 (MSI 경기면 "MSI", LCK 경기면 "LCK")
 - 다크/라이트 모드 자동 대응
 - **잠금화면 accessory 위젯**: `.accessoryCircular` / `.accessoryRectangular` / `.accessoryInline` 3종
+- **예정 경기 캐시 만료 없음**: 앱을 오래 안 열어도 예정 경기 정보 유지 (startTime 전이면 TTL 미적용)
+- App Group 캐시 없을 때 라이브 API fallback 자동 호출 → MSI·Worlds 라이브 경기도 위젯 표시 가능
 
 ## 앱 플로우
 

@@ -55,7 +55,8 @@ final class LiveActivityService {
 
     /// 폴링 결과로 liveMatches가 갱신될 때마다 호출
     /// — 즐겨찾기 팀의 경기 Live Activity를 시작/업데이트/종료
-    func syncActivities(_ liveMatches: [LiveMatch], favoritedTeamIds: Set<String>) async {
+    /// - overdueMatches: startTime 지났으나 API 미확인 경기 (예약 시각부터 pre-live Activity 표시)
+    func syncActivities(_ liveMatches: [LiveMatch], overdueMatches: [Match] = [], favoritedTeamIds: Set<String>) async {
         let authInfo = ActivityAuthorizationInfo()
         guard authInfo.areActivitiesEnabled else {
             #if DEBUG
@@ -71,9 +72,11 @@ final class LiveActivityService {
             favoritedTeamIds.contains($0.match.teamB.code)
         }
 
-        // 더 이상 진행 중이지 않은 경기 종료
+        // 라이브 경기 + 예약 시각 지난 경기 모두 유지 (둘 다 아닌 경우에만 종료)
         let liveIds = Set(relevant.map { $0.match.id })
-        for (id, activity) in activities where !liveIds.contains(id) {
+        let overdueIds = Set(overdueMatches.map { $0.id })
+        let keepIds = liveIds.union(overdueIds)
+        for (id, activity) in activities where !keepIds.contains(id) {
             await activity.end(dismissalPolicy: .immediate)
             activities.removeValue(forKey: id)
         }
@@ -124,6 +127,46 @@ final class LiveActivityService {
                     print("❌ [LiveActivity] request 실패: \(error)")
                     #endif
                 }
+            }
+        }
+
+        // 예약 시각이 지났으나 API 미확인 경기 → pre-live Activity (isLive: false)
+        for match in overdueMatches {
+            guard activities[match.id] == nil else { continue }  // 이미 시작됨
+
+            let state = MatchActivityAttributes.ContentState(
+                scoreA: 0, scoreB: 0, currentGame: 1, isLive: false
+            )
+            async let thumbA = fetchThumbnail(urlString: match.teamA.imageURL, teamCode: match.teamA.code)
+            async let thumbB = fetchThumbnail(urlString: match.teamB.imageURL, teamCode: match.teamB.code)
+            let (teamAData, teamBData) = await (thumbA, thumbB)
+
+            let attrs = MatchActivityAttributes(
+                matchId: match.id,
+                teamAName: match.teamA.name,
+                teamACode: match.teamA.code,
+                teamAImageURL: match.teamA.imageURL,
+                teamAImageData: teamAData,
+                teamBName: match.teamB.name,
+                teamBCode: match.teamB.code,
+                teamBImageURL: match.teamB.imageURL,
+                teamBImageData: teamBData,
+                leagueName: match.league.name
+            )
+            do {
+                let activity = try Activity.request(
+                    attributes: attrs,
+                    content: .init(state: state, staleDate: nil),
+                    pushType: nil
+                )
+                activities[match.id] = activity
+                #if DEBUG
+                print("⏰ [LiveActivity] 예약시작: \(match.teamA.code) vs \(match.teamB.code) id=\(activity.id)")
+                #endif
+            } catch {
+                #if DEBUG
+                print("❌ [LiveActivity] 예약시작 실패: \(error)")
+                #endif
             }
         }
     }

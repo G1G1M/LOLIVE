@@ -47,9 +47,17 @@ struct MatchLiveActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     HStack(spacing: 4) {
-                        Circle().fill(Color.red).frame(width: 5, height: 5)
-                        Text("LIVE · Game \(context.state.currentGame)")
-                            .font(.caption2).foregroundStyle(.secondary)
+                        if context.state.isLive {
+                            Circle().fill(Color.red).frame(width: 5, height: 5)
+                            Text("LIVE · Game \(context.state.currentGame)")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        } else {
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                            Text("시작 중...")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
                         Text("·").foregroundStyle(.secondary)
                         Text(context.attributes.leagueName)
                             .font(.caption2).foregroundStyle(.secondary)
@@ -162,14 +170,25 @@ struct LockScreenLiveActivityView: View {
                         .foregroundStyle(.white)
                         .monospacedDigit()
                 }
-                HStack(spacing: 3) {
-                    Circle().fill(Color.red).frame(width: 5, height: 5)
-                    Text("LIVE")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.red)
-                    Text("· G\(state.currentGame)")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.white.opacity(0.55))
+                if state.isLive {
+                    HStack(spacing: 3) {
+                        Circle().fill(Color.red).frame(width: 5, height: 5)
+                        Text("LIVE")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.red)
+                        Text("· G\(state.currentGame)")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
+                } else {
+                    HStack(spacing: 3) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 8))
+                            .foregroundStyle(.white.opacity(0.5))
+                        Text("시작 중...")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
                 }
                 Text(attributes.leagueName)
                     .font(.system(size: 8))

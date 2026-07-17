@@ -136,8 +136,9 @@ struct FavoriteTeamProvider: TimelineProvider {
         )
         let currentSharedMatch = allSharedMatches[fav.teamCode.uppercased()]
 
-        // 예정 시작 1.5시간 이내인 팀이 있으면 라이브 API 1회 호출 (일찍 시작 감지)
-        let needsLiveCheck = allSharedMatches.values.contains {
+        // sharedMatch 없는 팀이 있거나, 예정 1.5시간 이내인 팀이 있으면 라이브 API 1회 호출
+        let noSharedData = teams.contains { allSharedMatches[$0.teamCode.uppercased()] == nil }
+        let needsLiveCheck = noSharedData || allSharedMatches.values.contains {
             !$0.isLive && $0.startTime.timeIntervalSinceNow < 5400
         }
 
@@ -149,9 +150,10 @@ struct FavoriteTeamProvider: TimelineProvider {
         let (liveInfo, apiMatch, teamImg) = await (liveInfoTask, apiMatchTask, teamImgTask)
 
         // 우선순위: 라이브 API 확인 > App Group 데이터 > 스케줄 API fallback
-        let shouldCheckLive = currentSharedMatch.map {
+        // sharedMatch 없을 때도 liveInfo 활용 (MSI 등 홈 리그 외 경기 커버)
+        let shouldCheckLive = currentSharedMatch == nil || (currentSharedMatch.map {
             !$0.isLive && $0.startTime.timeIntervalSinceNow < 5400
-        } ?? false
+        } ?? false)
         let liveCheck = shouldCheckLive ? liveInfo[fav.teamCode.uppercased()] : nil
         let match = liveCheck ?? currentSharedMatch.map {
             WidgetNetworkService.NextMatchInfo(
@@ -193,9 +195,9 @@ struct FavoriteTeamProvider: TimelineProvider {
         await withTaskGroup(of: (Int, TeamRowInfo).self) { group in
             for (i, fav) in teams.enumerated() {
                 let sharedMatch = sharedMatches[fav.teamCode.uppercased()]
-                let shouldCheckLive = sharedMatch.map {
+                let shouldCheckLive = sharedMatch == nil || (sharedMatch.map {
                     !$0.isLive && $0.startTime.timeIntervalSinceNow < 5400
-                } ?? false
+                } ?? false)
                 let liveCheck = shouldCheckLive ? liveInfo[fav.teamCode.uppercased()] : nil
 
                 group.addTask {
