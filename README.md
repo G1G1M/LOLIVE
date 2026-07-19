@@ -68,7 +68,9 @@
 - 전 세계 선수 통합 목록
 - 포지션 / 리그 필터 및 이름 검색
 - 1군/2군 리그 중복 제거
+- 이미지 없는 선수: 통일된 플레이스홀더 아이콘 표시 (Riot API 기본 실루엣 이미지 밝기 감지로 자동 대체)
 - 선수 상세: 시즌 스탯, most픽 챔피언, 최근 경기 결과
+- 선수명 대소문자 불일치 보정: Riot summonerName ↔ Leaguepedia Link 케이싱 차이를 대소문자 무시 폴백으로 자동 매칭
 
 ### 검색
 - 탭바 Search 탭으로 즉시 접근 (5번째 탭 → fullScreenCover 전환)
@@ -99,6 +101,7 @@
 - MSI·Worlds 컨텍스트에서 팀 상세 진입 시 홈 리그(LCK 등) 기준으로 선수단·최근경기 로드
 - 밴 카드: 게임별 blue/red 사이드 밴 챔피언 표시 (Riot API 데이터)
 - 미시작 경기: 로딩 스피너 없이 "경기 예정" 카드 + 시작 시간 표시
+- 게임 대기 상태: "드래프트 대기 중" 대신 "경기 시작 전" + 시계 아이콘으로 표시
 - 게임 시리즈 픽커: G1/G2 텍스트 + 상태 점 (라이브 빨간 점 / 완료 파란 점 / 예정 텍스트), 선택 시 전체 버튼 영역 터치 가능
 - 경기 종료 배지 아래 경기 날짜 표시
 - 팀 로고 탭 → 팀 상세 페이지 이동
@@ -218,7 +221,9 @@ TournamentDetailViewModel.load()
 ```
 
 - 캐시 부분 히트(일부 리그만 캐시됨)도 있는 것만 즉시 표시
-- `CachedAsyncImage`: 메모리 → 디스크 → 네트워크 3단계 캐시
+- `CachedAsyncImage`: 메모리 → 디스크 → 네트워크 3단계 캐시, 정적 `loadImage(from:)` 메서드로 외부 공유
+- `PlayerAvatarView`: URL nil·로드 실패·기본 실루엣(평균 밝기 < 15%) 모두 동일 플레이스홀더로 통일
+- `LoadingView`: 전체화면 페이드인 로딩 인디케이터 (0.1초 딜레이, 캐시 즉시 로드 시 깜빡임 방지)
 
 ### API 오류 대응 (Stale 캐시 폴백)
 
@@ -314,7 +319,7 @@ LOLIVE/
 │       ├── LeagueDetailView, TournamentDetailView
 │       ├── TeamDetailView, LeaguePlayerDetailView, SeasonStatsView
 │       ├── MatchDetailView, PlayerDetailView
-│       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, ...
+│       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, LoadingView, PlayerAvatarView, ...
 ├── ContentView.swift        — TabView 진입점 (Today/Leagues/Players/Favorites/Search 5탭)
 ├── LOLIVEApp.swift          — 앱 진입점
 └── LOLIVEWidgets/           — Widget Extension
