@@ -169,16 +169,7 @@ struct TeamDetailView: View {
     // MARK: - Error
 
     private func fetchErrorView(_ retry: @escaping () -> Void) -> some View {
-        VStack(spacing: 14) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 36))
-                .foregroundStyle(.secondary)
-            Text("데이터를 불러올 수 없습니다")
-                .font(.subheadline).foregroundStyle(.secondary)
-            Button("다시 시도", action: retry)
-                .buttonStyle(.bordered)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ErrorRetryView(retry: retry)
     }
 
     // MARK: - Favorite

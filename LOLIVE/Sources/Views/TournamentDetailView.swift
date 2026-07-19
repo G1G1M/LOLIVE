@@ -22,15 +22,7 @@ struct TournamentDetailView: View {
             if viewModel.isLoading {
                 LoadingView("전체 일정 불러오는 중...")
             } else if viewModel.loadFailed {
-                VStack(spacing: 14) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 36)).foregroundStyle(.secondary)
-                    Text("데이터를 불러올 수 없습니다")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    Button("다시 시도") { Task { await viewModel.load() } }
-                        .buttonStyle(.bordered)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ErrorRetryView { Task { await viewModel.load() } }
             } else {
                 VStack(spacing: 0) {
                     // 연도 선택 (고정)

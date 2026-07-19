@@ -32,15 +32,7 @@ struct TeamSearchView: View {
                 if viewModel.isLoading {
                     LoadingView("팀 목록 불러오는 중...")
                 } else if viewModel.loadFailed {
-                    VStack(spacing: 14) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 36)).foregroundStyle(.secondary)
-                        Text("팀 목록을 불러올 수 없습니다")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                        Button("다시 시도") { Task { await viewModel.load() } }
-                            .buttonStyle(.bordered)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ErrorRetryView("팀 목록을 불러올 수 없습니다") { Task { await viewModel.load() } }
                 } else {
                     List {
                         if filtered.isEmpty && !searchText.isEmpty {
