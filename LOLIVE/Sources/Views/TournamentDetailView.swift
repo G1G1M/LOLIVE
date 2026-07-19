@@ -20,8 +20,7 @@ struct TournamentDetailView: View {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
             if viewModel.isLoading {
-                ProgressView("전체 일정 불러오는 중...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                LoadingView("전체 일정 불러오는 중...")
             } else if viewModel.loadFailed {
                 VStack(spacing: 14) {
                     Image(systemName: "exclamationmark.triangle")
@@ -43,10 +42,9 @@ struct TournamentDetailView: View {
                     if !viewModel.hasTournamentStarted {
                         notStartedView
                     } else if viewModel.isLoadingHistoricalMatches {
-                        ProgressView("경기 기록 불러오는 중...")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        LoadingView("경기 기록 불러오는 중...")
                     } else if viewModel.selectedRoundDateGroups.isEmpty && viewModel.tournamentMatches.isEmpty {
-                        emptyState("데이터를 불러올 수 없습니다")
+                        emptyState("경기 데이터가 없습니다")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         // rounds 있을 때만 라운드 칩 표시

@@ -505,10 +505,10 @@ struct MatchDetailView: View {
     // MARK: - Draft Waiting Card
 
     private var draftWaitingCard: some View {
-        HStack(spacing: 10) {
-            ProgressView()
-                .scaleEffect(0.8)
-            Text("드래프트 대기 중...")
+        HStack(spacing: 8) {
+            Image(systemName: "clock")
+                .foregroundStyle(.secondary)
+            Text("경기 시작 전")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

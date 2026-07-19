@@ -30,8 +30,7 @@ struct TeamSearchView: View {
                 Color(.systemGroupedBackground).ignoresSafeArea()
 
                 if viewModel.isLoading {
-                    ProgressView("팀 목록 불러오는 중...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    LoadingView("팀 목록 불러오는 중...")
                 } else if viewModel.loadFailed {
                     VStack(spacing: 14) {
                         Image(systemName: "exclamationmark.triangle")

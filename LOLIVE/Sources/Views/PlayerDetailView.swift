@@ -145,7 +145,7 @@ struct PlayerDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: "chart.bar.xaxis")
                 .foregroundStyle(.secondary)
-            Text("통계 데이터를 불러올 수 없습니다")
+            Text("통계 데이터가 없습니다")
                 .font(.subheadline).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)

@@ -41,8 +41,7 @@ struct TeamDetailView: View {
                 Divider()
 
                 if viewModel.isLoading {
-                    ProgressView("불러오는 중...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    LoadingView()
                 } else if viewModel.loadFailed {
                     fetchErrorView { Task { await viewModel.load() } }
                 } else {
@@ -246,9 +245,7 @@ struct TeamDetailView: View {
 
     private func playerRow(_ player: Player) -> some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: player.imageURL ?? ""))
-                .frame(width: 40, height: 40)
-                .clipShape(Circle())
+            PlayerAvatarView(imageURL: player.imageURL, size: 40)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(player.summonerName)

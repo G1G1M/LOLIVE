@@ -32,8 +32,7 @@ struct PlayersView: View {
                     Color(.systemGroupedBackground).ignoresSafeArea()
 
                     if viewModel.isLoading {
-                        ProgressView("선수 목록 불러오는 중...")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        LoadingView("선수 목록 불러오는 중...")
                     } else if viewModel.loadFailed {
                         VStack(spacing: 14) {
                             Image(systemName: "exclamationmark.triangle")
@@ -168,9 +167,7 @@ struct PlayersView: View {
 
     private func playerRow(_ entry: PlayersViewModel.PlayerEntry) -> some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: entry.player.imageURL ?? ""))
-                .frame(width: 44, height: 44)
-                .clipShape(Circle())
+            PlayerAvatarView(imageURL: entry.player.imageURL, size: 44)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.player.summonerName)
@@ -206,7 +203,7 @@ struct PlayersView: View {
         HStack(spacing: 8) {
             Image(systemName: "person.slash")
                 .foregroundStyle(.secondary)
-            Text(viewModel.allPlayers.isEmpty ? "선수 데이터를 불러올 수 없습니다" : "검색 결과가 없습니다")
+            Text(viewModel.allPlayers.isEmpty ? "선수 데이터가 없습니다" : "검색 결과가 없습니다")
                 .font(.subheadline).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)

@@ -23,7 +23,7 @@ final class PlayersViewModel {
 
     var allPlayers: [PlayerEntry] = []
     var leagues: [League] = []
-    var isLoading = false
+    var isLoading = true
     var loadFailed = false
     var selectedRole: String? = nil
     var selectedLeagueId: String? = nil
@@ -63,10 +63,10 @@ final class PlayersViewModel {
     // MARK: - Load
 
     func load() async {
-        if preloadFromCache() { return }
         isLoading = true
         loadFailed = false
         defer { isLoading = false }
+        if preloadFromCache() { return }
 
         let svc = service
 

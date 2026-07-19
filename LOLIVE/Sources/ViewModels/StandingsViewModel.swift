@@ -15,7 +15,7 @@ final class StandingsViewModel {
     var leagues: [League] = []
     var standings: [Standing] = []
     var selectedLeague: League? = nil
-    var isLoadingLeagues = false
+    var isLoadingLeagues = true
     var isLoadingStandings = false
     var loadFailed = false
 

@@ -43,7 +43,7 @@ final class LeagueDetailViewModel {
     var upcomingMatches: [Match] = []
     var completedMatches: [Match] = []
     var players: [Player] = []
-    var isLoading = false
+    var isLoading = true
     var errorMessage: String? = nil
 
     // MARK: - Bracket

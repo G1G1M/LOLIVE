@@ -193,9 +193,7 @@ struct SearchView: View {
         let isFav = favoritePlayers.contains { $0.playerId == player.id }
         return NavigationLink(destination: LeaguePlayerDetailView(player: player, league: league)) {
             HStack(spacing: 12) {
-                CachedAsyncImage(url: URL(string: player.imageURL ?? ""))
-                    .frame(width: 36, height: 36)
-                    .clipShape(Circle())
+                PlayerAvatarView(imageURL: player.imageURL, size: 36)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(player.summonerName)
                         .font(.subheadline).fontWeight(.semibold)

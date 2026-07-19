@@ -193,9 +193,7 @@ struct FavoritesView: View {
 
     private func playerRow(_ fav: FavoritePlayer) -> some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: fav.playerImageURL ?? ""))
-                .frame(width: 36, height: 36)
-                .clipShape(Circle())
+            PlayerAvatarView(imageURL: fav.playerImageURL, size: 36)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(fav.summonerName)

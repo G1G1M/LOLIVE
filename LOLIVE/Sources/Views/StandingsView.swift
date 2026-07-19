@@ -26,8 +26,7 @@ struct StandingsView: View {
                 ZStack {
                     Color(.systemGroupedBackground).ignoresSafeArea()
                     if viewModel.isLoadingLeagues {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        LoadingView()
                     } else if viewModel.loadFailed {
                         VStack(spacing: 14) {
                             Image(systemName: "exclamationmark.triangle")
@@ -109,9 +108,8 @@ struct StandingsView: View {
     @ViewBuilder
     private var standingsBody: some View {
         if viewModel.isLoadingStandings {
-            ProgressView()
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 60)
+            LoadingView("순위 불러오는 중...")
+                .frame(minHeight: 120)
         } else if viewModel.standings.isEmpty {
             emptyState
         } else {
@@ -271,7 +269,7 @@ struct StandingsView: View {
             Image(systemName: "chart.bar.xaxis")
                 .font(.system(size: 32))
                 .foregroundStyle(.quaternary)
-            Text("순위 데이터를 불러올 수 없습니다")
+            Text("순위 데이터가 없습니다")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

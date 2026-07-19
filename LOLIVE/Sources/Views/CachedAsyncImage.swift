@@ -12,11 +12,11 @@ struct CachedAsyncImage: View {
 
     @State private var uiImage: UIImage? = nil
 
-    // 1단계: 메모리 캐시 (세션 내 즉시 반환)
-    private static let memCache = NSCache<NSString, UIImage>()
+    // 메모리 캐시 (internal — PlayerAvatarView에서도 공유)
+    static let memCache = NSCache<NSString, UIImage>()
 
-    // 2단계: 디스크 캐시 디렉토리
-    private static let diskDir: URL = {
+    // 디스크 캐시 디렉토리 (internal)
+    static let diskDir: URL = {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         let dir = base.appendingPathComponent("image_cache", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -38,47 +38,41 @@ struct CachedAsyncImage: View {
     }
 
     private func load() async {
-        guard let url else { uiImage = nil; return }
+        uiImage = await Self.loadImage(from: url)
+    }
+
+    // 외부(PlayerAvatarView 등)에서 공용으로 사용할 수 있는 정적 로더
+    static func loadImage(from url: URL?) async -> UIImage? {
+        guard let url else { return nil }
         let key     = url.absoluteString as NSString
-        let fileURL = Self.diskDir.appendingPathComponent(diskKey(for: url))
+        let fileURL = diskDir.appendingPathComponent(diskKey(for: url))
 
-        // 1. 메모리 캐시 확인
-        if let cached = Self.memCache.object(forKey: key) {
-            uiImage = cached
-            return
-        }
+        if let cached = memCache.object(forKey: key) { return cached }
 
-        // 2. 디스크 캐시 확인 (백그라운드 스레드에서 읽기)
         if let img = await Task.detached(priority: .userInitiated, operation: {
             guard let data = try? Data(contentsOf: fileURL) else { return nil as UIImage? }
             return UIImage(data: data)
         }).value {
-            Self.memCache.setObject(img, forKey: key)
-            uiImage = img
-            return
+            memCache.setObject(img, forKey: key)
+            return img
         }
 
-        // 3. 네트워크 다운로드
-        uiImage = nil
         var request = URLRequest(url: url)
         if url.host?.contains("fandom.com") == true || url.host?.contains("wikia") == true {
             request.setValue("https://lol.fandom.com", forHTTPHeaderField: "Referer")
         }
         guard let (data, _) = try? await URLSession.shared.data(for: request),
-              let img = UIImage(data: data) else { return }
+              let img = UIImage(data: data) else { return nil }
 
-        Self.memCache.setObject(img, forKey: key)
-        uiImage = img
-
-        // 디스크 저장 (백그라운드, 완료 기다리지 않음)
+        memCache.setObject(img, forKey: key)
         let dataToSave = data
         Task.detached(priority: .background) {
             try? dataToSave.write(to: fileURL, options: .atomic)
         }
+        return img
     }
 
-    // URL → SHA256 해시 파일명 (특수문자 없이 고정 길이)
-    private func diskKey(for url: URL) -> String {
+    static func diskKey(for url: URL) -> String {
         let hash = SHA256.hash(data: Data(url.absoluteString.utf8))
         return hash.map { String(format: "%02x", $0) }.joined()
     }

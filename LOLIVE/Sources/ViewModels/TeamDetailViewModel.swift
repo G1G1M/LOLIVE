@@ -21,7 +21,7 @@ final class TeamDetailViewModel {
     var players: [Player] = []
     var recentMatches: [Match] = []
     var h2hRecords: [H2HRecord] = []
-    var isLoading = false
+    var isLoading = true
     var loadFailed = false
 
     private let team: Team

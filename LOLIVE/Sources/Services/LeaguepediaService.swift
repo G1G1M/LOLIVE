@@ -95,9 +95,7 @@ struct LeaguepediaService: Sendable {
         // 1단계: 캐시된 overviewPage로 먼저 시도 (API 호출 없음)
         if let cachedPage = await LeaguepediaCache.shared.overviewPage(for: leagueName),
            let allStats = await allPlayerStats(overviewPage: cachedPage) {
-            let prefix = "\(summonerName) ("
-            let stats = allStats[summonerName]
-                ?? allStats.first(where: { $0.key.hasPrefix(prefix) })?.value
+            let stats = findStats(in: allStats, summonerName: summonerName)
             if let stats, stats.games > 0 {
                 await LeaguepediaCache.shared.setSeasonStats(stats, key: cacheKey)
                 return stats
@@ -108,9 +106,7 @@ struct LeaguepediaService: Sendable {
         let pages = await candidateOverviewPages(leagueName: leagueName)
         for page in pages {
             guard let allStats = await allPlayerStats(overviewPage: page) else { continue }
-            let prefix = "\(summonerName) ("
-            let stats = allStats[summonerName]
-                ?? allStats.first(where: { $0.key.hasPrefix(prefix) })?.value
+            let stats = findStats(in: allStats, summonerName: summonerName)
             if let stats, stats.games > 0 {
                 await LeaguepediaCache.shared.setSeasonStats(stats, key: cacheKey)
                 return stats
@@ -232,9 +228,7 @@ struct LeaguepediaService: Sendable {
 
         // 배치 캐시 우선 확인 (preloadLeagueStats가 완료된 경우 API 호출 불필요)
         if let batch = await LeaguepediaCache.shared.allChampionPicksBatch(for: overviewPage) {
-            let picks = batch[summonerName]
-                ?? batch.first(where: { $0.key.hasPrefix("\(summonerName) (") })?.value
-                ?? []
+            let picks = findPicks(in: batch, summonerName: summonerName)
             await LeaguepediaCache.shared.setChampionPicks(picks, key: cacheKey)
             return picks.isEmpty ? nil : picks
         }
@@ -558,6 +552,27 @@ struct LeaguepediaService: Sendable {
     }
 
     // MARK: - Batch: 토너먼트 전체 선수 스탯 한 번에 로드
+
+    // Leaguepedia Link는 canonical 케이싱(예: "Hades1")이고 Riot summonerName은 다를 수 있음(예: "HADES1").
+    // 정확 일치 → 접미사 "(팀명)" 패턴 → 대소문자 무시 순서로 폴백.
+    private func findStats(in dict: [String: PlayerSeasonStats], summonerName: String) -> PlayerSeasonStats? {
+        let prefix = "\(summonerName) ("
+        let lower  = summonerName.lowercased()
+        return dict[summonerName]
+            ?? dict.first(where: { $0.key.hasPrefix(prefix) })?.value
+            ?? dict.first(where: { $0.key.lowercased() == lower })?.value
+            ?? dict.first(where: { $0.key.lowercased().hasPrefix("\(lower) (") })?.value
+    }
+
+    private func findPicks(in dict: [String: [ChampionPickEntry]], summonerName: String) -> [ChampionPickEntry] {
+        let prefix = "\(summonerName) ("
+        let lower  = summonerName.lowercased()
+        return dict[summonerName]
+            ?? dict.first(where: { $0.key.hasPrefix(prefix) })?.value
+            ?? dict.first(where: { $0.key.lowercased() == lower })?.value
+            ?? dict.first(where: { $0.key.lowercased().hasPrefix("\(lower) (") })?.value
+            ?? []
+    }
 
     /// overviewPage 내 모든 선수 스탯을 500행씩 페이지네이션해서 가져온 뒤 캐싱.
     /// 결과: [Link → PlayerSeasonStats] (Link는 Leaguepedia canonical 이름)

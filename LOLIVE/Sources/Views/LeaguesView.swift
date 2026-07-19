@@ -76,7 +76,7 @@ struct LeaguesView: View {
                     Color(.systemGroupedBackground).ignoresSafeArea()
 
                     if isLoading && leagues.isEmpty {
-                        ProgressView("불러오는 중...")
+                        LoadingView()
                     } else if loadFailed && leagues.isEmpty {
                         VStack(spacing: 14) {
                             Image(systemName: "exclamationmark.triangle")

@@ -13,12 +13,12 @@ struct SeasonStatsView: View {
         Group {
             if isLoading {
                 HStack(spacing: 8) {
-                    ProgressView()
+                    ProgressView().scaleEffect(0.9)
                     Text("시즌 스탯 불러오는 중...")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
+                .padding(.vertical, 24)
                 .background(Color(.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             } else if let stats {

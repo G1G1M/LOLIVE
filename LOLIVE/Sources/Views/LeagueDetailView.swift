@@ -20,8 +20,7 @@ struct LeagueDetailView: View {
             Color(.systemGroupedBackground).ignoresSafeArea()
 
             if viewModel.isLoading {
-                ProgressView("불러오는 중...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                LoadingView()
             } else if viewModel.loadFailed {
                 VStack(spacing: 14) {
                     Image(systemName: "exclamationmark.triangle")
@@ -233,7 +232,7 @@ struct LeagueDetailView: View {
         let groups = viewModel.standingGroups
         return ScrollView {
             if viewModel.standings.isEmpty {
-                emptyState("순위 데이터를 불러올 수 없습니다")
+                emptyState("순위 데이터가 없습니다")
                     .padding(16)
             } else if groups.isEmpty {
                 standingsBlock(standings: viewModel.standings, groupName: nil)
@@ -462,7 +461,7 @@ struct LeagueDetailView: View {
                 }
 
                 if viewModel.upcomingMatches.isEmpty && viewModel.completedMatches.isEmpty {
-                    emptyState("일정을 불러올 수 없습니다").padding(.top, 60)
+                    emptyState("등록된 일정이 없습니다").padding(.top, 60)
                 }
             }
             .padding(.bottom, 16)
@@ -509,7 +508,7 @@ struct LeagueDetailView: View {
         return ScrollView {
             LazyVStack(spacing: 12) {
                 if viewModel.standings.isEmpty {
-                    emptyState("팀 데이터를 불러올 수 없습니다").padding(.top, 60)
+                    emptyState("팀 데이터가 없습니다").padding(.top, 60)
                 } else if groups.isEmpty {
                     ForEach(viewModel.standings) { standing in
                         teamCard(standing: standing)
@@ -582,9 +581,7 @@ struct LeagueDetailView: View {
     private func playerChip(_ player: Player) -> some View {
         NavigationLink(value: player) {
             HStack(spacing: 8) {
-                CachedAsyncImage(url: URL(string: player.imageURL ?? ""))
-                    .frame(width: 30, height: 30)
-                    .clipShape(Circle())
+                PlayerAvatarView(imageURL: player.imageURL, size: 30)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(player.summonerName)
@@ -610,7 +607,7 @@ struct LeagueDetailView: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 if viewModel.players.isEmpty {
-                    emptyState("선수 데이터를 불러올 수 없습니다").padding(.top, 60)
+                    emptyState("선수 데이터가 없습니다").padding(.top, 60)
                 } else {
                     ForEach(viewModel.players) { player in
                         playerRow(player)
@@ -629,9 +626,7 @@ struct LeagueDetailView: View {
     private func playerRow(_ player: Player) -> some View {
         NavigationLink(value: player) {
             HStack(spacing: 12) {
-                CachedAsyncImage(url: URL(string: player.imageURL ?? ""))
-                    .frame(width: 44, height: 44)
-                    .clipShape(Circle())
+                PlayerAvatarView(imageURL: player.imageURL, size: 44)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(player.summonerName)

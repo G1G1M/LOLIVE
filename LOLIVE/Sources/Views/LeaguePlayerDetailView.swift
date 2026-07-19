@@ -68,9 +68,7 @@ struct LeaguePlayerDetailView: View {
 
     private var playerHeader: some View {
         HStack(spacing: 16) {
-            CachedAsyncImage(url: URL(string: player.imageURL ?? ""))
-                .frame(width: 60, height: 60)
-                .clipShape(Circle())
+            PlayerAvatarView(imageURL: player.imageURL, size: 60)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(player.summonerName)
