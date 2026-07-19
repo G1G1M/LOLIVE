@@ -22,8 +22,65 @@ final class LiveActivityService {
 
     // MARK: - Private
 
-    /// URL에서 이미지를 fetch해 30×30 PNG 썸네일로 변환 후 반환.
+    /// App Group 공유 컨테이너의 고화질 로고 디렉토리.
+    /// attributes 4KB 제한을 우회하기 위해 위젯이 여기서 파일을 직접 읽는다.
+    private static let sharedLogoDir: URL? = {
+        guard let base = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: SharedDataService.appGroupId) else { return nil }
+        let dir = base.appendingPathComponent("LiveActivityLogos", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
+    /// 팀 코드 → 로고 파일명 (경로에 쓸 수 없는 문자 치환).
+    /// 위젯 쪽 sharedHiResLogo(teamCode:)와 동일한 규칙이어야 한다.
+    private static func logoFileName(teamCode: String) -> String {
+        teamCode
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: " ", with: "_") + ".png"
+    }
+
+    /// 원본 이미지를 고화질 PNG로 App Group에 저장.
+    ///
+    /// [화질 원칙]
+    /// - 업스케일 금지: 원본이 목표보다 작으면 원본 해상도 그대로 저장 (억지로 키우면 뭉개짐)
+    /// - 비율 유지: 정사각 캔버스에 scaledToFit으로 그리고 여백은 투명 처리
+    /// - 목표 300px: 잠금화면 로고 38pt(@3x=114px) 대비 충분한 여유
+    private func saveHiResLogo(_ original: UIImage, teamCode: String) {
+        guard let dir = Self.sharedLogoDir else { return }
+
+        // 원본의 실제 픽셀 크기 (UIImage.size는 포인트 단위이므로 scale 곱)
+        let originalPx = CGSize(width: original.size.width * original.scale,
+                                height: original.size.height * original.scale)
+        let maxOriginalSide = max(originalPx.width, originalPx.height)
+        guard maxOriginalSide > 0 else { return }
+
+        let side = min(300, maxOriginalSide)  // 업스케일 방지
+        let ratio = side / maxOriginalSide
+        let drawSize = CGSize(width: originalPx.width * ratio,
+                              height: originalPx.height * ratio)
+        let origin = CGPoint(x: (side - drawSize.width) / 2,
+                             y: (side - drawSize.height) / 2)
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: side, height: side),
+                                               format: format)
+        let image = renderer.image { _ in
+            original.draw(in: CGRect(origin: origin, size: drawSize))
+        }
+        guard let png = image.pngData() else { return }
+        try? png.write(to: dir.appendingPathComponent(Self.logoFileName(teamCode: teamCode)),
+                       options: .atomic)
+        print("🖼️ [\(teamCode)] 고화질 로고 저장 (\(Int(side))px, \(png.count) bytes, App Group)")
+    }
+
+    /// URL에서 이미지를 fetch해 소형 PNG 썸네일로 변환 후 반환.
     /// 반환된 Data는 MatchActivityAttributes에 직접 포함되어 ActivityKit이 위젯 Extension에 전달.
+    ///
+    /// [크기 제한] ActivityKit은 attributes 전체를 4KB로 제한한다 (초과 시 attributesTooLarge).
+    /// 이미지 2장 + 텍스트가 들어가므로 이미지 1장당 최대 1.5KB로 맞추고,
+    /// 초과하면 해상도를 단계적으로 낮춰 재시도한다 (복잡한 로고 PNG 대응).
     private func fetchThumbnail(urlString: String?, teamCode: String) async -> Data? {
         guard let str = urlString, let url = URL(string: str) else {
             print("🖼️ [\(teamCode)] URL 없음")
@@ -37,19 +94,122 @@ final class LiveActivityService {
             print("🖼️ [\(teamCode)] UIImage 변환 실패")
             return nil
         }
-        // 30×30으로 리사이즈해 PNG 크기를 최소화
-        let size = CGSize(width: 30, height: 30)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        let thumbnail = renderer.image { _ in
-            original.draw(in: CGRect(origin: .zero, size: size))
+
+        // 고화질 버전을 App Group에 저장 — 위젯이 우선 사용 (4KB 제한 없음)
+        saveHiResLogo(original, teamCode: teamCode)
+
+        let maxBytes = 1500
+        // 투명 배경 유지를 위해 PNG 고정.
+        // 큰 해상도부터 시도해 예산(1.5KB) 안에 들어오는 가장 선명한 크기를 사용.
+        // (90px = 기존 30pt@3x와 동일 화질 — 단순한 로고는 그대로 유지됨)
+        let originalPx = CGSize(width: original.size.width * original.scale,
+                                height: original.size.height * original.scale)
+        let maxOriginalSide = max(originalPx.width, originalPx.height, 1)
+        for side in [90, 72, 60, 48, 36, 30, 24, 16, 12] {
+            let canvas = CGFloat(side)
+            // 비율 유지: 정사각 캔버스에 scaledToFit, 여백은 투명
+            let ratio = min(canvas / maxOriginalSide, 1)  // 업스케일 방지
+            let drawSize = CGSize(width: originalPx.width * ratio,
+                                  height: originalPx.height * ratio)
+            let origin = CGPoint(x: (canvas - drawSize.width) / 2,
+                                 y: (canvas - drawSize.height) / 2)
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1  // @2x/@3x 렌더링 방지 — 픽셀 수가 그대로 파일 크기로 이어짐
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: canvas, height: canvas),
+                                                   format: format)
+            let thumbnail = renderer.image { _ in
+                original.draw(in: CGRect(origin: origin, size: drawSize))
+            }
+            guard let png = thumbnail.pngData() else { continue }
+            if png.count <= maxBytes {
+                print("🖼️ [\(teamCode)] ✅ 썸네일 준비: \(png.count) bytes (\(side)×\(side) PNG)")
+                return png
+            }
         }
-        guard let png = thumbnail.pngData() else {
-            print("🖼️ [\(teamCode)] PNG 변환 실패")
-            return nil
-        }
-        print("🖼️ [\(teamCode)] ✅ 썸네일 준비: \(png.count) bytes (30×30 PNG)")
-        return png
+        // 12×12로도 1.5KB를 넘으면 이미지 생략 → 위젯은 팀 코드 텍스트로 폴백
+        print("🖼️ [\(teamCode)] ⚠️ 압축 실패 — 이미지 생략")
+        return nil
     }
+
+    // MARK: - 테스트 (DEBUG 빌드 전용)
+
+    #if DEBUG
+    /// 테스트용 더미 경기 ID — 실제 경기 Activity와 충돌하지 않는 고정 값
+    private static let testMatchId = "lolive_test_activity"
+
+    /// 테스트 Activity가 실행 중인지 여부 (설정 화면 버튼 상태용)
+    var isTestActivityRunning: Bool {
+        activities[Self.testMatchId] != nil
+    }
+
+    /// 더미 경기(T1 vs Gen.G)로 Live Activity 즉시 시작.
+    /// 실제 경기 시간과 무관하게 Dynamic Island / 잠금화면 표시를 확인할 수 있다.
+    /// - Returns: 시작 성공 여부 (실패 시 설정 > 실시간 활동 비활성화가 원인일 가능성)
+    @discardableResult
+    func startTestActivity() async -> Bool {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            print("⚠️ [LiveActivity 테스트] 비활성화됨 — 설정 > LOLIVE > 실시간 활동 확인")
+            return false
+        }
+        guard activities[Self.testMatchId] == nil else { return true }  // 이미 실행 중
+
+        // 실제 로고를 fetch해 위젯 이미지 표시까지 함께 검증
+        async let thumbA = fetchThumbnail(
+            urlString: "https://lol.fandom.com/wiki/Special:FilePath/T1logo_std.png",
+            teamCode: "T1")
+        async let thumbB = fetchThumbnail(
+            urlString: "https://lol.fandom.com/wiki/Special:FilePath/Gen.Glogo_std.png",
+            teamCode: "GEN")
+        let (teamAData, teamBData) = await (thumbA, thumbB)
+
+        let attrs = MatchActivityAttributes(
+            matchId: Self.testMatchId,
+            teamAName: "T1",
+            teamACode: "T1",
+            teamAImageURL: nil,
+            teamAImageData: teamAData,
+            teamBName: "Gen.G",
+            teamBCode: "GEN",
+            teamBImageURL: nil,
+            teamBImageData: teamBData,
+            leagueName: "LCK (테스트)"
+        )
+        let state = MatchActivityAttributes.ContentState(
+            scoreA: 0, scoreB: 0, currentGame: 1, isLive: true
+        )
+        do {
+            let activity = try Activity.request(
+                attributes: attrs,
+                content: .init(state: state, staleDate: nil),
+                pushType: nil
+            )
+            activities[Self.testMatchId] = activity
+            print("✅ [LiveActivity 테스트] 시작 id=\(activity.id)")
+            return true
+        } catch {
+            print("❌ [LiveActivity 테스트] 시작 실패: \(error)")
+            return false
+        }
+    }
+
+    /// 테스트 Activity의 스코어/세트 업데이트 — 실시간 갱신 동작 검증용.
+    func updateTestActivity(scoreA: Int, scoreB: Int, currentGame: Int) async {
+        guard let activity = activities[Self.testMatchId] else { return }
+        let state = MatchActivityAttributes.ContentState(
+            scoreA: scoreA, scoreB: scoreB, currentGame: currentGame, isLive: true
+        )
+        await activity.update(.init(state: state, staleDate: nil))
+        print("🔄 [LiveActivity 테스트] 업데이트 \(scoreA):\(scoreB) 세트\(currentGame)")
+    }
+
+    /// 테스트 Activity 즉시 종료.
+    func endTestActivity() async {
+        guard let activity = activities[Self.testMatchId] else { return }
+        await activity.end(dismissalPolicy: .immediate)
+        activities.removeValue(forKey: Self.testMatchId)
+        print("🏁 [LiveActivity 테스트] 종료")
+    }
+    #endif
 
     // MARK: - Public
 

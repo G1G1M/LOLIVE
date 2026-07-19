@@ -12,8 +12,68 @@ struct AppSettingsView: View {
         return "\(version) (\(build))"
     }
 
+    #if DEBUG
+    // 테스트 Live Activity 상태 (DEBUG 전용)
+    @State private var testActivityRunning = false
+    @State private var testScoreA = 0
+    @State private var testScoreB = 0
+    #endif
+
     var body: some View {
         List {
+            #if DEBUG
+            // MARK: - 테스트 (DEBUG 빌드에서만 표시)
+            Section {
+                Button {
+                    Task { await MatchNotificationService.shared.sendTestNotification() }
+                } label: {
+                    Label("테스트 알림 (5초 후 발송)", systemImage: "bell.badge")
+                }
+
+                if !testActivityRunning {
+                    Button {
+                        Task {
+                            let ok = await LiveActivityService.shared.startTestActivity()
+                            testActivityRunning = ok
+                            testScoreA = 0; testScoreB = 0
+                        }
+                    } label: {
+                        Label("Live Activity 시작 (T1 vs Gen.G)", systemImage: "play.circle")
+                    }
+                } else {
+                    Button {
+                        Task {
+                            // 번갈아 한 세트씩 승리하는 시나리오 시뮬레이션
+                            if testScoreA <= testScoreB { testScoreA += 1 } else { testScoreB += 1 }
+                            await LiveActivityService.shared.updateTestActivity(
+                                scoreA: testScoreA, scoreB: testScoreB,
+                                currentGame: testScoreA + testScoreB + 1
+                            )
+                        }
+                    } label: {
+                        Label("스코어 업데이트 (\(testScoreA):\(testScoreB) → 다음 세트)",
+                              systemImage: "arrow.triangle.2.circlepath")
+                    }
+
+                    Button(role: .destructive) {
+                        Task {
+                            await LiveActivityService.shared.endTestActivity()
+                            testActivityRunning = false
+                        }
+                    } label: {
+                        Label("Live Activity 종료", systemImage: "stop.circle")
+                    }
+                }
+            } header: {
+                Text("테스트 (DEBUG 전용)")
+            } footer: {
+                Text("알림: 버튼을 누르고 5초 안에 잠금화면으로 이동하면 잠금화면 알림도 확인할 수 있습니다.\nLive Activity: 시작 후 Dynamic Island와 잠금화면에서 확인하세요. 이 섹션은 App Store 배포 빌드에는 표시되지 않습니다.")
+            }
+            .onAppear {
+                testActivityRunning = LiveActivityService.shared.isTestActivityRunning
+            }
+            #endif
+
             // MARK: - 정보
             Section("정보") {
                 NavigationLink(destination: LegalTextView(title: "이용약관", content: termsOfService)) {

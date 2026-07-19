@@ -7,6 +7,22 @@ import ActivityKit
 import WidgetKit
 import SwiftUI
 
+// MARK: - App Group 고화질 로고 로더
+
+/// 메인 앱(LiveActivityService)이 App Group에 저장해둔 고화질 로고(180×180 PNG)를 읽는다.
+/// ActivityKit attributes는 4KB 제한 때문에 저화질 썸네일만 담을 수 있으므로
+/// 파일이 있으면 이쪽을 우선 사용한다. 파일명 규칙은 메인 앱과 동일해야 한다.
+func sharedHiResLogo(teamCode: String) -> UIImage? {
+    guard let base = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: SharedDataService.appGroupId) else { return nil }
+    let safe = teamCode
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: " ", with: "_")
+    let url = base.appendingPathComponent("LiveActivityLogos/\(safe).png")
+    guard let data = try? Data(contentsOf: url) else { return nil }
+    return UIImage(data: data)
+}
+
 struct MatchLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: MatchActivityAttributes.self) { context in
@@ -93,7 +109,9 @@ struct MatchLiveActivityWidget: Widget {
 
     @ViewBuilder
     func teamLogoView(imageData: Data?, teamCode: String, imageURL: String?, size: CGFloat) -> some View {
-        if let data = imageData, let img = UIImage(data: data) {
+        // 1순위: App Group 고화질 파일 → 2순위: attributes 내장 썸네일 → 3순위: URL/텍스트 폴백
+        if let img = sharedHiResLogo(teamCode: teamCode)
+            ?? imageData.flatMap({ UIImage(data: $0) }) {
             Image(uiImage: img)
                 .resizable().scaledToFit()
                 .frame(width: size, height: size)
@@ -216,7 +234,9 @@ struct LockScreenLiveActivityView: View {
 
     @ViewBuilder
     private func teamLogo(imageData: Data?, teamCode: String, imageURL: String?, size: CGFloat) -> some View {
-        if let data = imageData, let img = UIImage(data: data) {
+        // 1순위: App Group 고화질 파일 → 2순위: attributes 내장 썸네일 → 3순위: URL/텍스트 폴백
+        if let img = sharedHiResLogo(teamCode: teamCode)
+            ?? imageData.flatMap({ UIImage(data: $0) }) {
             Image(uiImage: img)
                 .resizable().scaledToFit()
                 .frame(width: size, height: size)

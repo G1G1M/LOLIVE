@@ -58,6 +58,26 @@ final class MatchNotificationService: Sendable {
         try? await UNUserNotificationCenter.current().add(request)
     }
 
+    // MARK: - 테스트 (DEBUG 빌드 전용)
+
+    #if DEBUG
+    /// 실제 경기 시간과 무관하게 5초 후 발송되는 테스트 알림.
+    /// 앱 설정 > 테스트 섹션에서 호출된다.
+    func sendTestNotification() async {
+        let content = UNMutableNotificationContent()
+        content.title = "T1 경기 1시간 전"
+        content.body = "vs Gen.G · LCK (테스트 알림)"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "lolive_test_\(Date().timeIntervalSince1970)",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+        )
+        try? await UNUserNotificationCenter.current().add(request)
+    }
+    #endif
+
     // MARK: - Private
 
     private var minutesBefore: Int {
