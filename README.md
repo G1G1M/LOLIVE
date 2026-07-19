@@ -114,7 +114,8 @@
 - 즐겨찾기한 선수 행에 현재 LIVE 경기 정보 실시간 표시
 - **대표 팀 설정**: 팀 행 길게 누르면 대표 팀 지정 → 앱 전체 Tint 색상 적용
 - Live Activity: 잠금화면 실시간 스코어 (`[로고] 팀명 스코어–스코어 팀명 [로고]`) + Dynamic Island
-  - 팀 로고: `MatchActivityAttributes`에 30×30 PNG 썸네일 직접 포함 → 크로스프로세스 파일 공유 불필요
+  - 팀 로고: 고화질 로고(최대 300px, 비율 유지·업스케일 방지)를 App Group에 저장 → 위젯이 파일 직접 로드
+  - ActivityKit attributes 4KB 제한 대응: attributes에는 예산(1.5KB/장) 내 최대 해상도 썸네일만 폴백으로 포함 (`attributesTooLarge` 방지)
   - 폴링: ContentView 레벨에서 실행 — 탭 전환·앱 재포그라운드 시에도 중단 없이 유지
   - **예약 시각부터 즉시 표시**: 경기 startTime 도달 시 API 확인 전에도 `isLive: false` pre-live Activity 시작 → "🕐 시작 중..." 표시. API가 inProgress 확인하면 실시간 스코어로 전환
   - 조기 시작 대응: API 딜레이 없이 예약 시각 기준으로 즉시 잠금화면·Dynamic Island에 대전 정보 표시
@@ -124,6 +125,7 @@
 - 알림 변경 시 즐겨찾기 팀 전체 알림 자동 재스케줄링
 - 앱 설정 페이지 이동 (이용약관, 개인정보처리방침, 앱 사용 설명서, 버전 정보)
 - 앱 설정 하단 법적 고지 — Riot Games 비제휴 팬 앱 명시 (한/영)
+- **DEBUG 전용 테스트 섹션** (배포 빌드 미포함): 테스트 알림 5초 발송 / Live Activity 시작·스코어 업데이트·종료 — 실제 경기 시간 없이 알림·위젯 검증 가능
 
 ### 홈 화면·잠금화면 위젯 (LOLIVEWidgets)
 - 즐겨찾기한 팀의 다음 경기 일정 표시
@@ -295,19 +297,24 @@ LOLIVE/
 │   │   ├── GameWindow (라이브 스탯)
 │   │   └── MatchActivityAttributes (Live Activity)
 │   ├── Services/
-│   │   ├── RiotEsportsService   — 경기/팀/선수 API
-│   │   ├── LeaguepediaService   — 시즌 스탯, 배치 캐싱
-│   │   ├── LiveStatsService     — 게임 윈도우 데이터
-│   │   ├── LiveActivityService  — Dynamic Island / 잠금화면
-│   │   ├── MatchNotificationService — 로컬 알림
-│   │   ├── AppPreloadService    — 앱 시작 시 경기 상세 + Leaguepedia 스탯 병렬 프리로드
-│   │   └── SharedDataService    — App Groups 동기화
+│   │   ├── RiotEsportsService           — 경기/팀/선수 API
+│   │   ├── LeaguepediaService           — Leaguepedia 코어 (네트워크 인프라 + 리그명 매핑 + RateLimiter)
+│   │   ├── LeaguepediaService+Stats     — 선수 스탯 / 챔피언픽 / 밴 / 프로필 이미지 (extension)
+│   │   ├── LeaguepediaService+History   — 과거 대회 경기 데이터 (extension)
+│   │   ├── LeaguepediaCargo             — Cargo API 응답 모델 + 공유 타입
+│   │   ├── LeaguepediaCache             — 메모리 + 디스크 캐시 actor
+│   │   ├── LiveStatsService             — 게임 윈도우 데이터
+│   │   ├── LiveActivityService          — Dynamic Island / 잠금화면 (App Group 고화질 로고 저장)
+│   │   ├── MatchNotificationService     — 로컬 알림
+│   │   ├── AppPreloadService            — 앱 시작 시 경기 상세 + Leaguepedia 스탯 병렬 프리로드
+│   │   └── SharedDataService            — App Groups 동기화
 │   ├── ViewModels/
 │   │   ├── TodayViewModel           — 경기 목록 + 라이브 폴링
 │   │   ├── TournamentDetailViewModel — 대회 일정 (Riot + Leaguepedia 3단계)
 │   │   ├── StandingsViewModel       — 리그 순위
 │   │   ├── PlayersViewModel         — 선수 목록 + 필터
 │   │   ├── SearchViewModel          — 통합 검색
+│   │   ├── LeaguesViewModel         — 리그 목록 로드/필터/지역 그룹핑
 │   │   ├── LeagueDetailViewModel
 │   │   ├── TeamDetailViewModel
 │   │   ├── LeaguePlayerDetailViewModel — 챔피언/경기 데이터
@@ -315,10 +322,12 @@ LOLIVE/
 │   └── Views/
 │       ├── TodayView, StandingsView, PlayersView
 │       ├── SearchView, FavoritesView
-│       ├── AppMenuView, AppSettingsView
-│       ├── LeagueDetailView, TournamentDetailView
-│       ├── TeamDetailView, LeaguePlayerDetailView, SeasonStatsView
+│       ├── AppMenuView, AppSettingsView (DEBUG 테스트 섹션 포함)
+│       ├── LeaguesView, TournamentDetailView
+│       ├── LeagueDetailView (+Standings / +Schedule / +Teams 탭별 extension 분리)
+│       ├── TeamDetailView, LeaguePlayerDetailView, ChampionDetailSheet, SeasonStatsView
 │       ├── MatchDetailView, PlayerDetailView
+│       ├── StateViews (ErrorRetryView / EmptyStateView 공통 상태 컴포넌트)
 │       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, LoadingView, PlayerAvatarView, ...
 ├── ContentView.swift        — TabView 진입점 (Today/Leagues/Players/Favorites/Search 5탭)
 ├── LOLIVEApp.swift          — 앱 진입점
