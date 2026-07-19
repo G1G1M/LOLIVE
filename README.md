@@ -122,7 +122,7 @@
 - 앱 설정 페이지 이동 (이용약관, 개인정보처리방침, 앱 사용 설명서, 버전 정보)
 - 앱 설정 하단 법적 고지 — Riot Games 비제휴 팬 앱 명시 (한/영)
 
-### 홈 화면 위젯 (LOLIVEWidgets)
+### 홈 화면·잠금화면 위젯 (LOLIVEWidgets)
 - 즐겨찾기한 팀의 다음 경기 일정 표시
 - Small / Medium / **Large** 사이즈 지원
 - Large: 즐겨찾기 팀 전체 목록 (최대 5팀) 한눈에 표시
@@ -133,6 +133,8 @@
 - 실제 경기 리그명 표시 (MSI 경기면 "MSI", LCK 경기면 "LCK")
 - 다크/라이트 모드 자동 대응
 - **잠금화면 accessory 위젯**: `.accessoryCircular` / `.accessoryRectangular` / `.accessoryInline` 3종
+- **조기 시작 감지**: 예정 1.5시간 이내 진입 시 `/getLive` API 직접 호출 → 예약 시각보다 일찍 시작하는 경기 즉시 반영
+- **갱신 주기 최적화**: 라이브 중 15분 / 시작 1.5시간 이내 5분 / 그 이상은 (startTime − 1.5h) 시점에 갱신
 - **예정 경기 캐시 만료 없음**: 앱을 오래 안 열어도 예정 경기 정보 유지 (startTime 전이면 TTL 미적용)
 - App Group 캐시 없을 때 라이브 API fallback 자동 호출 → MSI·Worlds 라이브 경기도 위젯 표시 가능
 
