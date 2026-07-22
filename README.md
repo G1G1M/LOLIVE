@@ -52,6 +52,9 @@
 - 즐겨찾기 팀 경기만 필터링 (전체 / ★ 즐겨찾기 토글)
 - 예정 경기(unstarted) 날짜 제한 없음 — API가 반환하는 모든 미래 경기 표시
 - 타이틀 · 날짜 스트립 · 필터 고정, 경기 목록만 스크롤
+- 라이브 경기가 종료되는 순간 화면에서 사라지지 않도록 로컬에서 즉시 완료 상태로 승격 (다음 전체 리로드 전까지도 유지)
+- `getSchedule` 과거 페이지(`pages.older`)까지 조회 — "오늘 기준" 첫 페이지만으로 누락되던 며칠 전 완료 경기 보강
+- ⚠️ 알려진 한계: 케스파컵 등 일부 대회는 Riot Esports API가 `state`/스코어를 아예 갱신해주지 않아(경기 후에도 `unstarted`) 앱에서 결과 표시 불가 — Leaguepedia 보완 로직 미구현
 
 ### Standings
 - 전 세계 리그 순위표 (W-L / GD / Win% 컬럼)
@@ -63,6 +66,7 @@
 - 리그 선택 칩 (lazy 로딩 + 캐싱), 리그 전환 시 디스크 캐시 즉시 표시
 - 팀 탭 → 팀 상세 페이지 이동
 - 리그 상세의 순위 탭과 동일한 UI/데이터 구조 공유
+- 탭바 3번째 탭으로 직접 진입 가능 (리그 상세 내 순위 탭과는 별개 진입점, 데이터/스타일은 공유)
 
 ### Players
 - 전 세계 선수 통합 목록
@@ -81,8 +85,11 @@
 ### 팀 상세
 - **탭 기반 레이아웃**: 상단 고정 헤더(팀 로고 + 이름 + 순위) + 탭 바(선수단 / 상대 전적 / 최근경기)
 - **선수단**: 포지션 순 정렬, 선수 탭 → 선수 상세 이동
-- **상대 전적**: 상대팀별 누적 W-L + 승률
+- **상대 전적**: 상대팀별 누적 W-L + 승률 — 현재 리그/대회 내 경기만 집계
 - **최근경기**: 1열 리스트 — W/L 배지 + 상대팀 로고·이름 + 날짜 + 스코어, 최대 30경기, 탭 → 경기 상세 이동
+  - 대회 상관없이 통합 표시 (현재 리그 전체 시즌 스케줄 + 다른 대회 경기까지 병합)
+- 데이터 소스: `fetchSchedule`(오늘 기준 제한 윈도우) 대신 `fetchAllSchedule`(과거 페이지 전체 순회)로 전체 시즌 확보
+  + 진입한 화면(TodayViewModel 등)이 이미 들고 있는 교차 리그 경기를 주입 — 어느 화면에서 들어와도 동일하게 채워짐
 
 ### 선수 상세
 - **탭 기반 레이아웃**: 상단 고정 헤더(사진 + 소환사명 + 역할) + 탭 바(통계 / 챔피언풀 / 최근경기)
@@ -106,6 +113,9 @@
 - 경기 종료 배지 아래 경기 날짜 표시
 - 팀 로고 탭 → 팀 상세 페이지 이동
 - **킬 타임라인**: 게임별 킬 이벤트를 시간 축 위에 표시 (Blue/Red 점, 분 단위 레이블) — 완료 경기 30일 캐시
+- 선수 탭 → `PlayerDetailView`(이 경기 게임별 KDA만 표시, 인게임 데이터 기반이라 즐겨찾기 불가)
+  - 툴바 "프로필 보기" → 양 팀 로스터 조회로 정식 `Player` 해석 → `LeaguePlayerDetailView`(시즌 스탯·챔피언풀·즐겨찾기)로 이동
+  - 매칭 실패 시 알림으로 안내 (크래시 없이 원래 화면 유지)
 
 ### Favorites
 - SwiftData 기반 팀 / 선수 즐겨찾기
@@ -327,9 +337,9 @@ LOLIVE/
 │       ├── LeagueDetailView (+Standings / +Schedule / +Teams 탭별 extension 분리)
 │       ├── TeamDetailView, LeaguePlayerDetailView, ChampionDetailSheet, SeasonStatsView
 │       ├── MatchDetailView, PlayerDetailView
-│       ├── StateViews (ErrorRetryView / EmptyStateView 공통 상태 컴포넌트)
+│       ├── StateViews (ErrorRetryView / EmptyStateView 공통 상태 컴포넌트, EmptyStateView는 선택적 액션 버튼 지원)
 │       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, LoadingView, PlayerAvatarView, ...
-├── ContentView.swift        — TabView 진입점 (Today/Leagues/Players/Favorites/Search 5탭)
+├── ContentView.swift        — TabView 진입점 (Today/Leagues/Standings/Players/Favorites/Search 6탭)
 ├── LOLIVEApp.swift          — 앱 진입점
 └── LOLIVEWidgets/           — Widget Extension
     ├── FavoriteTeamWidget.swift
