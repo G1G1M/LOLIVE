@@ -46,10 +46,19 @@ struct ErrorRetryView: View {
 struct EmptyStateView: View {
     let message: String
     let icon: String
+    let actionTitle: String?
+    let action: (() -> Void)?
 
-    init(_ message: String, icon: String = "exclamationmark.circle") {
+    init(
+        _ message: String,
+        icon: String = "exclamationmark.circle",
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
         self.message = message
         self.icon = icon
+        self.actionTitle = actionTitle
+        self.action = action
     }
 
     var body: some View {
@@ -60,6 +69,13 @@ struct EmptyStateView: View {
             Text(message)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .font(.subheadline).fontWeight(.semibold)
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)

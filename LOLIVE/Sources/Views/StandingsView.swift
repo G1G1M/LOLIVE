@@ -103,7 +103,7 @@ struct StandingsView: View {
             LoadingView("순위 불러오는 중...")
                 .frame(minHeight: 120)
         } else if viewModel.standings.isEmpty {
-            emptyState
+            EmptyStateView("순위 데이터가 없습니다")
         } else {
             standingsTable
         }
@@ -156,7 +156,7 @@ struct StandingsView: View {
                 }
                 .buttonStyle(.plain)
                 if standing.id != standings.last?.id {
-                    Divider().padding(.leading, 64)
+                    Divider().padding(.leading, 72)
                 }
             }
         }
@@ -252,21 +252,6 @@ struct StandingsView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
-    }
-
-    // MARK: - Empty
-
-    private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 32))
-                .foregroundStyle(.quaternary)
-            Text("순위 데이터가 없습니다")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
     }
 
     // MARK: - Helpers

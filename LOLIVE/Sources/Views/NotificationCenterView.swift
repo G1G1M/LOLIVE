@@ -12,35 +12,27 @@ struct NotificationCenterView: View {
     @State private var isLoading = true
 
     var body: some View {
-        List {
+        ZStack {
+            Color(.systemGroupedBackground).ignoresSafeArea()
             if isLoading {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
+                LoadingView()
             } else if items.isEmpty {
-                ContentUnavailableView(
-                    "예정 알림 없음",
-                    systemImage: "bell.slash",
-                    description: Text("즐겨찾기 팀의 예정된 경기 알림이 없습니다")
-                )
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+                EmptyStateView("즐겨찾기 팀의 예정된 경기 알림이 없습니다", icon: "bell.slash")
             } else {
-                ForEach(items) { item in
-                    if let info = item.matchInfo {
-                        NavigationLink(destination: MatchDetailView(match: info.match)) {
+                List {
+                    ForEach(items) { item in
+                        if let info = item.matchInfo {
+                            NavigationLink(destination: MatchDetailView(match: info.match)) {
+                                itemRow(item)
+                            }
+                        } else {
                             itemRow(item)
                         }
-                    } else {
-                        itemRow(item)
                     }
                 }
+                .listStyle(.insetGrouped)
             }
         }
-        .listStyle(.insetGrouped)
         .navigationTitle("예정 알림")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadPending() }

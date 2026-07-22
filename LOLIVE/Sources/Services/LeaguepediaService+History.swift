@@ -284,7 +284,7 @@ extension LeaguepediaService {
     }
 
     /// 중복 Match 제거 (동일 id 유지, 첫 번째 등장 우선).
-    private func deduplicated(_ matches: [Match]) -> [Match] {
+    func deduplicated(_ matches: [Match]) -> [Match] {
         var seen = Set<String>()
         return matches.filter { seen.insert($0.id).inserted }
     }

@@ -27,6 +27,7 @@ final class TeamDetailViewModel {
     private let team: Team
     private var league: League
     private let service: RiotEsportsServiceProtocol
+    private var crossLeagueMatches: [Match] = []
 
     init(team: Team, league: League,
          service: RiotEsportsServiceProtocol = RiotEsportsService()) {
@@ -40,6 +41,13 @@ final class TeamDetailViewModel {
         league = newLeague
     }
 
+    /// 다른 리그/대회에서 이미 로드되어 있는 경기 목록을 주입 (예: TodayViewModel).
+    /// "최근 경기" 탭이 현재 리그 하나로 fetch가 제한되지 않고, 이 팀이 뛴 다른 대회 경기도 함께 보여줄 수 있도록 함.
+    /// load() 호출 전에 사용해야 반영됨.
+    func setCrossLeagueMatches(_ matches: [Match]) {
+        crossLeagueMatches = matches
+    }
+
     func load() async {
         let hadCache = preloadFromCache()
         isLoading = !hadCache
@@ -47,7 +55,9 @@ final class TeamDetailViewModel {
         defer { isLoading = false }
 
         async let rosterTask = service.fetchTeamRoster(teamId: team.id)
-        async let scheduleTask = service.fetchSchedule(league: league)
+        // 15분짜리 오늘 기준 스케줄이 아니라, 과거 페이지까지 전부 훑는 전체 시즌 스케줄을 사용해야
+        // 최근 맞대결이 없어도 상대 전적·최근 경기가 안정적으로 채워짐
+        async let scheduleTask = service.fetchAllSchedule(league: league)
 
         let rosterResult = try? await rosterTask
         let matchResult  = try? await scheduleTask
@@ -58,18 +68,8 @@ final class TeamDetailViewModel {
         }
 
         let roster = rosterResult ?? []
-        let allMatches = matchResult ?? []
-
         players = roster.sorted { roleOrder($0.role) < roleOrder($1.role) }
-
-        let completed = allMatches.filter {
-            ($0.teamA.id == team.id || $0.teamA.code == team.code ||
-             $0.teamB.id == team.id || $0.teamB.code == team.code) &&
-            $0.state == .completed
-        }.sorted { $0.startTime > $1.startTime }
-
-        recentMatches = Array(completed.prefix(30))
-        h2hRecords = buildH2H(from: completed)
+        applyMatches(matchResult ?? [])
     }
 
     private func preloadFromCache() -> Bool {
@@ -78,17 +78,30 @@ final class TeamDetailViewModel {
             players = roster.sorted { roleOrder($0.role) < roleOrder($1.role) }
             hadAny = true
         }
-        if let allMatches: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) {
-            let completed = allMatches.filter {
-                ($0.teamA.id == team.id || $0.teamA.code == team.code ||
-                 $0.teamB.id == team.id || $0.teamB.code == team.code) &&
-                $0.state == .completed
-            }.sorted { $0.startTime > $1.startTime }
-            recentMatches = Array(completed.prefix(30))
-            h2hRecords = buildH2H(from: completed)
+        if let allMatches: [Match] = AppDiskCache.get(key: "all_schedule_\(league.id)", maxAge: 2 * 3600) {
+            applyMatches(allMatches)
             hadAny = true
         }
         return hadAny
+    }
+
+    /// 현재 리그 전체 스케줄 + 교차 리그(국제 대회 등) 경기를 합쳐
+    /// "최근 경기"는 대회 상관없이 전부, "상대 전적"은 현재 리그/대회 내 경기만으로 구성한다.
+    private func applyMatches(_ leagueMatches: [Match]) {
+        func isThisTeam(_ m: Match) -> Bool {
+            m.teamA.id == team.id || m.teamA.code == team.code ||
+            m.teamB.id == team.id || m.teamB.code == team.code
+        }
+
+        let crossMatches = crossLeagueMatches.filter(isThisTeam)
+        var seen = Set<String>()
+        let merged = (leagueMatches + crossMatches).filter { seen.insert($0.id).inserted }
+
+        let completed = merged.filter { isThisTeam($0) && $0.state == .completed }
+            .sorted { $0.startTime > $1.startTime }
+
+        recentMatches = Array(completed.prefix(30))
+        h2hRecords = buildH2H(from: completed.filter { $0.league.id == league.id })
     }
 
     private func buildH2H(from matches: [Match]) -> [H2HRecord] {

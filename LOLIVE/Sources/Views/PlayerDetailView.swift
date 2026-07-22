@@ -11,6 +11,11 @@ struct PlayerDetailView: View {
     let gameWindows: [String: GameWindow]
     let match: Match
 
+    private let service: RiotEsportsServiceProtocol = RiotEsportsService()
+    @State private var isResolvingProfile = false
+    @State private var resolvedPlayer: Player? = nil
+    @State private var profileNotFound = false
+
     private struct GameStat: Identifiable {
         var id: Int { gameNumber }
         let gameNumber: Int
@@ -56,6 +61,45 @@ struct PlayerDetailView: View {
         }
         .navigationTitle(summonerName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await resolveProfile() }
+                } label: {
+                    if isResolvingProfile {
+                        ProgressView()
+                    } else {
+                        Label("프로필 보기", systemImage: "person.crop.circle")
+                    }
+                }
+                .disabled(isResolvingProfile)
+            }
+        }
+        .navigationDestination(item: $resolvedPlayer) { player in
+            LeaguePlayerDetailView(player: player, league: match.league)
+        }
+        .alert("선수 프로필을 찾을 수 없습니다", isPresented: $profileNotFound) {
+            Button("확인") { }
+        }
+    }
+
+    // MARK: - Profile Resolution
+
+    private func resolveProfile() async {
+        isResolvingProfile = true
+        defer { isResolvingProfile = false }
+
+        async let rosterA = try? service.fetchTeamRoster(teamId: match.teamA.id)
+        async let rosterB = try? service.fetchTeamRoster(teamId: match.teamB.id)
+        let roster = (await rosterA ?? []) + (await rosterB ?? [])
+
+        if let found = roster.first(where: {
+            $0.summonerName.localizedCaseInsensitiveCompare(summonerName) == .orderedSame
+        }) {
+            resolvedPlayer = found
+        } else {
+            profileNotFound = true
+        }
     }
 
     // MARK: - Match Info

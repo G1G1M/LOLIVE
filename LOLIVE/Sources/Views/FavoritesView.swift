@@ -44,29 +44,13 @@ struct FavoritesView: View {
                 // ── 즐겨찾기 없을 때 ─────────────────────────────────
                 if !hasFavorites {
                     Section {
-                        VStack(spacing: 12) {
-                            Image(systemName: "star")
-                                .font(.system(size: 44))
-                                .foregroundStyle(.secondary)
-                            Text("즐겨찾기가 없습니다")
-                                .font(.headline)
-                            Text("팀이나 선수 상세 페이지에서\n별 버튼을 눌러 추가하세요")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                            Button {
-                                showingTeamSearch = true
-                            } label: {
-                                Text("팀 찾아보기")
-                                    .font(.subheadline).fontWeight(.semibold)
-                                    .padding(.horizontal, 20).padding(.vertical, 10)
-                                    .background(Color.accentColor)
-                                    .foregroundStyle(.white)
-                                    .clipShape(Capsule())
-                            }
-                            .padding(.top, 4)
+                        EmptyStateView(
+                            "즐겨찾기가 없습니다\n팀이나 선수 상세 페이지에서 별 버튼을 눌러 추가하세요",
+                            icon: "star",
+                            actionTitle: "팀 찾아보기"
+                        ) {
+                            showingTeamSearch = true
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 60)
                         .listRowBackground(Color(.systemGroupedBackground))
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets())

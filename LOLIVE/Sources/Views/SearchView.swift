@@ -59,8 +59,9 @@ struct SearchView: View {
                     Color(.systemGroupedBackground).ignoresSafeArea()
 
                     if viewModel.isLoading && searchText.isEmpty {
-                        ProgressView("불러오는 중...")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        LoadingView()
+                    } else if viewModel.loadFailed && searchText.isEmpty {
+                        ErrorRetryView("검색 데이터를 불러올 수 없습니다") { Task { await viewModel.load() } }
                     } else if searchText.isEmpty {
                         emptyPrompt
                     } else if results.isEmpty {

@@ -313,7 +313,7 @@ extension LeaguepediaService {
     // MARK: - 스탯 계산 (내부)
 
     /// 선수의 게임 행(rows)에서 평균 스탯을 계산해 PlayerSeasonStats로 반환.
-    private func computeStats(from rows: [[String: String]]) -> PlayerSeasonStats {
+    func computeStats(from rows: [[String: String]]) -> PlayerSeasonStats {
         var wins = 0
         var totalK = 0.0, totalD = 0.0, totalA = 0.0
         var totalCSpm = 0.0, cspmCount = 0

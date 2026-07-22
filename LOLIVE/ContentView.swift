@@ -30,21 +30,25 @@ struct ContentView: View {
                 .tag(1)
                 .tabItem { Label("Leagues", systemImage: "trophy.fill") }
 
-            PlayersView()
+            StandingsView()
                 .tag(2)
+                .tabItem { Label("Standings", systemImage: "list.number") }
+
+            PlayersView()
+                .tag(3)
                 .tabItem { Label("Players", systemImage: "person.fill") }
 
             FavoritesView()
-                .tag(3)
+                .tag(4)
                 .tabItem { Label("Favorites", systemImage: "star.fill") }
 
             SearchView(focusTrigger: searchFocusTrigger)
-                .tag(4)
+                .tag(5)
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
         }
         .tint(themeColor)
         .onChange(of: selectedTab) { _, new in
-            if new == 4 {
+            if new == 5 {
                 searchFocusTrigger += 1
             }
         }

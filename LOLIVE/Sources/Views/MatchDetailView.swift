@@ -27,21 +27,11 @@ struct MatchDetailView: View {
                     scoreCard
 
                     if viewModel.isLoading {
-                        ProgressView("데이터 불러오는 중...")
-                            .padding(.vertical, 24)
+                        LoadingView("데이터 불러오는 중...")
+                            .frame(minHeight: 120)
                     } else if let error = viewModel.errorMessage {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.circle")
-                                .foregroundStyle(.secondary)
-                            Text(error)
-                                .font(.subheadline).foregroundStyle(.secondary)
-                            Spacer()
-                            Button("재시도") { Task { await viewModel.load() } }
-                                .font(.subheadline)
-                        }
-                        .padding(16)
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        ErrorRetryView(error) { Task { await viewModel.load() } }
+                            .frame(minHeight: 160)
                     } else if match.state == .unstarted && viewModel.eventDetail == nil {
                         upcomingCard
                     } else if let detail = viewModel.eventDetail {

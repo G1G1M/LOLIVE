@@ -88,6 +88,25 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
             newerCount += 1
         }
 
+        // 과거 완료 경기 페이지 (older) 최대 2페이지 추가
+        // "오늘 기준" 첫 페이지만으로는 며칠 전 완료 경기가 누락될 수 있음 (TodayView 날짜 스트립 -5일 대응)
+        var olderToken = response.data.schedule.pages?.older
+        var olderCount = 0
+        while let token = olderToken, olderCount < 2 {
+            var q = [URLQueryItem(name: "leagueId", value: league.id),
+                     URLQueryItem(name: "pageToken", value: token)]
+            if let d = try? await request(path: "/getSchedule", queryItems: q),
+               let r = try? decode(ScheduleResponse.self, from: d) {
+                for m in r.data.schedule.events.compactMap({ mapEventToMatch($0, fallbackLeague: league) }) {
+                    if seen.insert(m.id).inserted { allMatches.append(m) }
+                }
+                olderToken = r.data.schedule.pages?.older
+            } else {
+                break
+            }
+            olderCount += 1
+        }
+
         AppDiskCache.set(key: key, value: allMatches)
         return allMatches
     }

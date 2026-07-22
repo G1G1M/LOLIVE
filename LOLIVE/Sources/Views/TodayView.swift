@@ -32,8 +32,11 @@ struct TodayView: View {
                 ZStack {
                     Color(.systemGroupedBackground).ignoresSafeArea()
                     if viewModel.isLoading && viewModel.todayMatches.isEmpty {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        LoadingView()
+                    } else if viewModel.errorMessage != nil {
+                        ErrorRetryView(viewModel.errorMessage ?? "데이터를 불러올 수 없습니다") {
+                            Task { await viewModel.loadTodayMatches() }
+                        }
                     } else {
                         matchList
                     }
@@ -47,14 +50,6 @@ struct TodayView: View {
                     match: match,
                     liveMatch: viewModel.liveMatches.first { $0.match.id == match.id }
                 )
-            }
-            .alert("오류", isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            )) {
-                Button("확인") { viewModel.errorMessage = nil }
-            } message: {
-                Text(viewModel.errorMessage ?? "")
             }
         }
         .task {

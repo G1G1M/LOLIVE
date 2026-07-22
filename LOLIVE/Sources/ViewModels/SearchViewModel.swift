@@ -32,6 +32,7 @@ final class SearchViewModel {
     var allTeams:   [(team: Team, league: League)] = []
     var allPlayers: [(player: Player, league: League)] = []
     var isLoading = false
+    var loadFailed = false
 
     // MARK: - Search
 
@@ -71,9 +72,13 @@ final class SearchViewModel {
         guard allLeagues.isEmpty else { return }
         if preloadFromCache() { return }
         isLoading = true
+        loadFailed = false
         defer { isLoading = false }
 
-        let leagues = (try? await service.fetchLeagues()) ?? []
+        guard let leagues = try? await service.fetchLeagues() else {
+            loadFailed = true
+            return
+        }
         allLeagues = leagues
 
         let svc = service

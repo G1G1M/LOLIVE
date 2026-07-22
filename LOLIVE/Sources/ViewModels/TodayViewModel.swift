@@ -142,8 +142,9 @@ final class TodayViewModel {
         stopPolling()
         pollingTask = Task {
             while !Task.isCancelled {
-                // 즐겨찾기 팀의 현재 라이브 경기 스냅샷 (종료 감지용)
-                let prevFavoriteLive = liveMatches.filter { favoriteTeamCode(for: $0.match) != nil }
+                // 종료 감지용 스냅샷 (전체 라이브 경기 + 즐겨찾기 팀 경기)
+                let prevLive = liveMatches
+                let prevFavoriteLive = prevLive.filter { favoriteTeamCode(for: $0.match) != nil }
 
                 do {
                     let live = try await service.fetchLive()
@@ -156,6 +157,12 @@ final class TodayViewModel {
                                 for: lm.match, favoriteTeamCode: code
                             )
                         }
+                    }
+
+                    // 라이브에서 사라진 모든 경기 → 다음 전체 스케줄 리로드 전까지도
+                    // 화면에서 사라지지 않도록 로컬에서 즉시 완료 상태로 승격
+                    for lm in prevLive where !newLiveIds.contains(lm.match.id) {
+                        markCompleted(lm.match)
                     }
 
                     liveMatches = enrich(live)
@@ -233,6 +240,23 @@ final class TodayViewModel {
         return true
     }
 
+    /// 라이브 목록에서 방금 사라진 경기를 완료 상태로 로컬 승격.
+    /// 다음 loadTodayMatches() 전체 리로드(스케줄 캐시 15분) 전까지도
+    /// todayMatches/upcomingMatches에 남은 stale 항목을 제거하고 completedMatches로 옮긴다.
+    private func markCompleted(_ match: Match) {
+        todayMatches.removeAll { $0.id == match.id }
+        upcomingMatches.removeAll { $0.id == match.id }
+        guard !completedMatches.contains(where: { $0.id == match.id }) else { return }
+        let finished = Match(
+            id: match.id, league: match.league,
+            teamA: match.teamA, teamB: match.teamB,
+            scoreA: match.scoreA, scoreB: match.scoreB,
+            startTime: match.startTime, state: .completed,
+            blockName: match.blockName
+        )
+        completedMatches.insert(finished, at: 0)
+    }
+
     private func enrich(_ live: [LiveMatch]) -> [LiveMatch] {
         let map = Dictionary(uniqueKeysWithValues: cachedLeagues.map { ($0.id, $0.imageURL) })
         return live.map { lm in
@@ -253,16 +277,16 @@ final class TodayViewModel {
     }
 
     private func classify(matches: [Match]) {
-        let now = Date()
-        let todayStart = calendar.startOfDay(for: now)
+        let todayStart = calendar.startOfDay(for: Date())
         guard let todayEnd    = calendar.date(byAdding: .day, value:  1, to: todayStart),
               let fiveDaysAgo = calendar.date(byAdding: .day, value: -5, to: todayStart)
         else { return }
 
 
-        // 오늘 아직 시작 안 한 경기 (inProgress여도 미래 startTime이면 포함 — MSI 등 진행 중 토너먼트 대응)
+        // 오늘 경기 (예정 + 진행 중). startTime이 이미 지났어도 inProgress면 포함해야
+        // 라이브 폴링 중 fetchLive()에서만 빠지는 순간 화면에서 통째로 사라지지 않는다.
         todayMatches = matches.filter {
-            $0.startTime >= now && $0.startTime < todayEnd &&
+            $0.startTime >= todayStart && $0.startTime < todayEnd &&
             ($0.state == .unstarted || $0.state == .inProgress)
         }.sorted { $0.startTime < $1.startTime }
 

@@ -138,7 +138,8 @@ struct LeaguePlayerDetailView: View {
 
         case .champions:
             if viewModel.isLoadingStats && viewModel.championStats.isEmpty {
-                loadingView(message: "챔피언 통계 불러오는 중...")
+                LoadingView("챔피언 통계 불러오는 중...")
+                    .frame(minHeight: 120)
             } else if viewModel.championStats.isEmpty {
                 EmptyStateView("챔피언 통계가 없습니다", icon: "gamecontroller")
             } else {
@@ -147,23 +148,14 @@ struct LeaguePlayerDetailView: View {
 
         case .recent:
             if viewModel.recentResults.isEmpty && viewModel.isLoadingStats {
-                loadingView(message: "최근 경기 불러오는 중...")
+                LoadingView("최근 경기 불러오는 중...")
+                    .frame(minHeight: 120)
             } else if viewModel.recentResults.isEmpty {
                 EmptyStateView("최근 경기 기록이 없습니다", icon: "calendar.badge.clock")
             } else {
                 recentMatchesCard
             }
         }
-    }
-
-    private func loadingView(message: String) -> some View {
-        HStack(spacing: 8) {
-            ProgressView()
-            Text(message)
-                .font(.subheadline).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
     }
 
     // MARK: - Favorite

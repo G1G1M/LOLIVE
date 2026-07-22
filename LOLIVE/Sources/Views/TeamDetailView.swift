@@ -65,6 +65,9 @@ struct TeamDetailView: View {
         }
         .task {
             viewModel.updateLeague(resolvedHomeLeague)
+            viewModel.setCrossLeagueMatches(
+                todayViewModel.completedMatches + todayViewModel.todayMatches + todayViewModel.upcomingMatches
+            )
             await viewModel.load()
             checkFavoriteStatus()
         }
