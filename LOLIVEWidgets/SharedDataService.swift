@@ -4,6 +4,9 @@
 //
 //  App Groups UserDefaults에서 즐겨찾기 팀 데이터를 읽습니다.
 //
+//  ⚠️ 이 파일은 LOLIVE/Sources/Services/SharedDataService.swift와 물리적으로 복제되어 있습니다
+//  (앱 타겟과 위젯 Extension 타겟이 코드를 공유할 SPM 모듈이 없어서 파일을 그대로 복사함).
+//  구조체(SharedFavoriteTeam/SharedNextMatch)나 UserDefaults 키를 바꿀 땐 반드시 두 파일을 함께 수정하세요.
 
 import Foundation
 

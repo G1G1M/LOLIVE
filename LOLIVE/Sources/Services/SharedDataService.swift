@@ -4,6 +4,9 @@
 //
 //  App Groups UserDefaults를 통해 위젯 Extension과 즐겨찾기 팀 데이터를 공유합니다.
 //
+//  ⚠️ 이 파일은 LOLIVEWidgets/SharedDataService.swift와 물리적으로 복제되어 있습니다
+//  (앱 타겟과 위젯 Extension 타겟이 코드를 공유할 SPM 모듈이 없어서 파일을 그대로 복사함).
+//  구조체(SharedFavoriteTeam/SharedNextMatch)나 UserDefaults 키를 바꿀 땐 반드시 두 파일을 함께 수정하세요.
 
 import Foundation
 
@@ -31,16 +34,6 @@ struct SharedNextMatch: Codable {
 enum SharedDataService {
     static let appGroupId = "group.lolive"
     private static let favTeamsKey = "sharedFavoriteTeams"
-
-    static func saveTeamImageData(_ data: Data, teamCode: String) {
-        let defaults = UserDefaults(suiteName: appGroupId)
-        defaults?.set(data, forKey: "teamImg_\(teamCode)")
-        defaults?.synchronize()  // 위젯 Extension이 즉시 읽을 수 있도록 강제 flush
-    }
-
-    static func loadTeamImageData(teamCode: String) -> Data? {
-        UserDefaults(suiteName: appGroupId)?.data(forKey: "teamImg_\(teamCode)")
-    }
 
     static func saveNextMatches(_ matches: [String: SharedNextMatch]) {
         let encoder = JSONEncoder()

@@ -166,7 +166,6 @@ struct FavoriteTeamProvider: TimelineProvider {
         } ?? apiMatch
 
         let oppImg = await fetchImageData(match?.opponentImageURL)
-                   ?? SharedDataService.loadTeamImageData(teamCode: match?.opponentCode ?? "")
 
         let allTeamsData = await loadAllTeams(teams, liveInfo: liveInfo, sharedMatches: allSharedMatches)
         let leagueName = currentSharedMatch?.leagueName ?? fav.leagueName
@@ -218,7 +217,6 @@ struct FavoriteTeamProvider: TimelineProvider {
                     } ?? apiMatch
 
                     let oppImg = await fetchImageData(match?.opponentImageURL)
-                               ?? SharedDataService.loadTeamImageData(teamCode: match?.opponentCode ?? "")
                     let leagueName = sharedMatch?.leagueName ?? fav.leagueName
                     return (i, TeamRowInfo(
                         teamCode: fav.teamCode,
