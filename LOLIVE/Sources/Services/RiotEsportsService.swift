@@ -107,8 +107,23 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
             olderCount += 1
         }
 
+        allMatches = await reconcileUnreportedResults(allMatches, league: league)
+
         AppDiskCache.set(key: key, value: allMatches)
         return allMatches
+    }
+
+    /// 케스파컵처럼 Riot이 경기 상태/결과를 갱신해주지 않는 대회 대응.
+    /// 시작 시각이 한참 지났는데도 unstarted로 멈춰있는 경기가 있으면 Leaguepedia 결과로 보완한다.
+    /// 정상적으로 상태가 갱신되는 리그(대부분)는 감지되는 게 없어 API 호출 없이 그대로 반환된다.
+    private func reconcileUnreportedResults(_ matches: [Match], league: League) async -> [Match] {
+        let cutoff = Date().addingTimeInterval(-3 * 3600)
+        let hasStale = matches.contains { $0.state == .unstarted && $0.startTime < cutoff }
+        guard hasStale else { return matches }
+
+        let lpMatches = await LeaguepediaService.shared.fetchLiveTournamentResults(for: league)
+        guard !lpMatches.isEmpty else { return matches }
+        return LeaguepediaService.shared.reconcileResults(riotMatches: matches, leaguepediaMatches: lpMatches)
     }
 
     // 국제 대회(Worlds/MSI) 전용: 모든 페이지를 순회하여 전체 경기 목록 반환
@@ -143,7 +158,8 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
 
         // 중복 제거 (match ID 기준)
         var seen = Set<String>()
-        let result = allMatches.filter { seen.insert($0.id).inserted }
+        var result = allMatches.filter { seen.insert($0.id).inserted }
+        result = await reconcileUnreportedResults(result, league: league)
         if !result.isEmpty { AppDiskCache.set(key: key, value: result) }
         return result
     }

@@ -94,6 +94,58 @@ extension LeaguepediaService {
         return all
     }
 
+    // MARK: - Riot 미보고 결과 보완 (케스파컵 등)
+
+    /// 케스파컵처럼 Riot Esports API가 경기 상태/스코어를 갱신해주지 않는 대회를 위해,
+    /// 현재 진행 중인 대회의 Leaguepedia 실제 결과를 가져온다.
+    /// Worlds/MSI 과거 기록용 30일 캐시와 달리, 진행 중 대회라 15분 TTL로 짧게 캐싱한다.
+    func fetchLiveTournamentResults(for league: League) async -> [Match] {
+        guard let leagueName = leaguepediaName(for: league) else { return [] }
+        let pages = await cachedOrFetchPages(leagueName: leagueName)
+        guard let currentPage = pages.first else { return [] }
+
+        let cacheKey = "lpresults_\(leagueName)_\(currentPage.page)"
+        if let cached: [Match] = AppDiskCache.get(key: cacheKey, maxAge: 15 * 60) { return cached }
+
+        let matches = await matchesForOverviewPage(currentPage.page, league: league)
+        if !matches.isEmpty { AppDiskCache.set(key: cacheKey, value: matches) }
+        return matches
+    }
+
+    /// Riot 경기 목록 중 시작 시각이 한참 지났는데도 `unstarted`로 멈춰있는(=Riot이 결과를 안 준) 항목을
+    /// 같은 팀 조합·비슷한 시각의 Leaguepedia 경기로 매칭해 스코어·상태만 교체한다.
+    /// 팀 로고 등 나머지 메타데이터는 Riot 원본을 유지해 화면 표시 일관성을 지킨다.
+    func reconcileResults(riotMatches: [Match], leaguepediaMatches: [Match]) -> [Match] {
+        guard !leaguepediaMatches.isEmpty else { return riotMatches }
+        let cutoff = Date().addingTimeInterval(-3 * 3600)
+
+        return riotMatches.map { riot in
+            guard riot.state == .unstarted, riot.startTime < cutoff else { return riot }
+            guard let lp = leaguepediaMatches.first(where: { lp in
+                lp.state == .completed &&
+                sameTeams(riot, lp) &&
+                abs(lp.startTime.timeIntervalSince(riot.startTime)) < 6 * 3600
+            }) else { return riot }
+
+            let sameOrder = normalizedName(riot.teamA) == normalizedName(lp.teamA)
+            let scoreA = sameOrder ? lp.scoreA : lp.scoreB
+            let scoreB = sameOrder ? lp.scoreB : lp.scoreA
+
+            return Match(id: riot.id, league: riot.league, teamA: riot.teamA, teamB: riot.teamB,
+                         scoreA: scoreA, scoreB: scoreB, startTime: riot.startTime,
+                         state: .completed, blockName: riot.blockName)
+        }
+    }
+
+    private func sameTeams(_ a: Match, _ b: Match) -> Bool {
+        Set([normalizedName(a.teamA), normalizedName(a.teamB)]) ==
+        Set([normalizedName(b.teamA), normalizedName(b.teamB)])
+    }
+
+    private func normalizedName(_ team: Team) -> String {
+        team.name.uppercased().trimmingCharacters(in: .whitespaces)
+    }
+
     // MARK: - 내부 헬퍼
 
     /// 대회 페이지 목록을 캐시에서 읽거나 API로 가져오는 공통 경로.
@@ -116,11 +168,12 @@ extension LeaguepediaService {
     private func allOverviewPagesForLeague(leagueName: String) async -> [LPTournamentEntry] {
         var c = URLComponents(string: baseURL)!
 
-        if leagueName == "Worlds" || leagueName == "MSI" {
-            // 국제 대회: OverviewPage 이름 패턴 매칭이 Leagues 조인보다 안정적
-            let pattern = leagueName == "Worlds"
-                ? "%Season World Championship%"
-                : "%Mid-Season Invitational%"
+        if leagueName == "Worlds" || leagueName == "MSI" || leagueName == "KeSPA Cup" {
+            // 국제 대회 / 컵 대회: OverviewPage 이름 패턴 매칭이 Leagues 조인보다 안정적
+            // (Leagues 테이블에 League_Short로 정식 등록 안 되어 있는 경우가 많음)
+            let pattern = leagueName == "Worlds" ? "%Season World Championship%"
+                : leagueName == "MSI"            ? "%Mid-Season Invitational%"
+                : "%KeSPA Cup%"
             c.queryItems = [
                 .init(name: "action",   value: "cargoquery"),
                 .init(name: "tables",   value: "Tournaments"),

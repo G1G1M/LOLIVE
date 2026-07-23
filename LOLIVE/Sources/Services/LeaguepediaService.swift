@@ -139,6 +139,8 @@ struct LeaguepediaService: Sendable {
         case lower == "lco" || slug == "lco":                         return "LCO"
         case lower == "lla" || slug == "lla":                         return "LLA"
         case lower == "lcp" || slug == "lcp":                         return "LCP"
+        case lower == "kespa cup" || slug == "kespa_cup" ||
+             lower.contains("kespa"):                                  return "KeSPA Cup"
         default:                                                        return nil
         }
     }
