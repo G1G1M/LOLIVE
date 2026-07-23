@@ -147,7 +147,7 @@ final class StandingsViewModel {
         return applyGD(fetched, schedule: schedule)
     }
 
-    private func applyGD(_ standings: [Standing], schedule: [Match]) -> [Standing] {
+    func applyGD(_ standings: [Standing], schedule: [Match]) -> [Standing] {
         let completed = schedule.filter { $0.state == .completed }
         var gameWinsMap: [String: Int] = [:]
         var gameLossesMap: [String: Int] = [:]
@@ -185,7 +185,7 @@ final class StandingsViewModel {
 
     /// 완료된 경기로부터 팀별 승패를 직접 집계하고, 그룹별로 승수 → 세트 득실 → 팀명 순 정렬해
     /// 순번을 다시 매긴다 (Riot이 동률로 묶어 내려준 rank를 실제 성적 기준 순위로 대체).
-    private func recomputeRecordsAndRanks(_ standings: [Standing], completed: [Match]) -> [Standing] {
+    func recomputeRecordsAndRanks(_ standings: [Standing], completed: [Match]) -> [Standing] {
         var wins: [String: Int] = [:]
         var losses: [String: Int] = [:]
         for match in completed {

@@ -243,7 +243,7 @@ final class TodayViewModel {
     /// 라이브 목록에서 방금 사라진 경기를 완료 상태로 로컬 승격.
     /// 다음 loadTodayMatches() 전체 리로드(스케줄 캐시 15분) 전까지도
     /// todayMatches/upcomingMatches에 남은 stale 항목을 제거하고 completedMatches로 옮긴다.
-    private func markCompleted(_ match: Match) {
+    func markCompleted(_ match: Match) {
         todayMatches.removeAll { $0.id == match.id }
         upcomingMatches.removeAll { $0.id == match.id }
         guard !completedMatches.contains(where: { $0.id == match.id }) else { return }
@@ -276,7 +276,7 @@ final class TodayViewModel {
         }
     }
 
-    private func classify(matches: [Match]) {
+    func classify(matches: [Match]) {
         let todayStart = calendar.startOfDay(for: Date())
         guard let todayEnd    = calendar.date(byAdding: .day, value:  1, to: todayStart),
               let fiveDaysAgo = calendar.date(byAdding: .day, value: -5, to: todayStart)

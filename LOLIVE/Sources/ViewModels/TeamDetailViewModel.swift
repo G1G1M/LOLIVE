@@ -87,7 +87,7 @@ final class TeamDetailViewModel {
 
     /// 현재 리그 전체 스케줄 + 교차 리그(국제 대회 등) 경기를 합쳐
     /// "최근 경기"는 대회 상관없이 전부, "상대 전적"은 현재 리그/대회 내 경기만으로 구성한다.
-    private func applyMatches(_ leagueMatches: [Match]) {
+    func applyMatches(_ leagueMatches: [Match]) {
         func isThisTeam(_ m: Match) -> Bool {
             m.teamA.id == team.id || m.teamA.code == team.code ||
             m.teamB.id == team.id || m.teamB.code == team.code
