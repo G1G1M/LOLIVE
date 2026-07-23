@@ -306,6 +306,22 @@ Leaguepedia rate limit(API 호출 간 2.5초 대기) 이슈를 배치 로딩으�
                   └─ inProgress 게임 → LiveStats API (캐시 없음)
 ```
 
+## 테스트
+
+`LOLIVETests` 타겟, Swift Testing 프레임워크(`import Testing`) 사용. 총 44개 케이스.
+
+| 대상 | 파일 | 내용 |
+|------|------|------|
+| `LeaguepediaService` 순수 함수 | `LOLIVETests.swift` | `escapeSql`/`parseBans`/`computeStats`/`findStats`/`findPicks`/`deduplicated` — 6개 스위트, 27개 케이스 |
+| `TodayViewModel` | `ViewModelTests.swift` | `classify`(오늘/예정/완료 분류, 5일 컷오프, 정렬), `markCompleted`(라이브 종료 시 완료 승격) |
+| `StandingsViewModel` | `ViewModelTests.swift` | `applyGD`(정상 리그는 Riot 원본 유지, 케스파컵처럼 전원 0-0이면 완료 경기로 재계산, 그룹별 독립 순위) |
+| `TeamDetailViewModel` | `ViewModelTests.swift` | `applyMatches`(리그 내 상대전적 vs 대회 무관 최근경기, 교차 리그 병합, 중복 제거) |
+
+- 네트워크가 필요한 함수는 `private` → `internal`로 가시성만 넓혀서 직접 호출 (동작 변화 없음, `RiotEsportsServiceProtocol`/`LiveStatsServiceProtocol` 같은 프로토콜 DI가 있는 경우 Mock 없이도 이 방식이 더 가벼움)
+- 날짜 경계를 테스트할 땐 `Date()` 상대 오프셋 대신 "오늘 자정(KST)" 고정 기준점을 써야 함 — 안 그러면 자정 근처 실행 시 flaky해짐 (실제로 한 번 겪음)
+- 커맨드라인 실행: `xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests`
+  (`LOLIVE.xcscheme`의 `TestAction`에 `LOLIVETests`가 `Testables`로 연결되어 있어야 함)
+
 ## 앱 구조
 
 ```
