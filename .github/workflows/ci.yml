@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare API keys
+        # 저장소에는 커밋되지 않는 로컬 설정 파일 (APIKeys.swift.template은 플레이스홀더만 있음).
+        # 여기 들어가는 키는 CLAUDE.md에도 평문으로 적혀 있는 공개된 비공식 Riot Esports API 키라
+        # GitHub Secrets 처리가 필요 없다 (진짜 민감한 키를 추가할 땐 secrets로 전환할 것).
+        run: |
+          cat > LOLIVE/APIKeys.swift <<'EOF'
+          enum APIKeys {
+              static let riotApiKey = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
+          }
+          EOF
+          cp LOLIVE/APIKeys.swift LOLIVEWidgets/APIKeys.swift
+
+      - name: Pick an available iOS Simulator
+        # 러너에 설치된 Xcode/시뮬레이터 버전이 바뀌어도 안 깨지도록
+        # 기종을 하드코딩하지 않고 그때그때 사용 가능한 iPhone 시뮬레이터를 찾는다.
+        run: |
+          NAME=$(xcodebuild -showdestinations -scheme LOLIVE -project LOLIVE.xcodeproj 2>/dev/null \
+            | grep 'platform:iOS Simulator' \
+            | grep -o 'name:[^,}]*' \
+            | sed 's/name://' \
+            | sort -u \
+            | grep -m1 '^iPhone')
+          echo "선택된 시뮬레이터: $NAME"
+          echo "SIMULATOR_NAME=$NAME" >> "$GITHUB_ENV"
+
+      - name: Run LOLIVETests (44 cases)
+        run: |
+          xcodebuild test \
+            -scheme LOLIVE \
+            -destination "platform=iOS Simulator,name=$SIMULATOR_NAME" \
+            -only-testing:LOLIVETests
+
+      - name: Build widget extension
+        # 위젯 타겟은 별도 스킴이라 위 테스트 빌드에 포함되지 않는다.
+        # 테스트는 없지만 컴파일이 깨지는지는 여기서 잡는다.
+        run: |
+          xcodebuild build \
+            -scheme LOLIVEWidgetsExtension \
+            -destination "generic/platform=iOS Simulator"
