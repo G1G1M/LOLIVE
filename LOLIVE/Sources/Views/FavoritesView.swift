@@ -16,31 +16,12 @@ struct FavoritesView: View {
 
     private var hasFavorites: Bool { !favoriteTeams.isEmpty || !favoritePlayers.isEmpty }
 
+    // iOS가 하단 탭 6개 중 5·6번째(Favorites/Search)를 자동으로 "더보기"로 묶는데,
+    // "더보기" 목록 자체가 이미 UINavigationController를 제공하므로 여기서 NavigationStack을
+    // 또 씌우면 백버튼이 2개(더보기 것 + 이 화면 것) 겹쳐 보인다. 그래서 NavigationStack 없이
+    // "더보기"가 제공하는 네비게이션 컨텍스트에 NavigationLink를 바로 얹는다.
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                HStack {
-                    Text("즐겨찾기")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color(.label))
-                    Spacer()
-                    if hasFavorites {
-                        Button {
-                            showingTeamSearch = true
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 17, weight: .medium))
-                                .foregroundStyle(Color.accentColor)
-                                .frame(width: 36, height: 36)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 6)
-                .background(Color(.systemGroupedBackground))
-
-                List {
+        List {
                 // ── 즐겨찾기 없을 때 ─────────────────────────────────
                 if !hasFavorites {
                     Section {
@@ -105,14 +86,24 @@ struct FavoritesView: View {
                         }
                     }
                 }
+        }
+        .listStyle(.insetGrouped)
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .navigationTitle("즐겨찾기")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if hasFavorites {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingTeamSearch = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
             }
-                .listStyle(.insetGrouped)
-            } // VStack end
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingTeamSearch) {
-                TeamSearchView()
-            }
+        }
+        .sheet(isPresented: $showingTeamSearch) {
+            TeamSearchView()
         }
     }
 

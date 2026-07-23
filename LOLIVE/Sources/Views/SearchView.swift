@@ -20,20 +20,10 @@ struct SearchView: View {
         viewModel.results(for: searchText)
     }
 
+    // FavoritesView와 동일한 이유로 NavigationStack을 두지 않는다 —
+    // "더보기" 목록이 이미 UINavigationController를 제공하므로 여기서 또 씌우면 백버튼이 2개가 된다.
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                HStack {
-                    Text("검색")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color(.label))
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 6)
-                .background(Color(.systemGroupedBackground))
-
+        VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
@@ -70,10 +60,10 @@ struct SearchView: View {
                         resultList
                     }
                 }
-            }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
         }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .navigationTitle("검색")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.load() }
         .task(id: focusTrigger) {
             guard focusTrigger > 0 else { return }
