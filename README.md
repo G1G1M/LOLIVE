@@ -1,5 +1,7 @@
 # LOLIVE
 
+[![CI](https://github.com/G1G1M/LOLIVE/actions/workflows/ci.yml/badge.svg)](https://github.com/G1G1M/LOLIVE/actions/workflows/ci.yml)
+
 리그 오브 레전드 e스포츠 경기 정보 iOS 앱
 
 ---
@@ -321,6 +323,19 @@ Leaguepedia rate limit(API 호출 간 2.5초 대기) 이슈를 배치 로딩으�
 - 날짜 경계를 테스트할 땐 `Date()` 상대 오프셋 대신 "오늘 자정(KST)" 고정 기준점을 써야 함 — 안 그러면 자정 근처 실행 시 flaky해짐 (실제로 한 번 겪음)
 - 커맨드라인 실행: `xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests`
   (`LOLIVE.xcscheme`의 `TestAction`에 `LOLIVETests`가 `Testables`로 연결되어 있어야 함)
+
+## CI/CD
+
+`.github/workflows/ci.yml` — GitHub Actions, `main` push / PR마다 자동 실행.
+
+1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 44개 테스트 실행
+2. `LOLIVEWidgetsExtension` 별도 빌드 (별도 스킴이라 위 테스트에 안 딸려옴 — 컴파일 깨짐만 감지, 테스트는 없음)
+
+- API 키는 워크플로 안에서 직접 파일을 생성 — `APIKeys.swift.template`은 플레이스홀더(`YOUR_API_KEY_HERE`)만 있어서 그대로는 못 씀.
+  여기 들어가는 키는 CLAUDE.md에도 평문으로 적힌 공개된 비공식 Riot Esports API 키라 GitHub Secrets 없이 처리함
+  (진짜 민감한 키를 추가할 땐 반드시 Secrets로 전환할 것)
+- 시뮬레이터 기종은 하드코딩하지 않고 러너에 설치된 iPhone 시뮬레이터를 실행 시점에 동적으로 선택 (Xcode/시뮬레이터 버전이 바뀌어도 안 깨지게)
+- CD(자동 배포)는 아직 없음 — 앱스토어 출시 이후 TestFlight 업로드 자동화 추가 고려
 
 ## 앱 구조
 
