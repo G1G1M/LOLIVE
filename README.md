@@ -14,7 +14,7 @@
 |------|------|
 | 플랫폼 | iOS 17+ |
 | 언어 | Swift 6.0 |
-| UI | SwiftUI (다크모드 고정) |
+| UI | SwiftUI (다크모드 고정 — `.preferredColorScheme(.dark)` + `Info.plist UIUserInterfaceStyle=Dark`로 시스템 UI까지 이중 고정) |
 | 아키텍처 | MVVM + `@Observable` |
 | 네트워크 | URLSession + async/await |
 | 로컬 저장 | SwiftData |
@@ -54,7 +54,9 @@
 - 타이틀 · 날짜 스트립 · 필터 고정, 경기 목록만 스크롤
 - 라이브 경기가 종료되는 순간 화면에서 사라지지 않도록 로컬에서 즉시 완료 상태로 승격 (다음 전체 리로드 전까지도 유지)
 - `getSchedule` 과거 페이지(`pages.older`)까지 조회 — "오늘 기준" 첫 페이지만으로 누락되던 며칠 전 완료 경기 보강
-- ⚠️ 알려진 한계: 케스파컵 등 일부 대회는 Riot Esports API가 `state`/스코어를 아예 갱신해주지 않아(경기 후에도 `unstarted`) 앱에서 결과 표시 불가 — Leaguepedia 보완 로직 미구현
+- **Riot 결과 미보고 대회 보완**: 케스파컵 등 일부 대회는 Riot Esports API가 경기 후에도 `state`/스코어를 `unstarted`·0-0으로 방치함
+  → 시작 시각이 3시간 이상 지난 `unstarted` 경기가 감지되면 Leaguepedia에서 같은 팀 조합·비슷한 시각의 실제 결과를 찾아 스코어·상태만 교체
+  → 정상적으로 결과가 갱신되는 리그(대부분)는 감지되는 게 없어 추가 API 호출 없이 그대로 반환
 
 ### Standings
 - 전 세계 리그 순위표 (W-L / GD / Win% 컬럼)
@@ -67,6 +69,9 @@
 - 팀 탭 → 팀 상세 페이지 이동
 - 리그 상세의 순위 탭과 동일한 UI/데이터 구조 공유
 - 탭바 3번째 탭으로 직접 진입 가능 (리그 상세 내 순위 탭과는 별개 진입점, 데이터/스타일은 공유)
+- **Riot 순위 미보고 대회 보완**: Riot Standings API가 전 팀을 0승 0패로 묶어 내려주는 대회(케스파컵 등) 감지 시
+  (위 Today의 Leaguepedia 보완으로 채워진) 완료 경기 결과를 직접 집계해 그룹별 승수 → 세트 득실 → 팀명 순으로 순위 재계산
+  → 정상적으로 개별 승패가 내려오는 리그는 Riot 원본 순위·타이브레이크 그대로 사용
 
 ### Players
 - 전 세계 선수 통합 목록
@@ -77,10 +82,13 @@
 - 선수명 대소문자 불일치 보정: Riot summonerName ↔ Leaguepedia Link 케이싱 차이를 대소문자 무시 폴백으로 자동 매칭
 
 ### 검색
-- 탭바 Search 탭으로 즉시 접근 (5번째 탭 → fullScreenCover 전환)
+- 탭바 Search 탭으로 접근 (6번째 탭 → iOS "더보기" 탭 안에 자동 편입)
 - 리그 / 팀 / 선수 통합 검색
 - 검색 결과에서 팀·선수 상세 페이지 바로 이동
 - 즐겨찾기 인라인 토글
+- **"더보기" 탭 네비게이션**: iOS가 하단 탭 5개 초과 시 나머지를 자동으로 "더보기" 목록에 넣는데,
+  그 목록이 이미 자체 네비게이션 컨테이너를 제공하므로 이 화면엔 별도 `NavigationStack`을 두지 않음
+  (겹치면 백버튼이 2개 표시됨). 타이틀도 커스텀 헤더 대신 `.navigationTitle`로 표준 위치(백버튼과 같은 줄)에 표시
 
 ### 팀 상세
 - **탭 기반 레이아웃**: 상단 고정 헤더(팀 로고 + 이름 + 순위) + 탭 바(선수단 / 상대 전적 / 최근경기)
@@ -118,6 +126,8 @@
   - 매칭 실패 시 알림으로 안내 (크래시 없이 원래 화면 유지)
 
 ### Favorites
+- 탭바 6번째 탭 → iOS "더보기" 탭 안에 자동 편입 (Search와 동일한 이유로 `NavigationStack` 미사용,
+  타이틀·"+" 버튼은 `.navigationTitle` + 툴바로 백버튼과 같은 줄에 표시)
 - SwiftData 기반 팀 / 선수 즐겨찾기
 - 팀 동일성 teamCode 기준 — MSI·LCK 컨텍스트 상관없이 동일 팀 중복 저장 방지, 소속 리그는 홈 리그로 자동 저장
 - 즐겨찾기한 팀의 LIVE 경기 실시간 뱃지 + 스코어
@@ -339,7 +349,8 @@ LOLIVE/
 │       ├── MatchDetailView, PlayerDetailView
 │       ├── StateViews (ErrorRetryView / EmptyStateView 공통 상태 컴포넌트, EmptyStateView는 선택적 액션 버튼 지원)
 │       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, LoadingView, PlayerAvatarView, ...
-├── ContentView.swift        — TabView 진입점 (Today/Leagues/Standings/Players/Favorites/Search 6탭)
+├── ContentView.swift        — TabView 진입점 (Today/Leagues/Standings/Players/Favorites/Search 6탭,
+│                              5개 초과라 Favorites·Search는 iOS가 자동으로 "더보기" 탭에 편입)
 ├── LOLIVEApp.swift          — 앱 진입점
 └── LOLIVEWidgets/           — Widget Extension
     ├── FavoriteTeamWidget.swift
@@ -352,7 +363,8 @@ LOLIVE/
 ## Xcode 설정 (수동)
 
 - **App Groups**: LOLIVE + LOLIVEWidgets 타겟 모두에 `group.lolive` 추가
-- **URL Scheme**: LOLIVE 타겟 Info → URL Types에 `lolive` 추가
+- **URL Scheme**: LOLIVE 타겟 `Info.plist`의 `CFBundleURLTypes`에 `lolive` 스킴 등록 (레포에 커밋됨)
+- **다크모드 고정**: `Info.plist`의 `UIUserInterfaceStyle = Dark` (레포에 커밋됨, 앱 코드의 `.preferredColorScheme(.dark)`와 이중 적용)
 - **NSSupportsLiveActivities**: LOLIVE 타겟 Info에 `YES` 설정
 - **NSSupportsLiveActivitiesFrequentUpdates**: LOLIVE 타겟 Info에 `YES` 설정
 - **API Key**: `APIKeys.swift` (gitignore됨) — `RiotAPIKey` 상수 정의 필요
