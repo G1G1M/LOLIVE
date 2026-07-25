@@ -84,7 +84,6 @@ struct TeamSearchView: View {
                 toggleFavorite(result, isFav: isFav)
             } label: {
                 Image(systemName: isFav ? "star.fill" : "star")
-                    .font(.title3)
                     .foregroundStyle(isFav ? Color.yellow : Color.secondary)
             }
             .buttonStyle(.plain)

@@ -180,11 +180,11 @@ struct PlayersView: View {
                 Text(entry.player.teamCode)
                     .font(.caption).foregroundStyle(.secondary)
 
-                Text(roleLabel(entry.player.role))
+                Text(RoleStyle.label(entry.player.role))
                     .font(.caption2).fontWeight(.bold)
                     .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(roleColor(entry.player.role).opacity(0.2))
-                    .foregroundStyle(roleColor(entry.player.role))
+                    .background(RoleStyle.color(entry.player.role).opacity(0.2))
+                    .foregroundStyle(RoleStyle.color(entry.player.role))
                     .clipShape(Capsule())
             }
         }
@@ -200,30 +200,6 @@ struct PlayersView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
-    }
-
-    // MARK: - Helpers
-
-    private func roleLabel(_ role: String) -> String {
-        switch role.lowercased() {
-        case "top":              return "TOP"
-        case "jungle":           return "JGL"
-        case "mid":              return "MID"
-        case "bottom", "bot":    return "BOT"
-        case "support":          return "SUP"
-        default:                 return role.uppercased()
-        }
-    }
-
-    private func roleColor(_ role: String) -> Color {
-        switch role.lowercased() {
-        case "top":              return .orange
-        case "jungle":           return .green
-        case "mid":              return .blue
-        case "bottom", "bot":    return .red
-        case "support":          return .purple
-        default:                 return .secondary
-        }
     }
 }
 

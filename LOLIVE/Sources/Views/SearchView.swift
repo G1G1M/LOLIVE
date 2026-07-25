@@ -212,17 +212,8 @@ struct SearchView: View {
     // MARK: - Helpers
 
     private func roleTag(_ role: String) -> some View {
-        let label: String
-        let color: Color
-        switch role.lowercased() {
-        case "top":             label = "TOP"; color = .orange
-        case "jungle":          label = "JGL"; color = .green
-        case "mid":             label = "MID"; color = .blue
-        case "bottom", "bot":   label = "BOT"; color = .red
-        case "support":         label = "SUP"; color = .purple
-        default:                label = role.uppercased(); color = .secondary
-        }
-        return Text(label)
+        let color = RoleStyle.color(role)
+        return Text(RoleStyle.label(role))
             .font(.caption2).fontWeight(.bold)
             .padding(.horizontal, 6).padding(.vertical, 3)
             .background(color.opacity(0.2))

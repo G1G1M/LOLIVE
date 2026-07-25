@@ -94,19 +94,18 @@ struct MatchCardView: View {
             HStack(spacing: 4) {
                 Circle()
                     .fill(Color.red)
-                    .frame(width: 5, height: 5)
-                    .scaleEffect(isPulsing ? 1.3 : 1.0)
+                    .frame(width: 6, height: 6)
+                    .scaleEffect(isPulsing ? 1.4 : 1.0)
                     .animation(
-                        .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
+                        .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
                         value: isPulsing
                     )
                     .onAppear { isPulsing = true }
                 Text("LIVE")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.red)
+                    .font(.caption).fontWeight(.bold).foregroundStyle(.red)
             }
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Color.red.opacity(0.12))
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(Color.red.opacity(0.15))
             .clipShape(Capsule())
         } else if match.state == .completed {
             Text("종료")
