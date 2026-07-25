@@ -67,21 +67,22 @@ struct LeagueDetailView: View {
                 Button {
                     viewModel.selectedTab = tab
                 } label: {
-                    VStack(spacing: 6) {
+                    VStack(spacing: 0) {
                         Text(tab.title)
                             .font(.subheadline)
                             .fontWeight(viewModel.selectedTab == tab ? .semibold : .regular)
-                            .foregroundStyle(viewModel.selectedTab == tab ? .primary : .secondary)
+                            .foregroundStyle(viewModel.selectedTab == tab ? Color.primary : Color.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
                         Rectangle()
                             .fill(viewModel.selectedTab == tab ? Color.accentColor : Color.clear)
                             .frame(height: 2)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
                 }
+                .buttonStyle(.plain)
             }
         }
-        .background(Color(.secondarySystemGroupedBackground))
+        .background(Color(.systemBackground))
     }
 
     // MARK: - Tab Content
