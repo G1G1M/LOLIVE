@@ -75,6 +75,11 @@
   (위 Today의 Leaguepedia 보완으로 채워진) 완료 경기 결과를 직접 집계해 그룹별 승수 → 세트 득실 → 팀명 순으로 순위 재계산
   → 정상적으로 개별 승패가 내려오는 리그는 Riot 원본 순위·타이브레이크 그대로 사용
 
+### 리그 상세
+- **탭 기반 레이아웃**: 탭 바(순위 / 일정 / 팀 / 선수) — 각 탭은 `LeagueDetailView+Standings`/`+Schedule`/`+Teams` extension으로 분리
+- 탭바 선택 밑줄·배경색을 `TeamDetailView`/`LeaguePlayerDetailView`와 동일한 구조로 통일
+  (기존엔 구조가 달라 밑줄이 텍스트와 어긋나 보이고 배경색도 미묘하게 달랐음)
+
 ### Players
 - 전 세계 선수 통합 목록
 - 포지션 / 리그 필터 및 이름 검색
