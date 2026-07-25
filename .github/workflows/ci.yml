@@ -29,14 +29,15 @@ jobs:
 
       - name: Pick an available iOS Simulator
         # 러너에 설치된 Xcode/시뮬레이터 버전이 바뀌어도 안 깨지도록
-        # 기종을 하드코딩하지 않고 그때그때 사용 가능한 iPhone 시뮬레이터를 찾는다.
+        # 기종을 하드코딩하지 않고 그때그때 설치된 iPhone 시뮬레이터를 simctl로 직접 조회한다.
+        # (xcodebuild -showdestinations 기반은 러너 환경에서 매칭 실패 이력이 있어 더 안정적인 방식으로 교체)
         run: |
-          NAME=$(xcodebuild -showdestinations -scheme LOLIVE -project LOLIVE.xcodeproj 2>/dev/null \
-            | grep 'platform:iOS Simulator' \
-            | grep -o 'name:[^,}]*' \
-            | sed 's/name://' \
-            | sort -u \
-            | grep -m1 '^iPhone')
+          NAME=$(xcrun simctl list devices available 2>/dev/null | grep -o 'iPhone[^(]*' | head -1 | sed 's/[[:space:]]*$//')
+          if [ -z "$NAME" ]; then
+            echo "iPhone 시뮬레이터를 찾지 못했습니다. 사용 가능한 기기 목록:"
+            xcrun simctl list devices available
+            exit 1
+          fi
           echo "선택된 시뮬레이터: $NAME"
           echo "SIMULATOR_NAME=$NAME" >> "$GITHUB_ENV"
 
