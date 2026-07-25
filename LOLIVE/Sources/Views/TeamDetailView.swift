@@ -195,26 +195,32 @@ struct TeamDetailView: View {
         }
     }
 
-    // 국제 대회 컨텍스트(MSI/Worlds)에서 즐겨찾기 시 홈 리그로 저장
+    // 국제 대회(MSI/Worlds)·국내 컵 대회(케스파컵 등) 컨텍스트에서 즐겨찾기 시 홈 리그로 저장.
+    // 이런 대회는 팀의 정규 소속 리그가 아니라 별도로 열리는 대회라, 팀 상세 진입 시에도
+    // 항상 홈 리그(LCK 등) 기준 선수단·최근경기·즐겨찾기 소속 리그를 사용해야 한다.
     private var resolvedHomeLeague: League {
-        let name = league.name.lowercased()
-        let region = league.region.lowercased()
-        let isIntl = name.contains("msi") || name.contains("worlds") || name.contains("월드") ||
-                     region.contains("international") || region.contains("국제")
-        guard isIntl else { return league }
+        guard Self.isSpecialTournament(league) else { return league }
         let allMatches = todayViewModel.completedMatches + todayViewModel.todayMatches + todayViewModel.upcomingMatches
         for match in allMatches {
-            let ml = match.league.name.lowercased()
-            let mr = match.league.region.lowercased()
-            let isMatchIntl = ml.contains("msi") || ml.contains("worlds") || ml.contains("월드") ||
-                              mr.contains("international") || mr.contains("국제")
-            guard !isMatchIntl else { continue }
+            guard !Self.isSpecialTournament(match.league) else { continue }
             if match.teamA.code.uppercased() == team.code.uppercased() ||
                match.teamB.code.uppercased() == team.code.uppercased() {
                 return match.league
             }
         }
         return league
+    }
+
+    /// 팀의 정규 소속 리그가 아니라 별도로 열리는 대회인지 판별.
+    /// MSI/Worlds 같은 국제 대회뿐 아니라 케스파컵처럼 지역이 "한국"으로 찍히는
+    /// 국내 컵 대회도 포함 — region만으로는 못 걸러서 이름/슬러그도 함께 확인한다.
+    private static func isSpecialTournament(_ league: League) -> Bool {
+        let name = league.name.lowercased()
+        let slug = league.slug.lowercased()
+        let region = league.region.lowercased()
+        return name.contains("msi") || name.contains("worlds") || name.contains("월드") ||
+               region.contains("international") || region.contains("국제") ||
+               name.contains("kespa") || slug.contains("kespa")
     }
 
     // MARK: - Roster Card

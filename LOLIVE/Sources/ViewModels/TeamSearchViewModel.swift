@@ -62,8 +62,12 @@ final class TeamSearchViewModel {
     }
 
 
+    // MSI/Worlds 같은 국제 대회뿐 아니라 케스파컵처럼 지역이 "한국"으로 찍히는
+    // 국내 컵 대회도 팀의 정규 소속 리그가 아니므로 포함 — 안 그러면 검색 인덱싱 시
+    // 도메인 리그(LCK 등)와 우선순위 다툼에서 이겨서 팀의 소속 리그가 잘못 표시될 수 있다.
     private func isInternational(_ league: League) -> Bool {
         let name   = league.name.lowercased()
+        let slug   = league.slug.lowercased()
         let region = league.region.lowercased()
         return name.contains("msi") ||
                name.contains("worlds") ||
@@ -71,6 +75,8 @@ final class TeamSearchViewModel {
                name.contains("world championship") ||
                name.contains("all-star") ||
                region.contains("international") ||
-               region.contains("국제")
+               region.contains("국제") ||
+               name.contains("kespa") ||
+               slug.contains("kespa")
     }
 }
