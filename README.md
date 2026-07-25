@@ -88,6 +88,9 @@
 - 리그 / 팀 / 선수 통합 검색
 - 검색 결과에서 팀·선수 상세 페이지 바로 이동
 - 즐겨찾기 인라인 토글
+- 팀 검색 인덱싱 시 케스파컵처럼 지역이 "한국"으로 찍히는 국내 컵 대회는 팀의 정규 소속 리그(LCK 등)보다
+  후순위로 정렬 — 안 그러면 네트워크 응답 순서에 따라 팀이 컵 대회 소속으로 잘못 표시될 수 있음.
+  `search_teams`/`search_players`는 12시간 디스크 캐시라 수정 후에도 캐시 만료 전까지는 기존 값이 남아있을 수 있음
 - **"더보기" 탭 네비게이션**: iOS가 하단 탭 5개 초과 시 나머지를 자동으로 "더보기" 목록에 넣는데,
   그 목록이 이미 자체 네비게이션 컨테이너를 제공하므로 이 화면엔 별도 `NavigationStack`을 두지 않음
   (겹치면 백버튼이 2개 표시됨). 타이틀도 커스텀 헤더 대신 `.navigationTitle`로 표준 위치(백버튼과 같은 줄)에 표시
@@ -100,6 +103,8 @@
   - 대회 상관없이 통합 표시 (현재 리그 전체 시즌 스케줄 + 다른 대회 경기까지 병합)
 - 데이터 소스: `fetchSchedule`(오늘 기준 제한 윈도우) 대신 `fetchAllSchedule`(과거 페이지 전체 순회)로 전체 시즌 확보
   + 진입한 화면(TodayViewModel 등)이 이미 들고 있는 교차 리그 경기를 주입 — 어느 화면에서 들어와도 동일하게 채워짐
+- **홈 리그 자동 보정**: MSI/Worlds 같은 국제 대회뿐 아니라 케스파컵처럼 지역이 "한국"으로 찍히는 국내 컵 대회에서
+  진입해도, 팀의 정규 소속 리그(LCK 등) 기준으로 선수단·상대전적·즐겨찾기 소속 리그를 표시 (`resolvedHomeLeague`)
 
 ### 선수 상세
 - **탭 기반 레이아웃**: 상단 고정 헤더(사진 + 소환사명 + 역할) + 탭 바(통계 / 챔피언풀 / 최근경기)
@@ -377,7 +382,7 @@ LOLIVE/
 │       ├── LeaguesView, TournamentDetailView
 │       ├── LeagueDetailView (+Standings / +Schedule / +Teams 탭별 extension 분리)
 │       ├── TeamDetailView, LeaguePlayerDetailView, ChampionDetailSheet, SeasonStatsView
-│       ├── MatchDetailView, PlayerDetailView
+│       ├── MatchDetailView (+Draft / +Stats / +Timeline 기능별 extension 분리), PlayerDetailView
 │       ├── StateViews (ErrorRetryView / EmptyStateView 공통 상태 컴포넌트, EmptyStateView는 선택적 액션 버튼 지원)
 │       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, LoadingView, PlayerAvatarView, ...
 ├── ContentView.swift        — TabView 진입점 (Today/Leagues/Standings/Players/Favorites/Search 6탭,
