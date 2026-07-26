@@ -12,6 +12,10 @@ struct MatchCardView: View {
 
     @State private var isPulsing = false
 
+    /// getLive 목록에 없어도(일부 대회는 실시간 API 응답 자체가 비어있음) 스케줄 상
+    /// 상태가 inProgress면 LIVE로 간주 — 두 신호 중 하나만 맞아도 라이브로 표시한다.
+    private var isEffectivelyLive: Bool { isLive || match.state == .inProgress }
+
     var body: some View {
         HStack(spacing: 0) {
             teamSide(team: match.teamA, score: match.scoreA, opponentScore: match.scoreB, trailing: true)
@@ -58,7 +62,7 @@ struct MatchCardView: View {
 
     private var centerBlock: some View {
         VStack(spacing: showDate ? 3 : 8) {
-            if showDate && !isLive {
+            if showDate && !isEffectivelyLive {
                 dateTimeBlock
             } else {
                 statusBadge
@@ -90,7 +94,7 @@ struct MatchCardView: View {
 
     @ViewBuilder
     private var statusBadge: some View {
-        if isLive {
+        if isEffectivelyLive {
             HStack(spacing: 4) {
                 Circle()
                     .fill(Color.red)

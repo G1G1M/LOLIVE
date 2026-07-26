@@ -129,7 +129,7 @@ struct FavoritesView: View {
                     .padding(.trailing, 4)
             }
 
-            if let live = liveInfo(for: fav) {
+            if let live = liveInfo(teamCode: fav.teamCode) {
                 VStack(alignment: .trailing, spacing: 3) {
                     HStack(spacing: 4) {
                         Circle().fill(Color.red).frame(width: 6, height: 6)
@@ -151,17 +151,30 @@ struct FavoritesView: View {
         let game: Int
     }
 
-    private func liveInfo(for fav: FavoriteTeam) -> LiveInfo? {
-        guard let liveMatch = todayViewModel.liveMatches.first(where: {
-            $0.match.teamA.code.lowercased() == fav.teamCode.lowercased() ||
-            $0.match.teamB.code.lowercased() == fav.teamCode.lowercased()
-        }) else { return nil }
+    /// getLive 목록에서 먼저 찾고, 없으면(일부 대회는 실시간 API 응답이 비어있음)
+    /// 오늘 스케줄 상 상태가 inProgress인 경기로 대체 판정한다.
+    private func liveInfo(teamCode: String) -> LiveInfo? {
+        if let liveMatch = todayViewModel.liveMatches.first(where: {
+            $0.match.teamA.code.lowercased() == teamCode.lowercased() ||
+            $0.match.teamB.code.lowercased() == teamCode.lowercased()
+        }) {
+            return liveInfo(match: liveMatch.match, teamCode: teamCode, game: liveMatch.currentSet)
+        }
+        if let match = todayViewModel.todayMatches.first(where: {
+            $0.state == .inProgress &&
+            ($0.teamA.code.lowercased() == teamCode.lowercased() || $0.teamB.code.lowercased() == teamCode.lowercased())
+        }) {
+            return liveInfo(match: match, teamCode: teamCode, game: 1)
+        }
+        return nil
+    }
 
-        let isTeamA = liveMatch.match.teamA.code.lowercased() == fav.teamCode.lowercased()
-        let myScore  = isTeamA ? liveMatch.match.scoreA : liveMatch.match.scoreB
-        let oppScore = isTeamA ? liveMatch.match.scoreB : liveMatch.match.scoreA
-        let oppCode  = isTeamA ? liveMatch.match.teamB.code : liveMatch.match.teamA.code
-        return LiveInfo(score: "\(myScore) - \(oppScore)  vs \(oppCode)", game: liveMatch.currentSet)
+    private func liveInfo(match: Match, teamCode: String, game: Int) -> LiveInfo {
+        let isTeamA  = match.teamA.code.lowercased() == teamCode.lowercased()
+        let myScore  = isTeamA ? match.scoreA : match.scoreB
+        let oppScore = isTeamA ? match.scoreB : match.scoreA
+        let oppCode  = isTeamA ? match.teamB.code : match.teamA.code
+        return LiveInfo(score: "\(myScore) - \(oppScore)  vs \(oppCode)", game: game)
     }
 
     // MARK: - Player Row
@@ -185,7 +198,7 @@ struct FavoritesView: View {
 
             Spacer()
 
-            if let live = liveInfo(for: fav) {
+            if let live = liveInfo(teamCode: fav.teamCode) {
                 VStack(alignment: .trailing, spacing: 3) {
                     HStack(spacing: 4) {
                         Circle().fill(Color.red).frame(width: 6, height: 6)
@@ -207,19 +220,6 @@ struct FavoritesView: View {
             }
         }
         .padding(.vertical, 4)
-    }
-
-    private func liveInfo(for fav: FavoritePlayer) -> LiveInfo? {
-        guard let liveMatch = todayViewModel.liveMatches.first(where: {
-            $0.match.teamA.code.lowercased() == fav.teamCode.lowercased() ||
-            $0.match.teamB.code.lowercased() == fav.teamCode.lowercased()
-        }) else { return nil }
-
-        let isTeamA  = liveMatch.match.teamA.code.lowercased() == fav.teamCode.lowercased()
-        let myScore  = isTeamA ? liveMatch.match.scoreA : liveMatch.match.scoreB
-        let oppScore = isTeamA ? liveMatch.match.scoreB : liveMatch.match.scoreA
-        let oppCode  = isTeamA ? liveMatch.match.teamB.code : liveMatch.match.teamA.code
-        return LiveInfo(score: "\(myScore) - \(oppScore)  vs \(oppCode)", game: liveMatch.currentSet)
     }
 
     // MARK: - Helpers
