@@ -66,8 +66,6 @@ struct MatchDetailView: View {
                             }
                         }
                     }
-
-                    infoCard
                 }
                 .padding()
             }
@@ -167,32 +165,43 @@ struct MatchDetailView: View {
                 .background(Color.red.opacity(0.15)).clipShape(Capsule())
 
                 if let t = viewModel.lastPolledAt {
-                    Text("업데이트 \(t, style: .relative) 전")
+                    Text("\(match.league.name) · 업데이트 \(t, style: .relative) 전")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                } else {
+                    Text(match.league.name)
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
                 }
             }
 
         case .completed:
+            let dateText = match.startTime.formatted(
+                .dateTime.month().day().hour().minute().locale(Locale(identifier: "ko_KR"))
+            )
             VStack(spacing: 4) {
                 Text("경기 종료")
                     .font(.caption).fontWeight(.medium).foregroundStyle(.secondary)
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(Color.secondary.opacity(0.15)).clipShape(Capsule())
-                Text(match.startTime.formatted(
-                    .dateTime.year().month().day().locale(Locale(identifier: "ko_KR"))
-                ))
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+                Text("\(match.league.name) · \(dateText)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
             }
 
         case .unstarted:
-            Text(match.startTime.formatted(
-                .dateTime.month().day().hour().minute().locale(Locale(identifier: "ko_KR"))
-            ))
-            .font(.caption).foregroundStyle(.secondary)
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(Color.secondary.opacity(0.1)).clipShape(Capsule())
+            VStack(spacing: 4) {
+                Text(match.startTime.formatted(
+                    .dateTime.month().day().hour().minute().locale(Locale(identifier: "ko_KR"))
+                ))
+                .font(.caption).foregroundStyle(.secondary)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Color.secondary.opacity(0.1)).clipShape(Capsule())
+
+                Text(match.league.name)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 
@@ -217,36 +226,6 @@ struct MatchDetailView: View {
         .padding(.vertical, 32)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
-    // MARK: - Info Card
-
-    private var infoCard: some View {
-        VStack(spacing: 0) {
-            infoRow(label: "시작 시간", value: match.startTime.formatted(
-                .dateTime.month().day().weekday().hour().minute()
-                .locale(Locale(identifier: "ko_KR"))
-            ))
-            Divider().padding(.horizontal, 16)
-            infoRow(label: "리그", value: match.league.name)
-            if let live = liveMatch {
-                Divider().padding(.horizontal, 16)
-                infoRow(label: "마지막 업데이트", value: live.lastUpdated.formatted(
-                    .relative(presentation: .numeric).locale(Locale(identifier: "ko_KR"))
-                ))
-            }
-        }
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func infoRow(label: String, value: String) -> some View {
-        HStack {
-            Text(label).font(.subheadline).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.subheadline).fontWeight(.medium)
-        }
-        .padding(.horizontal, 16).padding(.vertical, 14)
     }
 
     // MARK: - Shared Helpers (+Draft/+Stats/+Timeline에서도 사용)
