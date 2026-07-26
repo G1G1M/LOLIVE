@@ -130,7 +130,7 @@ extension LeaguepediaService {
                 abs(lp.startTime.timeIntervalSince(riot.startTime)) < 6 * 3600
             }) else { return riot }
 
-            let sameOrder = normalizedName(riot.teamA) == normalizedName(lp.teamA)
+            let sameOrder = teamsMatch(riot.teamA, lp.teamA)
             let scoreA = sameOrder ? lp.scoreA : lp.scoreB
             let scoreB = sameOrder ? lp.scoreB : lp.scoreA
 
@@ -141,8 +141,23 @@ extension LeaguepediaService {
     }
 
     private func sameTeams(_ a: Match, _ b: Match) -> Bool {
-        Set([normalizedName(a.teamA), normalizedName(a.teamB)]) ==
-        Set([normalizedName(b.teamA), normalizedName(b.teamB)])
+        (teamsMatch(a.teamA, b.teamA) && teamsMatch(a.teamB, b.teamB)) ||
+        (teamsMatch(a.teamA, b.teamB) && teamsMatch(a.teamB, b.teamA))
+    }
+
+    /// 이름이 정확히 같거나, 한쪽 이름이 다른 쪽에 포함되거나(예: "FURIA" ⊂ "FURIA ESPORTS"),
+    /// Riot 팀 코드가 상대 이름과 겹치면 같은 팀으로 간주한다. Leaguepedia MatchSchedule의
+    /// Team1/Team2는 위키 페이지명이라 Riot의 팀명과 완전히 일치하지 않는 경우가 있어 관대하게 비교한다.
+    private func teamsMatch(_ a: Team, _ b: Team) -> Bool {
+        let nameA = normalizedName(a)
+        let nameB = normalizedName(b)
+        if nameA == nameB || nameA.contains(nameB) || nameB.contains(nameA) { return true }
+
+        let codeA = a.code.uppercased().trimmingCharacters(in: .whitespaces)
+        let codeB = b.code.uppercased().trimmingCharacters(in: .whitespaces)
+        if !codeA.isEmpty && (codeA == nameB || nameB.contains(codeA)) { return true }
+        if !codeB.isEmpty && (codeB == nameA || nameA.contains(codeB)) { return true }
+        return false
     }
 
     private func normalizedName(_ team: Team) -> String {
