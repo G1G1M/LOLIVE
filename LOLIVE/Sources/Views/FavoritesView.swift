@@ -134,7 +134,7 @@ struct FavoritesView: View {
                     HStack(spacing: 4) {
                         Circle().fill(Color.red).frame(width: 6, height: 6)
                         Text("LIVE")
-                            .font(.caption2).fontWeight(.bold).foregroundStyle(.red)
+                            .font(.caption).fontWeight(.bold).foregroundStyle(.red)
                     }
                     Text(live.score)
                         .font(.caption).fontWeight(.semibold)
@@ -190,7 +190,7 @@ struct FavoritesView: View {
                     HStack(spacing: 4) {
                         Circle().fill(Color.red).frame(width: 6, height: 6)
                         Text("LIVE")
-                            .font(.caption2).fontWeight(.bold).foregroundStyle(.red)
+                            .font(.caption).fontWeight(.bold).foregroundStyle(.red)
                     }
                     Text(live.score)
                         .font(.caption).fontWeight(.semibold)

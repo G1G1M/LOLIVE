@@ -21,7 +21,7 @@ struct MatchCardView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Team Side

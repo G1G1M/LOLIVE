@@ -166,11 +166,11 @@ struct ChampionDetailSheet: View {
                 ForEach(Array(stat.entries.enumerated()), id: \.offset) { idx, entry in
                     VStack(spacing: 2) {
                         Text(entry.won ? "W" : "L")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2).fontWeight(.bold)
                             .foregroundStyle(.white)
                             .frame(width: 24, height: 24)
                             .background(entry.won ? Color.blue : Color.red)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
                         Text("\(idx + 1)")
                             .font(.system(size: 8)).foregroundStyle(.tertiary)
                     }
@@ -192,9 +192,9 @@ struct ChampionDetailSheet: View {
                     Text(entry.won ? "W" : "L")
                         .font(.caption2).fontWeight(.bold)
                         .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                         .background(entry.won ? Color.blue : Color.red)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
 
                     Text("게임 \(idx + 1)")
                         .font(.subheadline)

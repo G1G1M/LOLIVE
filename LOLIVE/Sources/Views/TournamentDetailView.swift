@@ -36,7 +36,7 @@ struct TournamentDetailView: View {
                     } else if viewModel.isLoadingHistoricalMatches {
                         LoadingView("경기 기록 불러오는 중...")
                     } else if viewModel.selectedRoundDateGroups.isEmpty && viewModel.tournamentMatches.isEmpty {
-                        emptyState("경기 데이터가 없습니다")
+                        EmptyStateView("경기 데이터가 없습니다")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         // rounds 있을 때만 라운드 칩 표시
@@ -128,7 +128,7 @@ struct TournamentDetailView: View {
     private var matchList: some View {
         Group {
             if viewModel.selectedRoundDateGroups.isEmpty {
-                emptyState("경기 데이터가 없습니다")
+                EmptyStateView("경기 데이터가 없습니다")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -188,17 +188,6 @@ struct TournamentDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    // MARK: - 빈 화면
-
-    private func emptyState(_ message: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.circle")
-                .font(.system(size: 36)).foregroundStyle(.quaternary)
-            Text(message)
-                .font(.subheadline).foregroundStyle(.secondary)
-        }
     }
 
     // MARK: - Helpers

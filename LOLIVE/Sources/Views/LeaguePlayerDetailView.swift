@@ -307,15 +307,20 @@ struct LeaguePlayerDetailView: View {
             ForEach(viewModel.recentResults) { result in
                 NavigationLink(destination: MatchDetailView(match: result.match)) {
                     HStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(result.won ? Color.blue : Color.red)
-                            .frame(width: 3, height: 32)
+                        Text(result.won ? "W" : "L")
+                            .font(.caption2).fontWeight(.bold)
+                            .foregroundStyle(.white)
+                            .frame(width: 24, height: 24)
+                            .background(result.won ? Color.blue : Color.red)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("vs \(result.opponent.name)")
                                 .font(.subheadline).fontWeight(.medium)
                                 .lineLimit(1)
-                            Text(result.date, style: .date)
+                            Text(result.date.formatted(.dateTime
+                                .month(.abbreviated).day()
+                                .locale(Locale(identifier: "ko_KR"))))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
 
@@ -325,12 +330,8 @@ struct LeaguePlayerDetailView: View {
                             .font(.subheadline).fontWeight(.semibold)
                             .foregroundStyle(result.won ? .primary : .secondary)
 
-                        Text(result.won ? "승" : "패")
-                            .font(.caption2).fontWeight(.bold)
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background((result.won ? Color.blue : Color.red).opacity(0.15))
-                            .foregroundStyle(result.won ? .blue : .red)
-                            .clipShape(Capsule())
+                        Image(systemName: "chevron.right")
+                            .font(.caption2).foregroundStyle(.tertiary)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 10)
                 }
