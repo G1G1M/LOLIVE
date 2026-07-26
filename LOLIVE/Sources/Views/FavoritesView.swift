@@ -13,15 +13,29 @@ struct FavoritesView: View {
     @Environment(TodayViewModel.self) private var todayViewModel
     @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
     @State private var showingTeamSearch = false
+    @State private var showLiveOnly = false
 
     private var hasFavorites: Bool { !favoriteTeams.isEmpty || !favoritePlayers.isEmpty }
+
+    private var displayedFavoriteTeams: [FavoriteTeam] {
+        guard showLiveOnly else { return favoriteTeams }
+        return favoriteTeams.filter { liveInfo(teamCode: $0.teamCode) != nil }
+    }
+
+    private var displayedFavoritePlayers: [FavoritePlayer] {
+        guard showLiveOnly else { return favoritePlayers }
+        return favoritePlayers.filter { liveInfo(teamCode: $0.teamCode) != nil }
+    }
 
     // iOS가 하단 탭 6개 중 5·6번째(Favorites/Search)를 자동으로 "더보기"로 묶는데,
     // "더보기" 목록 자체가 이미 UINavigationController를 제공하므로 여기서 NavigationStack을
     // 또 씌우면 백버튼이 2개(더보기 것 + 이 화면 것) 겹쳐 보인다. 그래서 NavigationStack 없이
     // "더보기"가 제공하는 네비게이션 컨텍스트에 NavigationLink를 바로 얹는다.
     var body: some View {
-        List {
+        VStack(spacing: 0) {
+            if hasFavorites { liveFilterBar }
+
+            List {
                 // ── 즐겨찾기 없을 때 ─────────────────────────────────
                 if !hasFavorites {
                     Section {
@@ -36,59 +50,70 @@ struct FavoritesView: View {
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets())
                     }
-                }
-
-                // ── 팀 섹션 ──────────────────────────────────────────
-                if !favoriteTeams.isEmpty {
-                    Section("팀") {
-                        ForEach(favoriteTeams) { fav in
-                            NavigationLink {
-                                TeamDetailView(team: fav.asTeam, league: fav.asLeague)
-                            } label: {
-                                teamRow(fav)
-                            }
-                            .contextMenu {
-                                let isPrimary = fav.teamCode.uppercased() == primaryTeamCode.uppercased()
-                                Button {
-                                    primaryTeamCode = isPrimary ? "" : fav.teamCode
+                } else if showLiveOnly && displayedFavoriteTeams.isEmpty && displayedFavoritePlayers.isEmpty {
+                    Section {
+                        EmptyStateView(
+                            "현재 라이브 중인 즐겨찾기 경기가 없습니다",
+                            icon: "dot.radiowaves.left.and.right"
+                        )
+                        .listRowBackground(Color(.systemGroupedBackground))
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets())
+                    }
+                } else {
+                    // ── 팀 섹션 ──────────────────────────────────────────
+                    if !displayedFavoriteTeams.isEmpty {
+                        Section("팀") {
+                            ForEach(displayedFavoriteTeams) { fav in
+                                NavigationLink {
+                                    TeamDetailView(team: fav.asTeam, league: fav.asLeague)
                                 } label: {
-                                    Label(
-                                        isPrimary ? "대표 팀 해제" : "대표 팀으로 설정",
-                                        systemImage: isPrimary ? "paintpalette" : "paintpalette.fill"
-                                    )
+                                    teamRow(fav)
+                                }
+                                .contextMenu {
+                                    let isPrimary = fav.teamCode.uppercased() == primaryTeamCode.uppercased()
+                                    Button {
+                                        primaryTeamCode = isPrimary ? "" : fav.teamCode
+                                    } label: {
+                                        Label(
+                                            isPrimary ? "대표 팀 해제" : "대표 팀으로 설정",
+                                            systemImage: isPrimary ? "paintpalette" : "paintpalette.fill"
+                                        )
+                                    }
                                 }
                             }
-                        }
-                        .onDelete { indexSet in
-                            indexSet.forEach {
-                                let team = favoriteTeams[$0]
-                                if team.teamCode.uppercased() == primaryTeamCode.uppercased() {
-                                    primaryTeamCode = ""
+                            .onDelete { indexSet in
+                                indexSet.forEach {
+                                    let team = displayedFavoriteTeams[$0]
+                                    if team.teamCode.uppercased() == primaryTeamCode.uppercased() {
+                                        primaryTeamCode = ""
+                                    }
+                                    modelContext.delete(team)
                                 }
-                                modelContext.delete(team)
                             }
                         }
                     }
-                }
 
-                // ── 선수 섹션 ─────────────────────────────────────────
-                if !favoritePlayers.isEmpty {
-                    Section("선수") {
-                        ForEach(favoritePlayers) { fav in
-                            NavigationLink {
-                                LeaguePlayerDetailView(player: fav.asPlayer, league: fav.asLeague)
-                            } label: {
-                                playerRow(fav)
+                    // ── 선수 섹션 ─────────────────────────────────────────
+                    if !displayedFavoritePlayers.isEmpty {
+                        Section("선수") {
+                            ForEach(displayedFavoritePlayers) { fav in
+                                NavigationLink {
+                                    LeaguePlayerDetailView(player: fav.asPlayer, league: fav.asLeague)
+                                } label: {
+                                    playerRow(fav)
+                                }
                             }
-                        }
-                        .onDelete { indexSet in
-                            indexSet.forEach { modelContext.delete(favoritePlayers[$0]) }
+                            .onDelete { indexSet in
+                                indexSet.forEach { modelContext.delete(displayedFavoritePlayers[$0]) }
+                            }
                         }
                     }
                 }
+            }
+            .listStyle(.insetGrouped)
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
-        .listStyle(.insetGrouped)
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("즐겨찾기")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -105,6 +130,32 @@ struct FavoritesView: View {
         .sheet(isPresented: $showingTeamSearch) {
             TeamSearchView()
         }
+    }
+
+    // MARK: - Live Filter Bar
+
+    private var liveFilterBar: some View {
+        HStack(spacing: 8) {
+            Button { showLiveOnly.toggle() } label: {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(showLiveOnly ? Color.white : Color.red)
+                        .frame(width: 6, height: 6)
+                    Text("LIVE")
+                }
+                .font(.subheadline).fontWeight(.semibold)
+                .padding(.horizontal, 14).padding(.vertical, 6)
+                .background(showLiveOnly ? Color.red : Color(.secondarySystemGroupedBackground))
+                .foregroundStyle(showLiveOnly ? Color.white : Color.secondary)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
+        .animation(.easeInOut(duration: 0.15), value: showLiveOnly)
     }
 
     // MARK: - Team Row

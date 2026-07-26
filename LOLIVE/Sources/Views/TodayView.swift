@@ -9,6 +9,7 @@ struct TodayView: View {
     @Environment(TodayViewModel.self) private var viewModel
     @State private var showMenu = false
     @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
+    @State private var showLiveOnly = false
 
     private let cal = Calendar.current
 
@@ -27,7 +28,7 @@ struct TodayView: View {
             VStack(spacing: 0) {
                 titleHeader
                 dateStrip
-                if viewModel.hasFavoriteTeams { favoritesToggle }
+                favoritesToggle
 
                 ZStack {
                     Color(.systemGroupedBackground).ignoresSafeArea()
@@ -168,15 +169,19 @@ struct TodayView: View {
             filterPill(title: "전체", isSelected: !viewModel.showFavoritesOnly) {
                 viewModel.showFavoritesOnly = false
             }
-            filterPill(title: "★ 즐겨찾기", isSelected: viewModel.showFavoritesOnly) {
-                viewModel.showFavoritesOnly = true
+            if viewModel.hasFavoriteTeams {
+                filterPill(title: "★ 즐겨찾기", isSelected: viewModel.showFavoritesOnly) {
+                    viewModel.showFavoritesOnly = true
+                }
             }
+            liveFilterPill
             Spacer()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(Color(.systemGroupedBackground))
         .animation(.easeInOut(duration: 0.15), value: viewModel.showFavoritesOnly)
+        .animation(.easeInOut(duration: 0.15), value: showLiveOnly)
     }
 
     private func filterPill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -187,6 +192,23 @@ struct TodayView: View {
                 .background(isSelected ? Color.accentColor : Color(.secondarySystemGroupedBackground))
                 .foregroundStyle(isSelected ? Color.white : Color.secondary)
                 .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var liveFilterPill: some View {
+        Button { showLiveOnly.toggle() } label: {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(showLiveOnly ? Color.white : Color.red)
+                    .frame(width: 6, height: 6)
+                Text("LIVE")
+            }
+            .font(.subheadline).fontWeight(.semibold)
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .background(showLiveOnly ? Color.red : Color(.secondarySystemGroupedBackground))
+            .foregroundStyle(showLiveOnly ? Color.white : Color.secondary)
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -235,6 +257,17 @@ struct TodayView: View {
         }
     }
 
+    /// getLive 목록 여부(isLive)와 스케줄 상태(inProgress) 중 하나만 맞아도 라이브로 간주 —
+    /// MatchCardView의 isEffectivelyLive 판정과 동일한 기준을 필터에도 적용한다.
+    private var displayedGroups: [LeagueMatchGroup] {
+        guard showLiveOnly else { return groupsForSelectedDate }
+        return groupsForSelectedDate.compactMap { group in
+            let live = group.matches.filter { $0.isLive || $0.match.state == .inProgress }
+            guard !live.isEmpty else { return nil }
+            return LeagueMatchGroup(league: group.league, matches: live)
+        }
+    }
+
     // MARK: - Match List
 
     private var matchList: some View {
@@ -243,18 +276,23 @@ struct TodayView: View {
                 LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
                     Color.clear.frame(height: 0).id("top")
 
-                    if viewModel.showFavoritesOnly && groupsForSelectedDate.isEmpty {
+                    if showLiveOnly && displayedGroups.isEmpty {
+                        emptyView(
+                            icon: "dot.radiowaves.left.and.right",
+                            message: "현재 라이브 중인 경기가 없습니다"
+                        )
+                    } else if viewModel.showFavoritesOnly && displayedGroups.isEmpty {
                         emptyView(
                             icon: "star.slash",
                             message: "즐겨찾기한 팀의 경기가 없습니다"
                         )
-                    } else if groupsForSelectedDate.isEmpty {
+                    } else if displayedGroups.isEmpty {
                         emptyView(
                             icon: "calendar.badge.exclamationmark",
                             message: "이 날짜에 경기가 없습니다"
                         )
                     } else {
-                        ForEach(groupsForSelectedDate) { group in
+                        ForEach(displayedGroups) { group in
                             Section {
                                 ForEach(group.matches, id: \.match.id) { (match, isLive) in
                                     NavigationLink(value: match) {

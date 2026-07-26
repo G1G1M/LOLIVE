@@ -189,28 +189,6 @@ struct MatchDetailView: View {
                     .foregroundStyle(.tertiary)
             }
 
-        case .unstarted where match.startTime <= Date():
-            // 예정 시각은 지났는데 Riot이 아직 상태를 안 바꿔준 경우 — 확정 라이브는 아니지만
-            // 시작을 놓치지 않았다는 걸 알 수 있게 별도 색상(주황)으로 구분해 표시
-            VStack(spacing: 4) {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 6, height: 6)
-                        .scaleEffect(isPulsing ? 1.4 : 1.0)
-                        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
-                        .onAppear { isPulsing = true }
-                    Text("진행 중일 수 있음")
-                        .font(.caption).fontWeight(.bold).foregroundStyle(.orange)
-                }
-                .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(Color.orange.opacity(0.15)).clipShape(Capsule())
-
-                Text(match.league.name)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
-
         case .unstarted:
             VStack(spacing: 4) {
                 Text(match.startTime.formatted(
@@ -230,27 +208,19 @@ struct MatchDetailView: View {
     // MARK: - Upcoming Card
 
     private var upcomingCard: some View {
-        let isOverdue = match.startTime <= Date()
-        return VStack(spacing: 10) {
-            Image(systemName: isOverdue ? "hourglass" : "clock")
+        VStack(spacing: 10) {
+            Image(systemName: "clock")
                 .font(.system(size: 28))
-                .foregroundStyle(isOverdue ? .orange : .secondary)
-            Text(isOverdue ? "곧 시작 · 진행 중일 수 있음" : "경기 예정")
+                .foregroundStyle(.secondary)
+            Text("경기 예정")
                 .font(.subheadline).fontWeight(.medium)
-                .foregroundStyle(isOverdue ? .orange : .secondary)
+                .foregroundStyle(.secondary)
             Text(match.startTime.formatted(
                 .dateTime.month().day().weekday().hour().minute()
                 .locale(Locale(identifier: "ko_KR"))
             ))
             .font(.caption)
             .foregroundStyle(.tertiary)
-            if isOverdue {
-                Text("예정 시각이 지났지만 아직 중계 상태 정보가 확인되지 않았습니다")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)

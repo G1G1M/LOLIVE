@@ -16,10 +16,6 @@ struct MatchCardView: View {
     /// 상태가 inProgress면 LIVE로 간주 — 두 신호 중 하나만 맞아도 라이브로 표시한다.
     private var isEffectivelyLive: Bool { isLive || match.state == .inProgress }
 
-    /// 예정 시각은 지났는데 Riot이 아직 unstarted로 멈춰있는 경우 — 확정 라이브는 아니지만
-    /// 사용자가 "시작을 놓친 게 아니다"를 알 수 있게 별도로 표시한다.
-    private var isOverdueUnstarted: Bool { match.state == .unstarted && match.startTime <= Date() }
-
     var body: some View {
         HStack(spacing: 0) {
             teamSide(team: match.teamA, score: match.scoreA, opponentScore: match.scoreB, trailing: true)
@@ -66,7 +62,7 @@ struct MatchCardView: View {
 
     private var centerBlock: some View {
         VStack(spacing: showDate ? 3 : 8) {
-            if showDate && !isEffectivelyLive && !isOverdueUnstarted {
+            if showDate && !isEffectivelyLive {
                 dateTimeBlock
             } else {
                 statusBadge
@@ -114,23 +110,6 @@ struct MatchCardView: View {
             }
             .padding(.horizontal, 10).padding(.vertical, 4)
             .background(Color.red.opacity(0.15))
-            .clipShape(Capsule())
-        } else if isOverdueUnstarted {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color.orange)
-                    .frame(width: 6, height: 6)
-                    .scaleEffect(isPulsing ? 1.4 : 1.0)
-                    .animation(
-                        .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
-                        value: isPulsing
-                    )
-                    .onAppear { isPulsing = true }
-                Text("진행중?")
-                    .font(.system(size: 11, weight: .bold)).foregroundStyle(.orange)
-            }
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Color.orange.opacity(0.15))
             .clipShape(Capsule())
         } else if match.state == .completed {
             Text("종료")
