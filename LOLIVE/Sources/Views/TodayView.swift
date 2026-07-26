@@ -166,12 +166,14 @@ struct TodayView: View {
 
     private var favoritesToggle: some View {
         HStack(spacing: 8) {
-            filterPill(title: "전체", isSelected: !viewModel.showFavoritesOnly) {
+            filterPill(title: "전체", isSelected: !viewModel.showFavoritesOnly && !showLiveOnly) {
                 viewModel.showFavoritesOnly = false
+                showLiveOnly = false
             }
             if viewModel.hasFavoriteTeams {
-                filterPill(title: "★ 즐겨찾기", isSelected: viewModel.showFavoritesOnly) {
+                filterPill(title: "★ 즐겨찾기", isSelected: viewModel.showFavoritesOnly && !showLiveOnly) {
                     viewModel.showFavoritesOnly = true
+                    showLiveOnly = false
                 }
             }
             liveFilterPill
@@ -197,7 +199,10 @@ struct TodayView: View {
     }
 
     private var liveFilterPill: some View {
-        Button { showLiveOnly.toggle() } label: {
+        Button {
+            showLiveOnly = true
+            viewModel.showFavoritesOnly = false
+        } label: {
             HStack(spacing: 4) {
                 Circle()
                     .fill(showLiveOnly ? Color.white : Color.red)
