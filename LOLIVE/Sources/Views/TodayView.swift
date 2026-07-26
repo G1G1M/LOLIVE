@@ -282,20 +282,11 @@ struct TodayView: View {
                     Color.clear.frame(height: 0).id("top")
 
                     if showLiveOnly && displayedGroups.isEmpty {
-                        emptyView(
-                            icon: "dot.radiowaves.left.and.right",
-                            message: "현재 라이브 중인 경기가 없습니다"
-                        )
+                        EmptyStateView("현재 라이브 중인 경기가 없습니다", icon: "dot.radiowaves.left.and.right")
                     } else if viewModel.showFavoritesOnly && displayedGroups.isEmpty {
-                        emptyView(
-                            icon: "star.slash",
-                            message: "즐겨찾기한 팀의 경기가 없습니다"
-                        )
+                        EmptyStateView("즐겨찾기한 팀의 경기가 없습니다", icon: "star.slash")
                     } else if displayedGroups.isEmpty {
-                        emptyView(
-                            icon: "calendar.badge.exclamationmark",
-                            message: "이 날짜에 경기가 없습니다"
-                        )
+                        EmptyStateView("이 날짜에 경기가 없습니다", icon: "calendar.badge.exclamationmark")
                     } else {
                         ForEach(displayedGroups) { group in
                             Section {
@@ -329,18 +320,6 @@ struct TodayView: View {
         }
     }
 
-    private func emptyView(icon: String, message: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 36))
-                .foregroundStyle(.quaternary)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 80)
-    }
 }
 
 #Preview {
