@@ -114,11 +114,16 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
     }
 
     /// 케스파컵처럼 Riot이 경기 상태/결과를 갱신해주지 않는 대회 대응.
-    /// 시작 시각이 한참 지났는데도 unstarted로 멈춰있는 경기가 있으면 Leaguepedia 결과로 보완한다.
+    /// 시작 시각이 한참 지났는데도 unstarted로 멈춰있거나, completed인데 스코어(gameWins)가
+    /// 비어 있어 0:0으로 내려오는 경기가 있으면 Leaguepedia 결과로 보완한다.
+    /// (LoL 경기는 정상 종료 시 0:0으로 끝날 수 없으므로 이 조건으로 걸러도 안전하다)
     /// 정상적으로 상태가 갱신되는 리그(대부분)는 감지되는 게 없어 API 호출 없이 그대로 반환된다.
     private func reconcileUnreportedResults(_ matches: [Match], league: League) async -> [Match] {
         let cutoff = Date().addingTimeInterval(-3 * 3600)
-        let hasStale = matches.contains { $0.state == .unstarted && $0.startTime < cutoff }
+        let hasStale = matches.contains {
+            ($0.state == .unstarted && $0.startTime < cutoff) ||
+            ($0.state == .completed && $0.scoreA == 0 && $0.scoreB == 0)
+        }
         guard hasStale else { return matches }
 
         let lpMatches = await LeaguepediaService.shared.fetchLiveTournamentResults(for: league)

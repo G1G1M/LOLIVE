@@ -112,7 +112,8 @@ extension LeaguepediaService {
         return matches
     }
 
-    /// Riot 경기 목록 중 시작 시각이 한참 지났는데도 `unstarted`로 멈춰있는(=Riot이 결과를 안 준) 항목을
+    /// Riot 경기 목록 중 (1) 시작 시각이 한참 지났는데도 `unstarted`로 멈춰있거나
+    /// (2) `completed`인데 스코어가 0:0으로 비어 있는(=Riot이 결과를 안 준) 항목을
     /// 같은 팀 조합·비슷한 시각의 Leaguepedia 경기로 매칭해 스코어·상태만 교체한다.
     /// 팀 로고 등 나머지 메타데이터는 Riot 원본을 유지해 화면 표시 일관성을 지킨다.
     func reconcileResults(riotMatches: [Match], leaguepediaMatches: [Match]) -> [Match] {
@@ -120,7 +121,9 @@ extension LeaguepediaService {
         let cutoff = Date().addingTimeInterval(-3 * 3600)
 
         return riotMatches.map { riot in
-            guard riot.state == .unstarted, riot.startTime < cutoff else { return riot }
+            let isStaleUnstarted = riot.state == .unstarted && riot.startTime < cutoff
+            let isZeroScoreCompleted = riot.state == .completed && riot.scoreA == 0 && riot.scoreB == 0
+            guard isStaleUnstarted || isZeroScoreCompleted else { return riot }
             guard let lp = leaguepediaMatches.first(where: { lp in
                 lp.state == .completed &&
                 sameTeams(riot, lp) &&
