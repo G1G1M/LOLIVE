@@ -149,11 +149,33 @@ final class TodayViewModel {
                 do {
                     let live = try await service.fetchLive()
                     let newLiveIds = Set(live.map { $0.match.id })
+                    let newFavoriteLive = live.filter { favoriteTeamCode(for: $0.match) != nil }
 
                     // 라이브에서 사라진 즐겨찾기 경기 → 결과 알림
                     for lm in prevFavoriteLive where !newLiveIds.contains(lm.match.id) {
                         if let code = favoriteTeamCode(for: lm.match) {
                             await MatchNotificationService.shared.sendResultNotification(
+                                for: lm.match, favoriteTeamCode: code
+                            )
+                        }
+                    }
+
+                    // 즐겨찾기 경기의 시작/세트 진행 알림
+                    for lm in newFavoriteLive {
+                        guard let code = favoriteTeamCode(for: lm.match) else { continue }
+                        if let prev = prevFavoriteLive.first(where: { $0.match.id == lm.match.id }) {
+                            // 세트 번호가 늘었으면 이전 세트 종료 + 새 세트 시작 알림
+                            if lm.currentSet > prev.currentSet {
+                                await MatchNotificationService.shared.sendSetEndNotification(
+                                    for: lm.match, favoriteTeamCode: code, endedSet: prev.currentSet
+                                )
+                                await MatchNotificationService.shared.sendSetStartNotification(
+                                    for: lm.match, favoriteTeamCode: code, newSet: lm.currentSet
+                                )
+                            }
+                        } else {
+                            // 직전 폴링엔 없었는데 지금 라이브 → 경기 시작
+                            await MatchNotificationService.shared.sendMatchStartNotification(
                                 for: lm.match, favoriteTeamCode: code
                             )
                         }

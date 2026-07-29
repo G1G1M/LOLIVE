@@ -92,15 +92,18 @@ struct ContentView: View {
             }) else { continue }
             let isTeamA = match.teamA.code.lowercased() == code
             let opponent = isTeamA ? match.teamB : match.teamA
-            let isLive = todayViewModel.liveMatches.contains { $0.match.id == match.id }
+            let liveMatch = todayViewModel.liveMatches.first { $0.match.id == match.id }
             nextMatchMap[fav.teamCode.uppercased()] = SharedNextMatch(
                 opponentName: opponent.name,
                 opponentCode: opponent.code,
                 opponentImageURL: opponent.imageURL,
                 startTime: match.startTime,
-                isLive: isLive,
+                isLive: liveMatch != nil,
                 leagueName: match.league.name,
-                savedAt: Date()
+                savedAt: Date(),
+                myScore: isTeamA ? match.scoreA : match.scoreB,
+                oppScore: isTeamA ? match.scoreB : match.scoreA,
+                currentGame: liveMatch?.currentSet
             )
         }
         SharedDataService.saveNextMatches(nextMatchMap)

@@ -15,6 +15,9 @@ enum WidgetNetworkService {
         let opponentImageURL: String?
         let startTime: Date
         let isLive: Bool
+        var myScore: Int? = nil
+        var oppScore: Int? = nil
+        var currentGame: Int? = nil
     }
 
     private static let baseURL = "https://esports-api.lolesports.com/persisted/gw"
@@ -71,6 +74,9 @@ enum WidgetNetworkService {
             else { continue }
 
             let startTime = (event["startTime"] as? String).flatMap { iso.date(from: $0) } ?? Date()
+            let games = matchDict["games"] as? [[String: Any]] ?? []
+            let currentGame = games.filter { ($0["state"] as? String) == "completed" }.count + 1
+            let scores = teams.map { ($0["result"] as? [String: Any])?["gameWins"] as? Int ?? 0 }
 
             for i in 0..<2 {
                 guard let code = teams[i]["code"] as? String else { continue }
@@ -80,7 +86,10 @@ enum WidgetNetworkService {
                     opponentCode:     (opp["code"]  as? String) ?? "TBD",
                     opponentImageURL: (opp["image"] as? String)?.replacingOccurrences(of: "http://", with: "https://"),
                     startTime:        startTime,
-                    isLive:           true
+                    isLive:           true,
+                    myScore:          scores[i],
+                    oppScore:         scores[1 - i],
+                    currentGame:      currentGame
                 )
             }
         }
@@ -124,9 +133,15 @@ enum WidgetNetworkService {
                 .replacingOccurrences(of: "http://", with: "https://")
 
             if state == "inProgress" && liveMatch == nil {
+                let myDict = teams.first { ($0["code"] as? String)?.lowercased() == teamCode.lowercased() }
+                let myScore  = (myDict?["result"] as? [String: Any])?["gameWins"] as? Int ?? 0
+                let oppScore = (opponentDict?["result"] as? [String: Any])?["gameWins"] as? Int ?? 0
+                let games = matchDict["games"] as? [[String: Any]] ?? []
+                let currentGame = games.filter { ($0["state"] as? String) == "completed" }.count + 1
                 liveMatch = NextMatchInfo(
                     opponentName: opponentName, opponentCode: opponentCode,
-                    opponentImageURL: opponentImage, startTime: startTime, isLive: true
+                    opponentImageURL: opponentImage, startTime: startTime, isLive: true,
+                    myScore: myScore, oppScore: oppScore, currentGame: currentGame
                 )
             } else if state == "unstarted" && startTime > now && nextMatch == nil {
                 nextMatch = NextMatchInfo(

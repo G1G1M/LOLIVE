@@ -29,6 +29,10 @@ struct SharedNextMatch: Codable {
     let isLive: Bool
     let leagueName: String
     let savedAt: Date
+    // 라이브 스코어 — 옵셔널로 두어 이전 버전이 저장한 데이터도 안전하게 디코딩
+    let myScore: Int?
+    let oppScore: Int?
+    let currentGame: Int?
 }
 
 enum SharedDataService {

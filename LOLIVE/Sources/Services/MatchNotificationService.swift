@@ -36,22 +36,69 @@ final class MatchNotificationService: Sendable {
         }
     }
 
-    // MARK: - Public (Result)
+    // MARK: - Public (경기/세트 진행 알림)
 
     func sendResultNotification(for match: Match, favoriteTeamCode: String) async {
-        let isTeamA = match.teamA.code.lowercased() == favoriteTeamCode.lowercased()
-        let myTeam   = isTeamA ? match.teamA  : match.teamB
-        let opponent = isTeamA ? match.teamB  : match.teamA
-        let myScore  = isTeamA ? match.scoreA : match.scoreB
-        let oppScore = isTeamA ? match.scoreB : match.scoreA
+        let p = perspective(for: match, favoriteTeamCode: favoriteTeamCode)
 
         let content = UNMutableNotificationContent()
-        content.title = myScore > oppScore ? "\(myTeam.name) 승리" : "\(myTeam.name) 패배"
-        content.body  = "\(myScore) - \(oppScore)  vs \(opponent.name)"
+        content.title = p.myScore > p.oppScore ? "\(p.myTeam.name) 승리" : "\(p.myTeam.name) 패배"
+        content.body  = "\(p.myScore) - \(p.oppScore)  vs \(p.opponent.name)"
         content.sound = .default
 
         let request = UNNotificationRequest(
             identifier: "lolive_result_\(match.id)_\(favoriteTeamCode.lowercased())",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        )
+        try? await UNUserNotificationCenter.current().add(request)
+    }
+
+    /// 즐겨찾기 팀 경기가 라이브로 전환된 시점(최초 감지)에 발송
+    func sendMatchStartNotification(for match: Match, favoriteTeamCode: String) async {
+        let p = perspective(for: match, favoriteTeamCode: favoriteTeamCode)
+
+        let content = UNMutableNotificationContent()
+        content.title = "\(p.myTeam.name) 경기 시작"
+        content.body  = "vs \(p.opponent.name) · \(match.league.name)"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "lolive_start_\(match.id)_\(favoriteTeamCode.lowercased())",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        )
+        try? await UNUserNotificationCenter.current().add(request)
+    }
+
+    /// 세트 번호(currentSet)가 증가한 시점 — 방금 끝난 세트 결과 알림
+    func sendSetEndNotification(for match: Match, favoriteTeamCode: String, endedSet: Int) async {
+        let p = perspective(for: match, favoriteTeamCode: favoriteTeamCode)
+
+        let content = UNMutableNotificationContent()
+        content.title = "Game \(endedSet) 종료"
+        content.body  = "\(p.myTeam.code) \(p.myScore) - \(p.oppScore) \(p.opponent.code)"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "lolive_setend_\(match.id)_\(endedSet)_\(favoriteTeamCode.lowercased())",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        )
+        try? await UNUserNotificationCenter.current().add(request)
+    }
+
+    /// 세트 번호(currentSet)가 증가한 시점 — 다음 세트 시작 알림
+    func sendSetStartNotification(for match: Match, favoriteTeamCode: String, newSet: Int) async {
+        let p = perspective(for: match, favoriteTeamCode: favoriteTeamCode)
+
+        let content = UNMutableNotificationContent()
+        content.title = "Game \(newSet) 시작"
+        content.body  = "\(p.myTeam.code) vs \(p.opponent.code) · \(match.league.name)"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "lolive_setstart_\(match.id)_\(newSet)_\(favoriteTeamCode.lowercased())",
             content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         )
@@ -79,6 +126,24 @@ final class MatchNotificationService: Sendable {
     #endif
 
     // MARK: - Private
+
+    private struct MatchPerspective {
+        let myTeam: Team
+        let opponent: Team
+        let myScore: Int
+        let oppScore: Int
+    }
+
+    /// 즐겨찾기 팀 기준으로 우리팀/상대팀/스코어를 정리
+    private func perspective(for match: Match, favoriteTeamCode: String) -> MatchPerspective {
+        let isTeamA = match.teamA.code.lowercased() == favoriteTeamCode.lowercased()
+        return MatchPerspective(
+            myTeam: isTeamA ? match.teamA : match.teamB,
+            opponent: isTeamA ? match.teamB : match.teamA,
+            myScore: isTeamA ? match.scoreA : match.scoreB,
+            oppScore: isTeamA ? match.scoreB : match.scoreA
+        )
+    }
 
     private var minutesBefore: Int {
         let stored = UserDefaults.standard.integer(forKey: "notificationMinutesBefore")

@@ -161,7 +161,10 @@ struct FavoriteTeamProvider: TimelineProvider {
                 opponentCode: $0.opponentCode,
                 opponentImageURL: $0.opponentImageURL,
                 startTime: $0.startTime,
-                isLive: $0.isLive
+                isLive: $0.isLive,
+                myScore: $0.myScore,
+                oppScore: $0.oppScore,
+                currentGame: $0.currentGame
             )
         } ?? apiMatch
 
@@ -212,7 +215,10 @@ struct FavoriteTeamProvider: TimelineProvider {
                             opponentCode: $0.opponentCode,
                             opponentImageURL: $0.opponentImageURL,
                             startTime: $0.startTime,
-                            isLive: $0.isLive
+                            isLive: $0.isLive,
+                            myScore: $0.myScore,
+                            oppScore: $0.oppScore,
+                            currentGame: $0.currentGame
                         )
                     } ?? apiMatch
 
@@ -321,7 +327,7 @@ struct FavoriteTeamWidgetView: View {
 
             if let match = entry.nextMatch {
                 if match.isLive {
-                    Text("● LIVE")
+                    Text("● " + (scoreText(match) ?? "LIVE"))
                         .font(.caption2).fontWeight(.semibold)
                 } else {
                     let timeToMatch = match.startTime.timeIntervalSinceNow
@@ -351,7 +357,7 @@ struct FavoriteTeamWidgetView: View {
         Group {
             if let match = entry.nextMatch {
                 if match.isLive {
-                    Text("\(entry.teamCode) vs \(match.opponentCode) · LIVE")
+                    Text("\(entry.teamCode) vs \(match.opponentCode) · " + (scoreText(match) ?? "LIVE"))
                 } else {
                     let timeToMatch = match.startTime.timeIntervalSinceNow
                     if timeToMatch > 0, timeToMatch <= 3600 {
@@ -366,6 +372,13 @@ struct FavoriteTeamWidgetView: View {
             }
         }
         .lineLimit(1)
+    }
+
+    /// "1 - 0 · Game 2" 형태의 라이브 스코어 텍스트 — 데이터 없으면 nil
+    private func scoreText(_ match: WidgetNetworkService.NextMatchInfo) -> String? {
+        guard let my = match.myScore, let opp = match.oppScore else { return nil }
+        guard let game = match.currentGame else { return "\(my) - \(opp)" }
+        return "\(my) - \(opp) · Game \(game)"
     }
 
     private func accessoryTimeText(_ date: Date) -> String {
@@ -450,8 +463,7 @@ struct FavoriteTeamWidgetView: View {
                     VStack(spacing: 4) {
                         if match.isLive {
                             liveBadge
-                            Text("경기 진행 중")
-                                .font(.caption2).foregroundStyle(.secondary)
+                            matchTimeView(match: match, compact: true)
                         } else {
                             matchTimeView(match: match, compact: false)
                         }
@@ -537,8 +549,8 @@ struct FavoriteTeamWidgetView: View {
                 if match.isLive {
                     VStack(alignment: .trailing, spacing: 2) {
                         liveBadge
-                        Text("vs \(match.opponentCode)")
-                            .font(.caption2).foregroundStyle(.secondary)
+                        Text(scoreText(match) ?? "vs \(match.opponentCode)")
+                            .font(.caption2).fontWeight(.medium).foregroundStyle(.primary)
                     }
                 } else {
                     VStack(alignment: .trailing, spacing: 2) {
@@ -561,7 +573,21 @@ struct FavoriteTeamWidgetView: View {
     @ViewBuilder
     private func matchTimeView(match: WidgetNetworkService.NextMatchInfo, compact: Bool) -> some View {
         let timeToMatch = match.startTime.timeIntervalSinceNow
-        if !match.isLive, timeToMatch > 0, timeToMatch <= 3600 {
+        if match.isLive {
+            if let score = scoreText(match) {
+                Text(score)
+                    .font(compact ? .caption2 : .title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            } else {
+                Text("경기 진행 중")
+                    .font(compact ? .caption2 : .subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        } else if timeToMatch > 0, timeToMatch <= 3600 {
             // 1시간 이내: 라이브 카운트다운
             Text(match.startTime, style: .timer)
                 .font(compact ? .caption2 : .title3)

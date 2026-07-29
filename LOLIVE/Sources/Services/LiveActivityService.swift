@@ -269,8 +269,16 @@ final class LiveActivityService {
             )
 
             if let activity = activities[liveMatch.match.id] {
-                // 기존 Activity 업데이트
-                await activity.update(.init(state: state, staleDate: nil))
+                // 세트가 바뀐 경우에만 다이나믹 아일랜드/잠금화면에 배너+알림음 표시
+                // (매 폴링마다 조용히 갱신되는 것과 구분 — 세트 종료라는 의미 있는 순간에만 알림)
+                let alert: AlertConfiguration? = activity.content.state.currentGame != state.currentGame
+                    ? AlertConfiguration(
+                        title: LocalizedStringResource(stringLiteral: "Game \(state.currentGame) 시작"),
+                        body: LocalizedStringResource(stringLiteral: "\(liveMatch.match.teamA.code) \(state.scoreA) - \(state.scoreB) \(liveMatch.match.teamB.code)"),
+                        sound: .default
+                      )
+                    : nil
+                await activity.update(.init(state: state, staleDate: nil), alertConfiguration: alert)
             } else {
                 // 두 팀 썸네일을 병렬로 fetch
                 async let thumbA = fetchThumbnail(urlString: liveMatch.match.teamA.imageURL, teamCode: liveMatch.match.teamA.code)
