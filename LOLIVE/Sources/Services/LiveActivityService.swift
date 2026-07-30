@@ -211,12 +211,20 @@ final class LiveActivityService {
     }
 
     /// 테스트 Activity의 스코어/세트 업데이트 — 실시간 갱신 동작 검증용.
+    /// 세트 번호가 바뀌면 실제 syncActivities와 동일하게 배너+알림음을 함께 트리거한다.
     func updateTestActivity(scoreA: Int, scoreB: Int, currentGame: Int) async {
         guard let activity = activities[Self.testMatchId] else { return }
+        let alert: AlertConfiguration? = activity.content.state.currentGame != currentGame
+            ? AlertConfiguration(
+                title: LocalizedStringResource(stringLiteral: "Game \(currentGame) 시작"),
+                body: LocalizedStringResource(stringLiteral: "T1 \(scoreA) - \(scoreB) GEN"),
+                sound: .default
+              )
+            : nil
         let state = MatchActivityAttributes.ContentState(
             scoreA: scoreA, scoreB: scoreB, currentGame: currentGame, isLive: true
         )
-        await activity.update(.init(state: state, staleDate: nil))
+        await activity.update(.init(state: state, staleDate: nil), alertConfiguration: alert)
         logger.debug("🔄 [LiveActivity 테스트] 업데이트 \(scoreA):\(scoreB) 세트\(currentGame)")
     }
 

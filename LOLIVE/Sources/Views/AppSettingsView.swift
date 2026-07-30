@@ -17,6 +17,18 @@ struct AppSettingsView: View {
     @State private var testActivityRunning = false
     @State private var testScoreA = 0
     @State private var testScoreB = 0
+
+    /// 알림 테스트용 더미 경기 (T1 vs Gen.G) — 실제 API 없이 알림 문구/동작 확인용
+    private var testMatch: Match {
+        Match(
+            id: "lolive_test_match",
+            league: League(id: "test_league", slug: "lck", name: "LCK", region: "KOREA", imageURL: nil),
+            teamA: Team(id: "T1", name: "T1", code: "T1", imageURL: nil),
+            teamB: Team(id: "GEN", name: "Gen.G", code: "GEN", imageURL: nil),
+            scoreA: testScoreA, scoreB: testScoreB,
+            startTime: Date(), state: .inProgress
+        )
+    }
     #endif
 
     var body: some View {
@@ -28,6 +40,26 @@ struct AppSettingsView: View {
                     Task { await MatchNotificationService.shared.sendTestNotification() }
                 } label: {
                     Label("테스트 알림 (5초 후 발송)", systemImage: "bell.badge")
+                }
+
+                Button {
+                    Task {
+                        await MatchNotificationService.shared.sendMatchStartNotification(
+                            for: testMatch, favoriteTeamCode: "T1"
+                        )
+                    }
+                } label: {
+                    Label("테스트: 경기 시작 알림", systemImage: "bell.badge")
+                }
+
+                Button {
+                    Task {
+                        await MatchNotificationService.shared.sendResultNotification(
+                            for: testMatch, favoriteTeamCode: "T1"
+                        )
+                    }
+                } label: {
+                    Label("테스트: 경기 종료 알림", systemImage: "bell.badge")
                 }
 
                 if !testActivityRunning {
@@ -44,10 +76,19 @@ struct AppSettingsView: View {
                     Button {
                         Task {
                             // 번갈아 한 세트씩 승리하는 시나리오 시뮬레이션
+                            let endedSet = testScoreA + testScoreB + 1
                             if testScoreA <= testScoreB { testScoreA += 1 } else { testScoreB += 1 }
+                            let newSet = testScoreA + testScoreB + 1
                             await LiveActivityService.shared.updateTestActivity(
                                 scoreA: testScoreA, scoreB: testScoreB,
-                                currentGame: testScoreA + testScoreB + 1
+                                currentGame: newSet
+                            )
+                            // 실제 폴링과 동일한 순서: 세트 종료 알림 → 다음 세트 시작 알림
+                            await MatchNotificationService.shared.sendSetEndNotification(
+                                for: testMatch, favoriteTeamCode: "T1", endedSet: endedSet
+                            )
+                            await MatchNotificationService.shared.sendSetStartNotification(
+                                for: testMatch, favoriteTeamCode: "T1", newSet: newSet
                             )
                         }
                     } label: {
@@ -67,7 +108,7 @@ struct AppSettingsView: View {
             } header: {
                 Text("테스트 (DEBUG 전용)")
             } footer: {
-                Text("알림: 버튼을 누르고 5초 안에 잠금화면으로 이동하면 잠금화면 알림도 확인할 수 있습니다.\nLive Activity: 시작 후 Dynamic Island와 잠금화면에서 확인하세요. 이 섹션은 App Store 배포 빌드에는 표시되지 않습니다.")
+                Text("알림: 버튼을 누르고 5초 안에 잠금화면으로 이동하면 잠금화면 알림도 확인할 수 있습니다. 경기 시작/종료 알림은 1초 후 바로 발송됩니다.\nLive Activity를 먼저 시작한 뒤 '스코어 업데이트'를 누르면 세트 종료/시작 알림과 다이나믹 아일랜드 배너를 동시에 확인할 수 있습니다. 이 섹션은 App Store 배포 빌드에는 표시되지 않습니다.")
             }
             .onAppear {
                 testActivityRunning = LiveActivityService.shared.isTestActivityRunning
