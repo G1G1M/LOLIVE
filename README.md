@@ -251,6 +251,7 @@ TournamentDetailViewModel.load()
 |--------|---------|-----|--------|
 | 리그 목록 | `leagues` | 24h | AppDiskCache |
 | 경기 일정 | `schedule_{leagueId}` | 15분 | AppDiskCache |
+| 라이브 경기 (네트워크 장애 폴백 전용) | `live` | 5분 | AppDiskCache |
 | 토너먼트 | `tournaments_{leagueId}` | 24h | AppDiskCache |
 | 순위 | `standings_{tournamentId}` | 1h | AppDiskCache |
 | 팀 로스터 | `roster_{teamId}` | 12h | AppDiskCache |
@@ -282,6 +283,16 @@ TournamentDetailViewModel.load()
 - `CachedAsyncImage`: 메모리 → 디스크 → 네트워크 3단계 캐시, 정적 `loadImage(from:)` 메서드로 외부 공유
 - `PlayerAvatarView`: URL nil·로드 실패·기본 실루엣(평균 밝기 < 15%) 모두 동일 플레이스홀더로 통일
 - `LoadingView`: 전체화면 페이드인 로딩 인디케이터 (0.1초 딜레이, 캐시 즉시 로드 시 깜빡임 방지)
+
+### 라이브 데이터 캐시 · 앱↔위젯 공유
+
+- `RiotEsportsService.fetchLive()`: 매 호출마다 결과를 `live` 키로 디스크에 저장. `/getLive` 요청이 네트워크 오류로
+  실패하면 5분 이내 캐시가 있을 때 그걸로 폴백 (30초 폴링 특성상 5분이면 낡은 데이터를 오래 우려먹지 않음).
+- **위젯 자체 API 호출 절감**: `ContentView.saveWidgetNextMatches()`가 즐겨찾기 팀뿐 아니라 지금 라이브 중인
+  모든 팀(상대팀 포함)을 App Group에 공유 저장한다. `WidgetNetworkService.fetchAllLiveMatchInfo()`는 이
+  스냅샷이 90초 이내로 신선하면 그대로 재사용하고 `/getLive` 호출을 건너뛴다 — 앱이 실행 중일 땐 위젯이
+  같은 데이터를 또 요청하지 않게 되어 API 호출 횟수가 줄어든다. 스냅샷이 없거나 오래됐으면(앱이 백그라운드/
+  종료 상태) 기존처럼 위젯이 직접 호출한다.
 
 ### API 오류 대응 (Stale 캐시 폴백)
 
