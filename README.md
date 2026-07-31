@@ -281,6 +281,13 @@ TournamentDetailViewModel.load()
 | 챔피언 픽 (개별) | `champs_{key}.json` | 24h | LeaguepediaStats/ |
 | 과거 경기 | `histv2_{key}.json` | 30일 | LeaguepediaStats/ |
 
+**완료 경기 프리로드 개수**: `TodayViewModel`/`LeagueDetailViewModel`/`TournamentDetailViewModel`/`AppPreloadService`
+4곳이 전부 같은 정책("최근 완료 경기 몇 개까지 상세 데이터를 미리 받아둘지")을 쓰는데, `prefix(8)`로 각자 하드코딩돼
+있던 걸 `MatchDetailViewModel.preloadCount`로 통합했습니다.
+
+**위젯 라이브 체크 시작 시점**: `FavoriteTeamWidget.swift` 안에서 "예정 90분 전부터 라이브 API 확인 시작"이라는
+같은 기준이 5곳에 `5400`(초)으로 반복돼 있던 걸 `FavoriteTeamProvider.earlyLiveCheckWindow` 상수로 통합했습니다.
+
 ### ViewModel 선로딩 패턴
 
 ```
