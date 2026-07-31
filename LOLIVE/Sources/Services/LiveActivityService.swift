@@ -110,10 +110,16 @@ final class LiveActivityService {
         await saveHiResLogo(original, teamCode: teamCode)
 
         // 투명 배경 유지를 위해 PNG 고정.
-        // 큰 해상도부터 시도해 예산(1.5KB) 안에 들어오는 가장 선명한 크기를 사용.
+        // 큰 해상도부터 시도해 예산 안에 들어오는 가장 선명한 크기를 사용.
         // (90px = 기존 30pt@3x와 동일 화질 — 단순한 로고는 그대로 유지됨)
         // 렌더링·인코딩은 CPU 바운드라 메인 스레드 밖(Task.detached)에서 수행한다.
-        let maxBytes = 1500
+        //
+        // [예산 900B인 이유] ActivityKit은 attributes를 JSON(Data→base64)으로 인코딩해 전달한다.
+        // base64는 원본보다 약 37% 커지므로, 로고가 복잡해 압축이 잘 안 되는 팀(T1·Gen.G 등)은
+        // 기존 1500B 예산도 base64 변환 후 이미지 2장만으로 4KB를 넘겨 attributesTooLarge로
+        // Activity.request 자체가 거부되는 버그가 있었다. 900B(base64 후 약 1.2KB) × 2장 +
+        // 팀명/코드/리그명 여유를 두어도 4KB 한도 안에 들어오도록 낮춘다.
+        let maxBytes = 900
         let sides = [90, 72, 60, 48, 36, 30, 24, 16, 12]
         let result = await Task.detached(priority: .utility) { () -> (side: Int, png: Data)? in
             let originalPx = CGSize(width: original.size.width * original.scale,
@@ -293,15 +299,18 @@ final class LiveActivityService {
                 async let thumbB = fetchThumbnail(urlString: liveMatch.match.teamB.imageURL, teamCode: liveMatch.match.teamB.code)
                 let (teamAImageData, teamBImageData) = await (thumbA, thumbB)
 
+                // teamAImageURL/teamBImageURL은 attributes에 담지 않는다 (4KB 예산 절약) —
+                // 위젯은 어차피 App Group 고화질 파일 → 썸네일 데이터 순으로 우선 사용하고,
+                // URL은 그 둘 다 없을 때만 쓰는 최후 폴백이라 생략해도 실사용에 영향 없다.
                 let attrs = MatchActivityAttributes(
                     matchId: liveMatch.match.id,
                     teamAName: liveMatch.match.teamA.name,
                     teamACode: liveMatch.match.teamA.code,
-                    teamAImageURL: liveMatch.match.teamA.imageURL,
+                    teamAImageURL: nil,
                     teamAImageData: teamAImageData,
                     teamBName: liveMatch.match.teamB.name,
                     teamBCode: liveMatch.match.teamB.code,
-                    teamBImageURL: liveMatch.match.teamB.imageURL,
+                    teamBImageURL: nil,
                     teamBImageData: teamBImageData,
                     leagueName: liveMatch.match.league.name
                 )
@@ -339,11 +348,11 @@ final class LiveActivityService {
                 matchId: match.id,
                 teamAName: match.teamA.name,
                 teamACode: match.teamA.code,
-                teamAImageURL: match.teamA.imageURL,
+                teamAImageURL: nil,
                 teamAImageData: teamAData,
                 teamBName: match.teamB.name,
                 teamBCode: match.teamB.code,
-                teamBImageURL: match.teamB.imageURL,
+                teamBImageURL: nil,
                 teamBImageData: teamBData,
                 leagueName: match.league.name
             )
