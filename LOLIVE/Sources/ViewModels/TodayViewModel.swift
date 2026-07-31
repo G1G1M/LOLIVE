@@ -89,7 +89,10 @@ final class TodayViewModel {
 
     // 라이브 스탯 피드가 멈췄는지 판단하기 위한 상태 (즐겨찾기 라이브 경기 전용)
     private var lastStuckCheck: [String: Date] = [:]              // matchId -> 마지막으로 Leaguepedia 대조한 시각
-    private var leaguepediaOverrides: [String: Match] = [:]       // matchId -> Leaguepedia가 확인해준 완료 결과 (Riot이 따라잡을 때까지 유지)
+    // matchId -> Leaguepedia로 보정한 최신 상태. state == .completed면 시리즈 전체 종료 확정,
+    // 그 외엔 세트 단위로 스코어만 보정된 상태(시리즈는 계속 진행 중)라 liveMatches에 계속 반영한다.
+    private var leaguepediaOverrides: [String: Match] = [:]
+    private var appliedGameCorrections: [String: Set<Int>] = [:]  // matchId -> 이미 보정 반영한 세트 번호 (중복 알림 방지)
     private static let staleFeedThreshold: TimeInterval = 5 * 60  // 라이브 피드 프레임이 이보다 오래 안 갱신되면 "멈춤"
     private static let stuckRecheckCooldown: TimeInterval = 5 * 60
 
@@ -170,9 +173,10 @@ final class TodayViewModel {
                     }
 
                     // 즐겨찾기 경기의 시작/세트 진행 알림
-                    // (Leaguepedia로 이미 완료 확정된 경기는 제외 — Riot이 아직 안 따라잡아 live에 남아있어도
-                    //  prevFavoriteLive엔 없으므로 "새로 시작"으로 오판하지 않도록 가드)
-                    for lm in newFavoriteLive where leaguepediaOverrides[lm.match.id] == nil {
+                    // (Leaguepedia로 이미 시리즈 완료 확정된 경기는 제외 — Riot이 아직 안 따라잡아 live에 남아있어도
+                    //  prevFavoriteLive엔 없으므로 "새로 시작"으로 오판하지 않도록 가드. 세트 단위 보정만 된
+                    //  경기는 여전히 진행 중이라 이 루프를 계속 타야 하므로 제외하지 않는다)
+                    for lm in newFavoriteLive where leaguepediaOverrides[lm.match.id]?.state != .completed {
                         guard let code = favoriteTeamCode(for: lm.match) else { continue }
                         if let prev = prevFavoriteLive.first(where: { $0.match.id == lm.match.id }) {
                             // 세트 번호가 늘었으면 이전 세트 종료 + 새 세트 시작 알림
@@ -201,8 +205,16 @@ final class TodayViewModel {
                     // Riot 라이브 목록에서 스스로 빠지면(뒤늦게라도 따라잡으면) override 기록도 정리
                     leaguepediaOverrides = leaguepediaOverrides.filter { newLiveIds.contains($0.key) }
                     lastStuckCheck = lastStuckCheck.filter { newLiveIds.contains($0.key) }
+                    appliedGameCorrections = appliedGameCorrections.filter { newLiveIds.contains($0.key) }
 
-                    liveMatches = enrich(live).filter { leaguepediaOverrides[$0.match.id] == nil }
+                    // Leaguepedia 보정 적용: 시리즈 완료 확정은 목록에서 제외(이미 markCompleted 처리됨),
+                    // 세트 단위 보정은 스코어만 교체해 계속 라이브로 표시
+                    liveMatches = enrich(live).compactMap { lm -> LiveMatch? in
+                        guard let override = leaguepediaOverrides[lm.match.id] else { return lm }
+                        guard override.state != .completed else { return nil }
+                        return LiveMatch(match: override, currentSet: lm.currentSet,
+                                         lastUpdated: lm.lastUpdated, currentGameId: lm.currentGameId)
+                    }
                     checkStuckLiveMatches(newFavoriteLive)
 
                     // 예약 시각이 지났으나 API 미확인 즐겨찾기 경기 (조기 시작 대응 + API 딜레이 브릿징)
@@ -299,28 +311,54 @@ final class TodayViewModel {
     ///
     /// [왜 스코어/세트 번호로 판단하지 않는가] 스코어는 한 세트가 끝나야만 바뀌는 값이라
     /// 정상 진행 중에도 20~40분씩 그대로인 게 당연하다 — 그걸로 "멈춤"을 판단하면
-    /// 멀쩡히 진행 중인 경기까지 전부 오탐하게 된다. 대신 인게임 피드의 최신 프레임 시각을
-    /// 직접 확인해서, 그게 오래 안 갱신되면 그때만 "진짜로 멈췄다"고 판단한다.
+    /// 멀쩡히 진행 중인 경기까지 전부 오탐하게 된다. 대신 인게임 피드의 gameState/최신 프레임
+    /// 시각을 직접 확인해서, `"finished"`가 명시적으로 찍혀 있거나 오래 조용할 때만 "멈췄다"고 판단한다.
     ///
-    /// 5분 쿨다운으로 경기당 너무 자주 호출되지 않게 하고, 멈춘 것으로 확인되면
-    /// Leaguepedia로 대조해 이미 끝난 경기면 로컬에서 완료 처리한다.
+    /// 멈춘 것으로 확인되면 두 단계로 Leaguepedia와 대조한다:
+    /// 1) 세트 단위 결과(ScoreboardGames) — 시리즈가 안 끝나도 방금 끝난 세트만 반영 가능
+    /// 2) 시리즈 전체 결과(MatchSchedule) — 1번에 없으면 시리즈 자체가 이미 끝났는지 확인
+    /// 둘 다 없으면 억지로 점수를 만들어내지 않고 다음 쿨다운에 재시도한다.
     private func checkStuckLiveMatches(_ favoriteLive: [LiveMatch]) {
         for lm in favoriteLive {
-            guard let gameId = lm.currentGameId, leaguepediaOverrides[lm.match.id] == nil else { continue }
+            guard let gameId = lm.currentGameId else { continue }
+            guard leaguepediaOverrides[lm.match.id]?.state != .completed else { continue }
             let lastCheck = lastStuckCheck[lm.match.id]
             guard lastCheck == nil || Date().timeIntervalSince(lastCheck!) > Self.stuckRecheckCooldown else { continue }
             lastStuckCheck[lm.match.id] = Date()
 
             let match = lm.match
+            let gameNumber = lm.currentSet
             let stats = liveStatsService
             Task {
                 let recentWindowStart = Date().addingTimeInterval(-(Self.staleFeedThreshold + 5 * 60))
                 guard let window = try? await stats.fetchGameWindow(gameId: gameId, startingTime: recentWindowStart)
                 else { return }
+                let isFinished = window.gameState == "finished"
                 let isStale = window.lastFrameTimestamp
                     .map { Date().timeIntervalSince($0) > Self.staleFeedThreshold } ?? true
-                guard isStale else { return }
+                guard isFinished || isStale else { return }
 
+                // 1순위: 세트 단위 결과 — 이미 반영한 세트면 중복 알림 방지를 위해 건너뜀
+                let alreadyApplied = appliedGameCorrections[match.id]?.contains(gameNumber) ?? false
+                if !alreadyApplied,
+                   let teamAWon = await LeaguepediaService.shared.fetchGameResult(match: match, gameNumber: gameNumber) {
+                    appliedGameCorrections[match.id, default: []].insert(gameNumber)
+                    let updated = Match(
+                        id: match.id, league: match.league, teamA: match.teamA, teamB: match.teamB,
+                        scoreA: match.scoreA + (teamAWon ? 1 : 0),
+                        scoreB: match.scoreB + (teamAWon ? 0 : 1),
+                        startTime: match.startTime, state: .inProgress, blockName: match.blockName
+                    )
+                    leaguepediaOverrides[match.id] = updated
+                    if let code = favoriteTeamCode(for: updated) {
+                        await MatchNotificationService.shared.sendSetEndNotification(
+                            for: updated, favoriteTeamCode: code, endedSet: gameNumber
+                        )
+                    }
+                    return
+                }
+
+                // 2순위: 시리즈 전체가 이미 끝났는지
                 guard let updated = await LeaguepediaService.shared.reconcileStuckLiveMatch(match) else { return }
                 leaguepediaOverrides[match.id] = updated
                 liveMatches.removeAll { $0.match.id == match.id }

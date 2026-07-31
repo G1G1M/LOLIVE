@@ -112,6 +112,47 @@ extension LeaguepediaService {
         return matches
     }
 
+    /// 진행 중인 시리즈의 개별 세트(게임) 결과를 Leaguepedia의 ScoreboardGames 테이블에서 조회.
+    /// MatchSchedule(시리즈 전체 단위)과 달리 게임 단위 테이블이라 시리즈가 안 끝나도
+    /// 한 세트가 끝나는 대로 반영될 수 있다 — 다만 위키 편집자가 그만큼 빨리 입력해야 실제로 잡힌다.
+    /// - Returns: 해당 세트에서 teamA가 이겼으면 true, teamB가 이겼으면 false, 결과가 아직 없으면 nil
+    func fetchGameResult(match: Match, gameNumber: Int) async -> Bool? {
+        let start = match.startTime.addingTimeInterval(-1 * 3600)
+        let end = match.startTime.addingTimeInterval(8 * 3600)
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        fmt.timeZone = TimeZone(identifier: "UTC")
+
+        var c = URLComponents(string: baseURL)!
+        c.queryItems = [
+            .init(name: "action",   value: "cargoquery"),
+            .init(name: "tables",   value: "ScoreboardGames"),
+            .init(name: "fields",   value: "Team1,Team2,WinTeam,N_GameInMatch,DateTime_UTC"),
+            .init(name: "where",    value: "ScoreboardGames.N_GameInMatch='\(gameNumber)' AND ScoreboardGames.DateTime_UTC BETWEEN '\(fmt.string(from: start))' AND '\(fmt.string(from: end))'"),
+            .init(name: "limit",    value: "50"),
+            .init(name: "format",   value: "json"),
+        ]
+        guard let url = c.url,
+              let data = await cargoData(url: url),
+              let resp = try? JSONDecoder().decode(CargoResp.self, from: data) else { return nil }
+
+        for row in resp.cargoquery {
+            let t1 = row.title["Team1"] ?? ""
+            let t2 = row.title["Team2"] ?? ""
+            let winTeam = row.title["WinTeam"] ?? ""
+            guard !winTeam.isEmpty else { continue }
+            let lpTeamA = Team(id: "lp_\(t1)", name: t1, code: t1, imageURL: nil)
+            let lpTeamB = Team(id: "lp_\(t2)", name: t2, code: t2, imageURL: nil)
+            guard sameTeams(match, Match(id: "", league: match.league, teamA: lpTeamA, teamB: lpTeamB,
+                                          scoreA: 0, scoreB: 0, startTime: match.startTime, state: .completed))
+            else { continue }
+            let winnerIsT1 = winTeam == t1
+            let sameOrder = teamsMatch(match.teamA, lpTeamA)
+            return sameOrder ? winnerIsT1 : !winnerIsT1
+        }
+        return nil
+    }
+
     /// Riot 경기 목록 중 (1) 시작 시각이 한참 지났는데도 `unstarted`로 멈춰있거나
     /// (2) `completed`인데 스코어가 0:0으로 비어 있는(=Riot이 결과를 안 준) 항목을
     /// 같은 팀 조합·비슷한 시각의 Leaguepedia 경기로 매칭해 스코어·상태만 교체한다.
