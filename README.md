@@ -168,7 +168,7 @@
 - **대표 팀 설정**: 팀 행 길게 누르면 대표 팀 지정 → 앱 전체 Tint 색상 적용
 - Live Activity: 잠금화면 실시간 스코어 (`[로고] 팀명 스코어–스코어 팀명 [로고]`) + Dynamic Island
   - 팀 로고: 고화질 로고(최대 300px, 비율 유지·업스케일 방지)를 App Group에 저장 → 위젯이 파일 직접 로드
-  - ActivityKit attributes 4KB 제한 대응: attributes에는 예산(1.5KB/장) 내 최대 해상도 썸네일만 폴백으로 포함 (`attributesTooLarge` 방지)
+  - ActivityKit attributes 4KB 제한 대응: attributes에는 예산(900B/장) 내 최대 해상도 썸네일만 폴백으로 포함, 원본 이미지 URL은 attributes에 담지 않음 (`attributesTooLarge` 방지 — base64 인코딩 시 원본보다 약 37% 커지는 걸 감안하지 않아 로고가 복잡한 팀에서 실제로 거부당하던 버그 수정)
   - 폴링: ContentView 레벨에서 실행 — 탭 전환·앱 재포그라운드 시에도 중단 없이 유지
   - **예약 시각부터 즉시 표시**: 경기 startTime 도달 시 API 확인 전에도 `isLive: false` pre-live Activity 시작 → "🕐 시작 중..." 표시. API가 inProgress 확인하면 실시간 스코어로 전환
   - 조기 시작 대응: API 딜레이 없이 예약 시각 기준으로 즉시 잠금화면·Dynamic Island에 대전 정보 표시
