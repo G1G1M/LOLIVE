@@ -592,7 +592,7 @@ struct OnboardingView: View {
                     .task {
                         let name = player.summonerName
                         guard loader.playerImageURLs[name] == nil else { return }
-                        AppDiskCache.clear(key: "lp_playerimg_\(name)")
+                        AppDiskCache.clear(.leaguepediaPlayerImage(summonerName: name))
                         if let url = await LeaguepediaService.shared.fetchPlayerImageURL(summonerName: name) {
                             loader.playerImageURLs[name] = url
                         }

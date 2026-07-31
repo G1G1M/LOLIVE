@@ -33,6 +33,7 @@ final class StandingsViewModel {
 
     private let service: RiotEsportsServiceProtocol
     private var standingsCache: [String: [Standing]] = [:]
+    private var tournamentIdByLeague: [String: String] = [:]
 
     private let excludedRegions: Set<String> = ["국제 대회"]
     private let secondaryKeywords = ["챌린저스", "challengers", "academy", "circuito desafiante"]
@@ -81,7 +82,11 @@ final class StandingsViewModel {
     func refreshStandings() async {
         guard let league = selectedLeague else { return }
         standingsCache.removeValue(forKey: league.id)
-        AppDiskCache.clear(key: "standings_\(league.id)")
+        // standings는 tournamentId 기준으로 캐싱되므로(league.id가 아님) 마지막으로 알고 있던
+        // tournamentId로 지워야 실제로 지워진다 — 예전엔 league.id로 지워서 아무 캐시도 안 지워지던 버그였음
+        if let tournamentId = tournamentIdByLeague[league.id] {
+            AppDiskCache.clear(.standings(tournamentId: tournamentId))
+        }
         await loadStandings(for: league)
     }
 
@@ -106,6 +111,7 @@ final class StandingsViewModel {
             standings = []
             return
         }
+        tournamentIdByLeague[league.id] = tournament.id
 
         async let standingsFetch = service.fetchStandings(tournamentId: tournament.id)
         async let scheduleFetch = service.fetchSchedule(league: league)
@@ -119,7 +125,7 @@ final class StandingsViewModel {
     }
 
     private func preloadFromCache() -> Bool {
-        guard let fetched: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600) else { return false }
+        guard let fetched: [League] = AppDiskCache.get(.leagues) else { return false }
         let filtered = fetched
             .filter { !excludedRegions.contains($0.region) }
             .filter { league in
@@ -139,11 +145,12 @@ final class StandingsViewModel {
     }
 
     private func preloadStandingsFromCache(for league: League) -> [Standing]? {
-        guard let tournaments: [Tournament] = AppDiskCache.get(key: "tournaments_\(league.id)", maxAge: 24 * 3600),
+        guard let tournaments: [Tournament] = AppDiskCache.get(.tournaments(leagueId: league.id)),
               let tournament = activeTournament(from: tournaments),
-              let fetched: [Standing] = AppDiskCache.get(key: "standings_\(tournament.id)", maxAge: 3600)
+              let fetched: [Standing] = AppDiskCache.get(.standings(tournamentId: tournament.id))
         else { return nil }
-        let schedule: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) ?? []
+        tournamentIdByLeague[league.id] = tournament.id
+        let schedule: [Match] = AppDiskCache.get(.schedule(leagueId: league.id)) ?? []
         return applyGD(fetched, schedule: schedule)
     }
 

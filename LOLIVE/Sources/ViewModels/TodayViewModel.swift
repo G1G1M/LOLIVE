@@ -236,10 +236,10 @@ final class TodayViewModel {
     // MARK: - Private
 
     private func preloadFromCache() -> Bool {
-        guard let leagues: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600) else { return false }
+        guard let leagues: [League] = AppDiskCache.get(.leagues) else { return false }
         var allMatches: [Match] = []
         for league in leagues {
-            if let matches: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) {
+            if let matches: [Match] = AppDiskCache.get(.schedule(leagueId: league.id)) {
                 allMatches.append(contentsOf: matches)
             }
         }
@@ -249,10 +249,10 @@ final class TodayViewModel {
     }
 
     private func loadFromStaleCache() -> Bool {
-        guard let leagues: [League] = AppDiskCache.getStale(key: "leagues") else { return false }
+        guard let leagues: [League] = AppDiskCache.getStale(.leagues) else { return false }
         var allMatches: [Match] = []
         for league in leagues {
-            if let matches: [Match] = AppDiskCache.getStale(key: "schedule_\(league.id)") {
+            if let matches: [Match] = AppDiskCache.getStale(.schedule(leagueId: league.id)) {
                 allMatches.append(contentsOf: matches)
             }
         }

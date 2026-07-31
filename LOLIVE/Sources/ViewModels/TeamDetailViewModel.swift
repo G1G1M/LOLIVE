@@ -74,11 +74,11 @@ final class TeamDetailViewModel {
 
     private func preloadFromCache() -> Bool {
         var hadAny = false
-        if let roster: [Player] = AppDiskCache.get(key: "roster_\(team.id)", maxAge: 12 * 3600) {
+        if let roster: [Player] = AppDiskCache.get(.roster(teamId: team.id)) {
             players = roster.sorted { roleOrder($0.role) < roleOrder($1.role) }
             hadAny = true
         }
-        if let allMatches: [Match] = AppDiskCache.get(key: "all_schedule_\(league.id)", maxAge: 2 * 3600) {
+        if let allMatches: [Match] = AppDiskCache.get(.allSchedule(leagueId: league.id)) {
             applyMatches(allMatches)
             hadAny = true
         }

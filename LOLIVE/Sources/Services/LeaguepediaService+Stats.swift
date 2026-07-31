@@ -178,8 +178,8 @@ extension LeaguepediaService {
     /// Leaguepedia Players 테이블에서 선수 프로필 이미지 URL 반환.
     /// Riot API는 선수 이미지를 제공하지 않으므로 Leaguepedia 보완 데이터 사용.
     func fetchPlayerImageURL(summonerName: String) async -> URL? {
-        let cacheKey = "lp_playerimg_\(summonerName)"
-        if let cached: String = AppDiskCache.get(key: cacheKey, maxAge: 7 * 24 * 3600) {
+        let cacheKey = CacheKey.leaguepediaPlayerImage(summonerName: summonerName)
+        if let cached: String = AppDiskCache.get(cacheKey) {
             return cached.isEmpty ? nil : URL(string: cached)
         }
         var c = URLComponents(string: baseURL)!
@@ -196,13 +196,13 @@ extension LeaguepediaService {
               let resp = try? JSONDecoder().decode(CargoResp.self, from: data),
               let photo = resp.cargoquery.first?.title["Photo"], !photo.isEmpty else {
             // 결과 없음도 캐싱해 불필요한 재요청 방지
-            AppDiskCache.set(key: cacheKey, value: "")
+            AppDiskCache.set(cacheKey, value: "")
             return nil
         }
         let encoded = photo.replacingOccurrences(of: " ", with: "_")
             .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? photo
         let urlString = "https://lol.fandom.com/wiki/Special:FilePath/\(encoded)"
-        AppDiskCache.set(key: cacheKey, value: urlString)
+        AppDiskCache.set(cacheKey, value: urlString)
         return URL(string: urlString)
     }
 

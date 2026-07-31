@@ -57,7 +57,7 @@ final class LeaguesViewModel {
     func load() async {
         // 캐시 히트 시 즉시 표시하고 백그라운드에서 갱신 (스피너 없음)
         let hadCache: Bool
-        if let cached: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600), !cached.isEmpty {
+        if let cached: [League] = AppDiskCache.get(.leagues), !cached.isEmpty {
             leagues = cached
             hadCache = true
         } else {

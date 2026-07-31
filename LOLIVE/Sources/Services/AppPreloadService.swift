@@ -42,11 +42,11 @@ final class AppPreloadService {
 
         // 1. 리그 목록 (캐시 우선)
         let leagues: [League]
-        if let cached: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600), !cached.isEmpty {
+        if let cached: [League] = AppDiskCache.get(.leagues), !cached.isEmpty {
             leagues = cached
         } else {
             guard let fetched = try? await service.fetchLeagues(), !fetched.isEmpty else { return }
-            AppDiskCache.set(key: "leagues", value: fetched)
+            AppDiskCache.set(.leagues, value: fetched)
             leagues = fetched
         }
 
@@ -61,7 +61,7 @@ final class AppPreloadService {
     private func preloadMatchDetails(_ leagues: [League], service: RiotEsportsService) async {
         for league in leagues {
             let schedule: [Match]
-            if let cached: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) {
+            if let cached: [Match] = AppDiskCache.get(.schedule(leagueId: league.id)) {
                 schedule = cached
             } else {
                 guard let fetched = try? await service.fetchSchedule(league: league) else { continue }

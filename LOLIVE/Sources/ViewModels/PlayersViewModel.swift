@@ -152,7 +152,7 @@ final class PlayersViewModel {
 
     private func preloadFromCache() -> Bool {
         guard let cached: [PlayerEntry] = AppDiskCache.get(key: "players_all", maxAge: 12 * 3600),
-              let cachedLeagues: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600),
+              let cachedLeagues: [League] = AppDiskCache.get(.leagues),
               !cached.isEmpty
         else { return false }
         allPlayers = cached

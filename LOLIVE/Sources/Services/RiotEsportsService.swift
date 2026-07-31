@@ -44,20 +44,19 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
     // MARK: - Public
 
     func fetchLeagues() async throws -> [League] {
-        let key = "leagues"
-        if let cached: [League] = AppDiskCache.get(key: key, maxAge: 24 * 3600) { return cached }
+        if let cached: [League] = AppDiskCache.get(.leagues) { return cached }
         let data = try await request(path: "/getLeagues", queryItems: [])
         let response = try decode(LeaguesResponse.self, from: data)
         let leagues = response.data.leagues.map {
             League(id: $0.id, slug: $0.slug ?? "", name: $0.name, region: $0.region, imageURL: https($0.image))
         }
-        AppDiskCache.set(key: key, value: leagues)
+        AppDiskCache.set(.leagues, value: leagues)
         return leagues
     }
 
     func fetchSchedule(league: League) async throws -> [Match] {
-        let key = "schedule_\(league.id)"
-        if let cached: [Match] = AppDiskCache.get(key: key, maxAge: 15 * 60) { return cached }
+        let cacheKey = CacheKey.schedule(leagueId: league.id)
+        if let cached: [Match] = AppDiskCache.get(cacheKey) { return cached }
 
         var allMatches: [Match] = []
         var seen = Set<String>()
@@ -109,7 +108,7 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
 
         allMatches = await reconcileUnreportedResults(allMatches, league: league)
 
-        AppDiskCache.set(key: key, value: allMatches)
+        AppDiskCache.set(cacheKey, value: allMatches)
         return allMatches
     }
 
@@ -133,8 +132,8 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
 
     // 국제 대회(Worlds/MSI) 전용: 모든 페이지를 순회하여 전체 경기 목록 반환
     func fetchAllSchedule(league: League) async throws -> [Match] {
-        let key = "all_schedule_\(league.id)"
-        if let cached: [Match] = AppDiskCache.get(key: key, maxAge: 2 * 3600) { return cached }
+        let cacheKey = CacheKey.allSchedule(leagueId: league.id)
+        if let cached: [Match] = AppDiskCache.get(cacheKey) { return cached }
         var allMatches: [Match] = []
         var pageToken: String? = nil
         var pageCount = 0
@@ -165,7 +164,7 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         var seen = Set<String>()
         var result = allMatches.filter { seen.insert($0.id).inserted }
         result = await reconcileUnreportedResults(result, league: league)
-        if !result.isEmpty { AppDiskCache.set(key: key, value: result) }
+        if !result.isEmpty { AppDiskCache.set(cacheKey, value: result) }
         return result
     }
 
@@ -178,12 +177,12 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
                 let currentSet = (event.match?.games?.filter { $0.state == "completed" }.count ?? 0) + 1
                 return LiveMatch(match: match, currentSet: currentSet, lastUpdated: Date())
             }
-            AppDiskCache.set(key: "live", value: live)
+            AppDiskCache.set(.live, value: live)
             return live
         } catch {
             // 네트워크 순간 장애 대응: 5분 이내 캐시가 있으면 폴백, 없으면(오래 끊겼으면) 에러 그대로 전달
             // (30초 폴링 주기 특성상 5분이면 이미 여러 번 재시도할 시간이라 낡은 데이터를 오래 우려먹진 않음)
-            if let cached: [LiveMatch] = AppDiskCache.get(key: "live", maxAge: 5 * 60) {
+            if let cached: [LiveMatch] = AppDiskCache.get(.live) {
                 return cached
             }
             throw error
@@ -251,21 +250,21 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
     }
 
     func fetchTournaments(leagueId: String) async throws -> [Tournament] {
-        let key = "tournaments_\(leagueId)"
-        if let cached: [Tournament] = AppDiskCache.get(key: key, maxAge: 24 * 3600) { return cached }
+        let cacheKey = CacheKey.tournaments(leagueId: leagueId)
+        if let cached: [Tournament] = AppDiskCache.get(cacheKey) { return cached }
         let query = [URLQueryItem(name: "leagueId", value: leagueId)]
         let data = try await request(path: "/getTournamentsForLeague", queryItems: query)
         let response = try decode(TournamentsResponse.self, from: data)
         let tournaments = response.data.leagues.flatMap { $0.tournaments }.map {
             Tournament(id: $0.id, slug: $0.slug, startDate: $0.startDate, endDate: $0.endDate ?? "")
         }
-        AppDiskCache.set(key: key, value: tournaments)
+        AppDiskCache.set(cacheKey, value: tournaments)
         return tournaments
     }
 
     func fetchStandings(tournamentId: String) async throws -> [Standing] {
-        let key = "standings_\(tournamentId)"
-        if let cached: [Standing] = AppDiskCache.get(key: key, maxAge: 3600) { return cached }
+        let cacheKey = CacheKey.standings(tournamentId: tournamentId)
+        if let cached: [Standing] = AppDiskCache.get(cacheKey) { return cached }
         let query = [URLQueryItem(name: "tournamentId", value: tournamentId)]
         let data = try await request(path: "/getStandings", queryItems: query)
         let response = try decode(StandingsResponse.self, from: data)
@@ -296,13 +295,13 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
             if $0.wins != $1.wins { return $0.wins > $1.wins }
             return $0.team.name < $1.team.name
         }
-        AppDiskCache.set(key: key, value: standings)
+        AppDiskCache.set(cacheKey, value: standings)
         return standings
     }
 
     func fetchTeamRoster(teamId: String) async throws -> [Player] {
-        let key = "roster_\(teamId)"
-        if let cached: [Player] = AppDiskCache.get(key: key, maxAge: 12 * 3600) { return cached }
+        let cacheKey = CacheKey.roster(teamId: teamId)
+        if let cached: [Player] = AppDiskCache.get(cacheKey) { return cached }
         let query = [URLQueryItem(name: "id", value: teamId)]
         let data = try await request(path: "/getTeams", queryItems: query)
         let response = try decode(TeamsResponse.self, from: data)
@@ -313,7 +312,7 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
                    role: p.role ?? "", imageURL: https(p.image),
                    teamId: team.id, teamCode: team.code)
         }
-        AppDiskCache.set(key: key, value: players)
+        AppDiskCache.set(cacheKey, value: players)
         return players
     }
 

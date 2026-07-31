@@ -148,7 +148,7 @@ final class SearchViewModel {
     }
 
     private func preloadFromCache() -> Bool {
-        guard let cachedLeagues: [League] = AppDiskCache.get(key: "leagues", maxAge: 24 * 3600),
+        guard let cachedLeagues: [League] = AppDiskCache.get(.leagues),
               let teams: [SearchTeamEntry] = AppDiskCache.get(key: "search_teams", maxAge: 12 * 3600),
               let players: [SearchPlayerEntry] = AppDiskCache.get(key: "search_players", maxAge: 12 * 3600),
               !cachedLeagues.isEmpty

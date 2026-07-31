@@ -176,7 +176,7 @@ final class LeagueDetailViewModel {
     // MARK: - Private
 
     private func preloadFromCache() -> Bool {
-        guard let allMatches: [Match] = AppDiskCache.get(key: "schedule_\(league.id)", maxAge: 15 * 60) else { return false }
+        guard let allMatches: [Match] = AppDiskCache.get(.schedule(leagueId: league.id)) else { return false }
         let now = Date()
         upcomingMatches = allMatches
             .filter { $0.startTime >= now && $0.state == .unstarted }
@@ -184,9 +184,9 @@ final class LeagueDetailViewModel {
         completedMatches = allMatches
             .filter { $0.state == .completed }
             .sorted { $0.startTime > $1.startTime }
-        if let tournaments: [Tournament] = AppDiskCache.get(key: "tournaments_\(league.id)", maxAge: 24 * 3600),
+        if let tournaments: [Tournament] = AppDiskCache.get(.tournaments(leagueId: league.id)),
            let tournament = activeTournament(from: tournaments),
-           let fetched: [Standing] = AppDiskCache.get(key: "standings_\(tournament.id)", maxAge: 3600) {
+           let fetched: [Standing] = AppDiskCache.get(.standings(tournamentId: tournament.id)) {
             standings = applyGD(fetched, schedule: allMatches)
         }
         if let cachedPlayers: [Player] = AppDiskCache.get(key: "league_players_\(league.id)", maxAge: 12 * 3600) {
@@ -196,7 +196,7 @@ final class LeagueDetailViewModel {
     }
 
     private func preloadFromStaleCache() -> Bool {
-        guard let allMatches: [Match] = AppDiskCache.getStale(key: "schedule_\(league.id)") else { return false }
+        guard let allMatches: [Match] = AppDiskCache.getStale(.schedule(leagueId: league.id)) else { return false }
         let now = Date()
         upcomingMatches = allMatches
             .filter { $0.startTime >= now && $0.state == .unstarted }
@@ -204,9 +204,9 @@ final class LeagueDetailViewModel {
         completedMatches = allMatches
             .filter { $0.state == .completed }
             .sorted { $0.startTime > $1.startTime }
-        if let tournaments: [Tournament] = AppDiskCache.getStale(key: "tournaments_\(league.id)"),
+        if let tournaments: [Tournament] = AppDiskCache.getStale(.tournaments(leagueId: league.id)),
            let tournament = activeTournament(from: tournaments),
-           let fetched: [Standing] = AppDiskCache.getStale(key: "standings_\(tournament.id)") {
+           let fetched: [Standing] = AppDiskCache.getStale(.standings(tournamentId: tournament.id)) {
             standings = applyGD(fetched, schedule: allMatches)
         }
         return true
