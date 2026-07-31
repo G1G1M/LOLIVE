@@ -114,14 +114,20 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
 
     /// 케스파컵처럼 Riot이 경기 상태/결과를 갱신해주지 않는 대회 대응.
     /// 시작 시각이 한참 지났는데도 unstarted로 멈춰있거나, completed인데 스코어(gameWins)가
-    /// 비어 있어 0:0으로 내려오는 경기가 있으면 Leaguepedia 결과로 보완한다.
-    /// (LoL 경기는 정상 종료 시 0:0으로 끝날 수 없으므로 이 조건으로 걸러도 안전하다)
+    /// 비어 있어 0:0으로 내려오는 경기, 또는 실제로는 끝났는데 inProgress로 오래 멈춰있는 경기가
+    /// 있으면 Leaguepedia 결과로 보완한다. (LoL 경기는 정상 종료 시 0:0으로 끝날 수 없으므로
+    /// 이 조건으로 걸러도 안전하다)
     /// 정상적으로 상태가 갱신되는 리그(대부분)는 감지되는 게 없어 API 호출 없이 그대로 반환된다.
     private func reconcileUnreportedResults(_ matches: [Match], league: League) async -> [Match] {
-        let cutoff = Date().addingTimeInterval(-3 * 3600)
+        let unstartedCutoff = Date().addingTimeInterval(-3 * 3600)
+        // inProgress는 unstarted보다 훨씬 짧은 유예만 준다 — 방송 지연으로 몇 시간씩 안 시작하는 건
+        // 흔하지만, 일단 시작한 경기가 90분 넘게 스코어 변화가 없는 건 Bo5를 감안해도 의심스럽다.
+        // (실제로 Leaguepedia에 완료 기록이 없으면 아래에서 그냥 원본 그대로 반환되니 오탐 위험은 낮음)
+        let inProgressCutoff = Date().addingTimeInterval(-90 * 60)
         let hasStale = matches.contains {
-            ($0.state == .unstarted && $0.startTime < cutoff) ||
-            ($0.state == .completed && $0.scoreA == 0 && $0.scoreB == 0)
+            ($0.state == .unstarted && $0.startTime < unstartedCutoff) ||
+            ($0.state == .completed && $0.scoreA == 0 && $0.scoreB == 0) ||
+            ($0.state == .inProgress && $0.startTime < inProgressCutoff)
         }
         guard hasStale else { return matches }
 

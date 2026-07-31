@@ -111,8 +111,15 @@ final class TodayViewModel {
 
     // MARK: - Public
 
-    func loadTodayMatches() async {
-        if !preloadFromCache() {
+    /// - Parameter forceRefresh: true면 일정 캐시(15분 TTL)를 무시하고 강제로 새로 받아온다.
+    ///   당겨서 새로고침(pull-to-refresh)이 캐시 때문에 실제로는 아무것도 안 바뀌는 문제를 막기 위함 —
+    ///   캐시가 남아있으면 API 재호출도, Leaguepedia 보정도 다시 안 타서 "새로고침해도 그대로"가 된다.
+    func loadTodayMatches(forceRefresh: Bool = false) async {
+        if forceRefresh {
+            for league in cachedLeagues {
+                AppDiskCache.clear(.schedule(leagueId: league.id))
+            }
+        } else if !preloadFromCache() {
             isLoading = true
         }
         errorMessage = nil

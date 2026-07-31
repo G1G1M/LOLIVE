@@ -309,7 +309,7 @@ struct TodayView: View {
                 .padding(.bottom, 20)
             }
             .refreshable {
-                await viewModel.loadTodayMatches()
+                await viewModel.loadTodayMatches(forceRefresh: true)
                 proxy.scrollTo("top", anchor: .top)
             }
             .onChange(of: selectedDate) {
