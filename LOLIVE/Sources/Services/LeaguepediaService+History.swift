@@ -112,47 +112,6 @@ extension LeaguepediaService {
         return matches
     }
 
-    /// 진행 중인 시리즈의 개별 세트(게임) 결과를 Leaguepedia의 ScoreboardGames 테이블에서 조회.
-    /// MatchSchedule(시리즈 전체 단위)과 달리 게임 단위 테이블이라 시리즈가 안 끝나도
-    /// 한 세트가 끝나는 대로 반영될 수 있다 — 다만 위키 편집자가 그만큼 빨리 입력해야 실제로 잡힌다.
-    /// - Returns: 해당 세트에서 teamA가 이겼으면 true, teamB가 이겼으면 false, 결과가 아직 없으면 nil
-    func fetchGameResult(match: Match, gameNumber: Int) async -> Bool? {
-        let start = match.startTime.addingTimeInterval(-1 * 3600)
-        let end = match.startTime.addingTimeInterval(8 * 3600)
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        fmt.timeZone = TimeZone(identifier: "UTC")
-
-        var c = URLComponents(string: baseURL)!
-        c.queryItems = [
-            .init(name: "action",   value: "cargoquery"),
-            .init(name: "tables",   value: "ScoreboardGames"),
-            .init(name: "fields",   value: "Team1,Team2,WinTeam,N_GameInMatch,DateTime_UTC"),
-            .init(name: "where",    value: "ScoreboardGames.N_GameInMatch='\(gameNumber)' AND ScoreboardGames.DateTime_UTC BETWEEN '\(fmt.string(from: start))' AND '\(fmt.string(from: end))'"),
-            .init(name: "limit",    value: "50"),
-            .init(name: "format",   value: "json"),
-        ]
-        guard let url = c.url,
-              let data = await cargoData(url: url),
-              let resp = try? JSONDecoder().decode(CargoResp.self, from: data) else { return nil }
-
-        for row in resp.cargoquery {
-            let t1 = row.title["Team1"] ?? ""
-            let t2 = row.title["Team2"] ?? ""
-            let winTeam = row.title["WinTeam"] ?? ""
-            guard !winTeam.isEmpty else { continue }
-            let lpTeamA = Team(id: "lp_\(t1)", name: t1, code: t1, imageURL: nil)
-            let lpTeamB = Team(id: "lp_\(t2)", name: t2, code: t2, imageURL: nil)
-            guard sameTeams(match, Match(id: "", league: match.league, teamA: lpTeamA, teamB: lpTeamB,
-                                          scoreA: 0, scoreB: 0, startTime: match.startTime, state: .completed))
-            else { continue }
-            let winnerIsT1 = winTeam == t1
-            let sameOrder = teamsMatch(match.teamA, lpTeamA)
-            return sameOrder ? winnerIsT1 : !winnerIsT1
-        }
-        return nil
-    }
-
     /// Riot 경기 목록 중 (1) 시작 시각이 한참 지났는데도 `unstarted`로 멈춰있거나
     /// (2) `completed`인데 스코어가 0:0으로 비어 있는(=Riot이 결과를 안 준) 항목을
     /// 같은 팀 조합·비슷한 시각의 Leaguepedia 경기로 매칭해 스코어·상태만 교체한다.
@@ -182,12 +141,15 @@ extension LeaguepediaService {
     }
 
     /// Riot 라이브 스탯 피드가 멈춘 것으로 판단된 경기를 Leaguepedia와 대조.
-    /// Leaguepedia가 이미 완료로 기록했다면 그 결과로 교체한 Match를, 아니면 nil을 반환한다.
-    /// (호출 측이 "얼마나 멈췄는지" 판단을 이미 마쳤다고 가정 — 여기선 팀 매칭만 담당)
+    ///
+    /// Leaguepedia의 MatchSchedule은 시리즈가 다 안 끝나도 Team1Score/Team2Score를 세트가
+    /// 끝날 때마다 갱신해준다 (Winner만 시리즈 전체가 끝나야 채워짐) — 그래서 `.completed`뿐 아니라
+    /// `.inProgress`(부분 스코어)도 받아들인다. 시리즈가 끝났으면 `.completed`인 Match를,
+    /// 세트만 진행됐으면 `.inProgress`인 Match를 반환한다. 스코어가 전혀 없으면(0-0, 미시작) nil.
     func reconcileStuckLiveMatch(_ match: Match) async -> Match? {
         let lpMatches = await fetchLiveTournamentResults(for: match.league)
         guard let lp = lpMatches.first(where: { lp in
-            lp.state == .completed &&
+            (lp.state == .completed || lp.state == .inProgress) &&
             sameTeams(match, lp) &&
             abs(lp.startTime.timeIntervalSince(match.startTime)) < 6 * 3600
         }) else { return nil }
@@ -197,7 +159,7 @@ extension LeaguepediaService {
         let scoreB = sameOrder ? lp.scoreB : lp.scoreA
         return Match(id: match.id, league: match.league, teamA: match.teamA, teamB: match.teamB,
                      scoreA: scoreA, scoreB: scoreB, startTime: match.startTime,
-                     state: .completed, blockName: match.blockName)
+                     state: lp.state, blockName: match.blockName)
     }
 
     private func sameTeams(_ a: Match, _ b: Match) -> Bool {
@@ -346,7 +308,10 @@ extension LeaguepediaService {
             let scoreA = Int(row["Team1Score"] ?? "") ?? 0
             let scoreB = Int(row["Team2Score"] ?? "") ?? 0
             let winner = row["Winner"] ?? ""
-            let state: MatchState = winner.isEmpty ? .unstarted : .completed
+            // Winner는 시리즈 전체가 끝나야 채워지지만, Team1Score/Team2Score는 시리즈 진행 중에도
+            // 세트가 끝날 때마다 갱신된다 — Winner 없다고 무조건 unstarted로 취급하면 이미 나와 있는
+            // 부분 스코어(예: 0-1)까지 통째로 버리게 되므로, 스코어가 있으면 진행 중으로 본다.
+            let state: MatchState = !winner.isEmpty ? .completed : (scoreA > 0 || scoreB > 0 ? .inProgress : .unstarted)
 
             let blockNameRaw = row["Tab"]?.trimmingCharacters(in: .whitespaces) ?? ""
             let blockName: String? = blockNameRaw.isEmpty ? nil : blockNameRaw
