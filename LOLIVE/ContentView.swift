@@ -79,6 +79,23 @@ struct ContentView: View {
         todayViewModel.favoritedTeamIds = Set(favoriteTeams.flatMap { [$0.teamId, $0.teamCode] })
     }
 
+    private func sharedMatchEntry(match: Match, teamCode: String, liveMatch: LiveMatch?) -> SharedNextMatch {
+        let isTeamA = match.teamA.code.lowercased() == teamCode.lowercased()
+        let opponent = isTeamA ? match.teamB : match.teamA
+        return SharedNextMatch(
+            opponentName: opponent.name,
+            opponentCode: opponent.code,
+            opponentImageURL: opponent.imageURL,
+            startTime: match.startTime,
+            isLive: liveMatch != nil,
+            leagueName: match.league.name,
+            savedAt: Date(),
+            myScore: isTeamA ? match.scoreA : match.scoreB,
+            oppScore: isTeamA ? match.scoreB : match.scoreA,
+            currentGame: liveMatch?.currentSet
+        )
+    }
+
     private func saveWidgetNextMatches() {
         let allMatches = todayViewModel.liveMatches.map { $0.match }
             + todayViewModel.todayMatches
@@ -90,22 +107,21 @@ struct ContentView: View {
             guard let match = allMatches.first(where: {
                 $0.teamA.code.lowercased() == code || $0.teamB.code.lowercased() == code
             }) else { continue }
-            let isTeamA = match.teamA.code.lowercased() == code
-            let opponent = isTeamA ? match.teamB : match.teamA
             let liveMatch = todayViewModel.liveMatches.first { $0.match.id == match.id }
-            nextMatchMap[fav.teamCode.uppercased()] = SharedNextMatch(
-                opponentName: opponent.name,
-                opponentCode: opponent.code,
-                opponentImageURL: opponent.imageURL,
-                startTime: match.startTime,
-                isLive: liveMatch != nil,
-                leagueName: match.league.name,
-                savedAt: Date(),
-                myScore: isTeamA ? match.scoreA : match.scoreB,
-                oppScore: isTeamA ? match.scoreB : match.scoreA,
-                currentGame: liveMatch?.currentSet
-            )
+            nextMatchMap[fav.teamCode.uppercased()] = sharedMatchEntry(match: match, teamCode: fav.teamCode, liveMatch: liveMatch)
         }
+
+        // 즐겨찾기 여부와 무관하게 지금 라이브 중인 모든 팀도 스냅샷에 포함 —
+        // 위젯 Extension이 이 스냅샷만으로 라이브 판정할 수 있게 해서 자체 API 재호출을 줄인다.
+        for liveMatch in todayViewModel.liveMatches {
+            for team in [liveMatch.match.teamA, liveMatch.match.teamB] {
+                let key = team.code.uppercased()
+                if nextMatchMap[key] == nil {
+                    nextMatchMap[key] = sharedMatchEntry(match: liveMatch.match, teamCode: team.code, liveMatch: liveMatch)
+                }
+            }
+        }
+
         SharedDataService.saveNextMatches(nextMatchMap)
         WidgetCenter.shared.reloadAllTimelines()
     }

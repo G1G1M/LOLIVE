@@ -170,12 +170,23 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
     }
 
     func fetchLive() async throws -> [LiveMatch] {
-        let data = try await request(path: "/getLive", queryItems: [])
-        let response = try decode(LiveResponse.self, from: data)
-        return response.data.schedule.events.compactMap { event in
-            guard let match = mapEventToMatch(event) else { return nil }
-            let currentSet = (event.match?.games?.filter { $0.state == "completed" }.count ?? 0) + 1
-            return LiveMatch(match: match, currentSet: currentSet, lastUpdated: Date())
+        do {
+            let data = try await request(path: "/getLive", queryItems: [])
+            let response = try decode(LiveResponse.self, from: data)
+            let live = response.data.schedule.events.compactMap { event -> LiveMatch? in
+                guard let match = mapEventToMatch(event) else { return nil }
+                let currentSet = (event.match?.games?.filter { $0.state == "completed" }.count ?? 0) + 1
+                return LiveMatch(match: match, currentSet: currentSet, lastUpdated: Date())
+            }
+            AppDiskCache.set(key: "live", value: live)
+            return live
+        } catch {
+            // 네트워크 순간 장애 대응: 5분 이내 캐시가 있으면 폴백, 없으면(오래 끊겼으면) 에러 그대로 전달
+            // (30초 폴링 주기 특성상 5분이면 이미 여러 번 재시도할 시간이라 낡은 데이터를 오래 우려먹진 않음)
+            if let cached: [LiveMatch] = AppDiskCache.get(key: "live", maxAge: 5 * 60) {
+                return cached
+            }
+            throw error
         }
     }
 

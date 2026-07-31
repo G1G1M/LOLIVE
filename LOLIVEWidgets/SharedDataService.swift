@@ -55,6 +55,17 @@ enum SharedDataService {
         UserDefaults(suiteName: appGroupId)?.set(index, forKey: "currentTeamIndex")
     }
 
+    /// 팀 코드 → SharedNextMatch 전체 스냅샷 로드 (즐겨찾기 여부 무관, 라이브 재사용용)
+    static func loadAllNextMatches() -> [String: SharedNextMatch] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let defaults = UserDefaults(suiteName: appGroupId),
+              let data = defaults.data(forKey: "nextMatches"),
+              let matches = try? decoder.decode([String: SharedNextMatch].self, from: data)
+        else { return [:] }
+        return matches
+    }
+
     // 메인 앱이 저장한 팀별 다음 경기 (MSI/Worlds 포함 전체 리그 커버)
     static func loadNextMatch(teamCode: String) -> SharedNextMatch? {
         let decoder = JSONDecoder()

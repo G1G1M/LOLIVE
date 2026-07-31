@@ -44,8 +44,30 @@ enum WidgetNetworkService {
 
     /// 현재 진행 중인 모든 경기를 teamCode(대문자) → NextMatchInfo 딕셔너리로 반환
     /// condition == false 이면 네트워크 호출 없이 빈 딕셔너리 즉시 반환
+    ///
+    /// 메인 앱이 90초 이내에 App Group에 저장해둔 라이브 스냅샷이 있으면 그걸 그대로 재사용하고
+    /// 네트워크 호출을 건너뛴다 — 앱이 실행 중(30초마다 갱신)일 땐 위젯이 굳이 자체 API를 또 부를 필요가 없다.
+    /// 스냅샷이 없거나 오래됐으면(앱이 백그라운드/종료 상태) 기존처럼 직접 호출한다.
     static func fetchAllLiveMatchInfo(onlyIf condition: Bool = true) async -> [String: NextMatchInfo] {
         guard condition else { return [:] }
+
+        let shared = SharedDataService.loadAllNextMatches()
+        let isSnapshotFresh = shared.values.contains { Date().timeIntervalSince($0.savedAt) < 90 }
+        if isSnapshotFresh {
+            return shared.filter { $0.value.isLive }.mapValues {
+                NextMatchInfo(
+                    opponentName: $0.opponentName,
+                    opponentCode: $0.opponentCode,
+                    opponentImageURL: $0.opponentImageURL,
+                    startTime: $0.startTime,
+                    isLive: true,
+                    myScore: $0.myScore,
+                    oppScore: $0.oppScore,
+                    currentGame: $0.currentGame
+                )
+            }
+        }
+
         var components = URLComponents(string: baseURL + "/getLive")
         components?.queryItems = [URLQueryItem(name: "hl", value: "ko-KR")]
         guard let url = components?.url else { return [:] }

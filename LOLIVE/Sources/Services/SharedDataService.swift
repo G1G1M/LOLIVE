@@ -48,6 +48,17 @@ enum SharedDataService {
         defaults.synchronize()
     }
 
+    /// 팀 코드 → SharedNextMatch 전체 스냅샷 로드 (즐겨찾기 여부 무관, 라이브 재사용용)
+    static func loadAllNextMatches() -> [String: SharedNextMatch] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let defaults = UserDefaults(suiteName: appGroupId),
+              let data = defaults.data(forKey: "nextMatches"),
+              let matches = try? decoder.decode([String: SharedNextMatch].self, from: data)
+        else { return [:] }
+        return matches
+    }
+
     static func saveFavoriteTeams(_ teams: [FavoriteTeam]) {
         let shared = teams.map {
             SharedFavoriteTeam(
