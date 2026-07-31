@@ -82,9 +82,16 @@ final class TodayViewModel {
     // MARK: - Private
 
     private let service: RiotEsportsServiceProtocol
+    private let liveStatsService: LiveStatsServiceProtocol
     private var pollingTask: Task<Void, Never>?
     private var syncTask: Task<Void, Never>?
     private var cachedLeagues: [League] = []
+
+    // 라이브 스탯 피드가 멈췄는지 판단하기 위한 상태 (즐겨찾기 라이브 경기 전용)
+    private var lastStuckCheck: [String: Date] = [:]              // matchId -> 마지막으로 Leaguepedia 대조한 시각
+    private var leaguepediaOverrides: [String: Match] = [:]       // matchId -> Leaguepedia가 확인해준 완료 결과 (Riot이 따라잡을 때까지 유지)
+    private static let staleFeedThreshold: TimeInterval = 5 * 60  // 라이브 피드 프레임이 이보다 오래 안 갱신되면 "멈춤"
+    private static let stuckRecheckCooldown: TimeInterval = 5 * 60
 
     private let calendar: Calendar = {
         var cal = Calendar(identifier: .gregorian)
@@ -94,8 +101,10 @@ final class TodayViewModel {
 
     // MARK: - Init
 
-    init(service: RiotEsportsServiceProtocol = RiotEsportsService()) {
+    init(service: RiotEsportsServiceProtocol = RiotEsportsService(),
+         liveStatsService: LiveStatsServiceProtocol = LiveStatsService()) {
         self.service = service
+        self.liveStatsService = liveStatsService
     }
 
     // MARK: - Public
@@ -161,7 +170,9 @@ final class TodayViewModel {
                     }
 
                     // 즐겨찾기 경기의 시작/세트 진행 알림
-                    for lm in newFavoriteLive {
+                    // (Leaguepedia로 이미 완료 확정된 경기는 제외 — Riot이 아직 안 따라잡아 live에 남아있어도
+                    //  prevFavoriteLive엔 없으므로 "새로 시작"으로 오판하지 않도록 가드)
+                    for lm in newFavoriteLive where leaguepediaOverrides[lm.match.id] == nil {
                         guard let code = favoriteTeamCode(for: lm.match) else { continue }
                         if let prev = prevFavoriteLive.first(where: { $0.match.id == lm.match.id }) {
                             // 세트 번호가 늘었으면 이전 세트 종료 + 새 세트 시작 알림
@@ -187,7 +198,12 @@ final class TodayViewModel {
                         markCompleted(lm.match)
                     }
 
-                    liveMatches = enrich(live)
+                    // Riot 라이브 목록에서 스스로 빠지면(뒤늦게라도 따라잡으면) override 기록도 정리
+                    leaguepediaOverrides = leaguepediaOverrides.filter { newLiveIds.contains($0.key) }
+                    lastStuckCheck = lastStuckCheck.filter { newLiveIds.contains($0.key) }
+
+                    liveMatches = enrich(live).filter { leaguepediaOverrides[$0.match.id] == nil }
+                    checkStuckLiveMatches(newFavoriteLive)
 
                     // 예약 시각이 지났으나 API 미확인 즐겨찾기 경기 (조기 시작 대응 + API 딜레이 브릿징)
                     let overdueMatches = todayMatches.filter {
@@ -279,6 +295,43 @@ final class TodayViewModel {
         completedMatches.insert(finished, at: 0)
     }
 
+    /// 즐겨찾기 라이브 경기의 인게임 스탯 피드(feed.lolesports.com)가 멈췄는지 확인.
+    ///
+    /// [왜 스코어/세트 번호로 판단하지 않는가] 스코어는 한 세트가 끝나야만 바뀌는 값이라
+    /// 정상 진행 중에도 20~40분씩 그대로인 게 당연하다 — 그걸로 "멈춤"을 판단하면
+    /// 멀쩡히 진행 중인 경기까지 전부 오탐하게 된다. 대신 인게임 피드의 최신 프레임 시각을
+    /// 직접 확인해서, 그게 오래 안 갱신되면 그때만 "진짜로 멈췄다"고 판단한다.
+    ///
+    /// 5분 쿨다운으로 경기당 너무 자주 호출되지 않게 하고, 멈춘 것으로 확인되면
+    /// Leaguepedia로 대조해 이미 끝난 경기면 로컬에서 완료 처리한다.
+    private func checkStuckLiveMatches(_ favoriteLive: [LiveMatch]) {
+        for lm in favoriteLive {
+            guard let gameId = lm.currentGameId, leaguepediaOverrides[lm.match.id] == nil else { continue }
+            let lastCheck = lastStuckCheck[lm.match.id]
+            guard lastCheck == nil || Date().timeIntervalSince(lastCheck!) > Self.stuckRecheckCooldown else { continue }
+            lastStuckCheck[lm.match.id] = Date()
+
+            let match = lm.match
+            let stats = liveStatsService
+            Task {
+                let recentWindowStart = Date().addingTimeInterval(-(Self.staleFeedThreshold + 5 * 60))
+                guard let window = try? await stats.fetchGameWindow(gameId: gameId, startingTime: recentWindowStart)
+                else { return }
+                let isStale = window.lastFrameTimestamp
+                    .map { Date().timeIntervalSince($0) > Self.staleFeedThreshold } ?? true
+                guard isStale else { return }
+
+                guard let updated = await LeaguepediaService.shared.reconcileStuckLiveMatch(match) else { return }
+                leaguepediaOverrides[match.id] = updated
+                liveMatches.removeAll { $0.match.id == match.id }
+                markCompleted(updated)
+                if let code = favoriteTeamCode(for: updated) {
+                    await MatchNotificationService.shared.sendResultNotification(for: updated, favoriteTeamCode: code)
+                }
+            }
+        }
+    }
+
     private func enrich(_ live: [LiveMatch]) -> [LiveMatch] {
         let map = Dictionary(uniqueKeysWithValues: cachedLeagues.map { ($0.id, $0.imageURL) })
         return live.map { lm in
@@ -294,7 +347,7 @@ final class TodayViewModel {
                 scoreA: lm.match.scoreA, scoreB: lm.match.scoreB,
                 startTime: lm.match.startTime, state: lm.match.state
             )
-            return LiveMatch(match: enrichedMatch, currentSet: lm.currentSet, lastUpdated: lm.lastUpdated)
+            return LiveMatch(match: enrichedMatch, currentSet: lm.currentSet, lastUpdated: lm.lastUpdated, currentGameId: lm.currentGameId)
         }
     }
 

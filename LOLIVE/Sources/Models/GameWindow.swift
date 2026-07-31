@@ -50,10 +50,11 @@ struct GameWindow: Identifiable, Codable {
     let blueTeamStats: TeamGameStats
     let redTeamStats: TeamGameStats
     let gameTime: Int?   // 인게임 경과 시간 (초), window/details API에서 수신
+    let lastFrameTimestamp: Date?   // 최신 프레임 시각 — 라이브 피드가 멈췄는지 판단하는 용도
 
     enum CodingKeys: String, CodingKey {
         case gameId, gameState, blueTeamId, redTeamId
-        case bluePlayers, redPlayers, blueTeamStats, redTeamStats, gameTime
+        case bluePlayers, redPlayers, blueTeamStats, redTeamStats, gameTime, lastFrameTimestamp
     }
 }
 

@@ -175,7 +175,8 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
             let live = response.data.schedule.events.compactMap { event -> LiveMatch? in
                 guard let match = mapEventToMatch(event) else { return nil }
                 let currentSet = (event.match?.games?.filter { $0.state == "completed" }.count ?? 0) + 1
-                return LiveMatch(match: match, currentSet: currentSet, lastUpdated: Date())
+                let currentGameId = event.match?.games?.first { $0.state == "inProgress" }?.id
+                return LiveMatch(match: match, currentSet: currentSet, lastUpdated: Date(), currentGameId: currentGameId)
             }
             AppDiskCache.set(.live, value: live)
             return live

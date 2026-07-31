@@ -191,6 +191,9 @@ final class LiveStatsService: LiveStatsServiceProtocol {
 
         // window 프레임에 gameTime이 있으면 초로 변환, 없으면 nil (details API fallback 사용)
         let gameTimeSec = latestFrame?.gameTime.map { $0 / 1000 }
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let lastFrameTimestamp = latestFrame.flatMap { isoFormatter.date(from: $0.rfc460Timestamp) }
 
         return GameWindow(
             gameId: response.esportsGameId,
@@ -201,7 +204,8 @@ final class LiveStatsService: LiveStatsServiceProtocol {
             redPlayers: redPlayers,
             blueTeamStats: buildTeamStats(latestFrame?.blueTeam),
             redTeamStats: buildTeamStats(latestFrame?.redTeam),
-            gameTime: gameTimeSec
+            gameTime: gameTimeSec,
+            lastFrameTimestamp: lastFrameTimestamp
         )
     }
 

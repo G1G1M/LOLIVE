@@ -94,6 +94,7 @@ struct ResultDTO: Decodable {
 struct GameDTO: Decodable {
     let number: Int
     let state: String
+    let id: String?
 }
 
 // MARK: - Event Details

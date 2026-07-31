@@ -140,6 +140,25 @@ extension LeaguepediaService {
         }
     }
 
+    /// Riot 라이브 스탯 피드가 멈춘 것으로 판단된 경기를 Leaguepedia와 대조.
+    /// Leaguepedia가 이미 완료로 기록했다면 그 결과로 교체한 Match를, 아니면 nil을 반환한다.
+    /// (호출 측이 "얼마나 멈췄는지" 판단을 이미 마쳤다고 가정 — 여기선 팀 매칭만 담당)
+    func reconcileStuckLiveMatch(_ match: Match) async -> Match? {
+        let lpMatches = await fetchLiveTournamentResults(for: match.league)
+        guard let lp = lpMatches.first(where: { lp in
+            lp.state == .completed &&
+            sameTeams(match, lp) &&
+            abs(lp.startTime.timeIntervalSince(match.startTime)) < 6 * 3600
+        }) else { return nil }
+
+        let sameOrder = teamsMatch(match.teamA, lp.teamA)
+        let scoreA = sameOrder ? lp.scoreA : lp.scoreB
+        let scoreB = sameOrder ? lp.scoreB : lp.scoreA
+        return Match(id: match.id, league: match.league, teamA: match.teamA, teamB: match.teamB,
+                     scoreA: scoreA, scoreB: scoreB, startTime: match.startTime,
+                     state: .completed, blockName: match.blockName)
+    }
+
     private func sameTeams(_ a: Match, _ b: Match) -> Bool {
         (teamsMatch(a.teamA, b.teamA) && teamsMatch(a.teamB, b.teamB)) ||
         (teamsMatch(a.teamA, b.teamB) && teamsMatch(a.teamB, b.teamA))
