@@ -53,9 +53,12 @@ struct CargoRow: Decodable {
 /// Leaguepedia MatchSchedule 테이블에서 가져온 대회 페이지 정보.
 /// - `page`: Leaguepedia OverviewPage 이름 (예: "LCK/2025 Season/Spring Split")
 /// - `year`: DateStart 기준 연도 (연도 탭 생성에 사용)
+/// - `dateStart`: 대회 시작일 — "현재 진행 중인 대회"를 고를 때 아직 시작 안 한 미래 대회
+///   (예: 정규시즌 도중 이미 등록돼 있는 플레이오프 페이지)를 걸러내는 데 사용
 struct LPTournamentEntry: Codable {
     let page: String
     let year: Int
+    let dateStart: Date
 }
 
 /// Leaguepedia ScoreboardGames에서 가져온 밴 정보.

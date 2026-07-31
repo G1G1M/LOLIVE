@@ -110,7 +110,7 @@ extension LeaguepediaService {
             return []
         }
         let pages = await cachedOrFetchPages(leagueName: leagueName)
-        guard let currentPage = pages.first else {
+        guard let currentPage = currentTournamentPage(from: pages) else {
             #if DEBUG
             reconcileLPLogger.debug("🔎 [Reconcile] \(leagueName) 대회 페이지 목록이 비어있음 (pages.count=\(pages.count))")
             #endif
@@ -142,8 +142,17 @@ extension LeaguepediaService {
     func clearLiveResultsCache(for league: League) async {
         guard let leagueName = leaguepediaName(for: league) else { return }
         let pages = await cachedOrFetchPages(leagueName: leagueName)
-        guard let currentPage = pages.first else { return }
+        guard let currentPage = currentTournamentPage(from: pages) else { return }
         AppDiskCache.clear(key: "lpresults_\(leagueName)_\(currentPage.page)")
+    }
+
+    /// pages는 DateStart 내림차순 정렬돼 있음 — 그중 "이미 시작한" 대회 중 가장 최근 것을 고른다.
+    /// 정규시즌 도중에도 플레이오프 페이지가 미래 DateStart로 이미 등록돼 있는 경우가 있어서,
+    /// 그냥 pages.first(가장 최근 DateStart)를 쓰면 아직 시작도 안 한 플레이오프를 "현재 대회"로
+    /// 잘못 고르게 된다 (실제로 겪은 버그 — 그 페이지엔 당연히 경기가 없어서 보정이 항상 실패했음).
+    /// 아직 아무 대회도 시작 안 했으면(프리시즌 등) 첫 번째로 폴백한다.
+    private func currentTournamentPage(from pages: [LPTournamentEntry]) -> LPTournamentEntry? {
+        pages.first(where: { $0.dateStart <= Date() }) ?? pages.first
     }
 
     /// Riot 경기 목록 중 (1) 시작 시각이 한참 지났는데도 `unstarted`로 멈춰있거나
@@ -291,7 +300,7 @@ extension LeaguepediaService {
                   let dateStr = row.title["DateStart"],
                   let date = fmt.date(from: dateStr) else { return nil }
             let year = Calendar.current.component(.year, from: date)
-            return LPTournamentEntry(page: page, year: year)
+            return LPTournamentEntry(page: page, year: year, dateStart: date)
         }
     }
 
