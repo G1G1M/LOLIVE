@@ -112,6 +112,16 @@ extension LeaguepediaService {
         return matches
     }
 
+    /// forceRefresh용 — fetchLiveTournamentResults의 15분 캐시를 지워서 다음 호출이 진짜로
+    /// API를 다시 부르게 한다. (schedule 캐시만 지우고 이 안쪽 캐시를 안 지우면, 오래된 Leaguepedia
+    /// 결과가 그대로 남아있어서 새로고침해도 여전히 옛날 값을 보정 결과로 쓰게 된다)
+    func clearLiveResultsCache(for league: League) async {
+        guard let leagueName = leaguepediaName(for: league) else { return }
+        let pages = await cachedOrFetchPages(leagueName: leagueName)
+        guard let currentPage = pages.first else { return }
+        AppDiskCache.clear(key: "lpresults_\(leagueName)_\(currentPage.page)")
+    }
+
     /// Riot 경기 목록 중 (1) 시작 시각이 한참 지났는데도 `unstarted`로 멈춰있거나
     /// (2) `completed`인데 스코어가 0:0으로 비어 있는(=Riot이 결과를 안 준) 항목,
     /// (3) `inProgress`인데 90분 넘게 스코어 변화가 없는(=실제론 끝났는데 Riot이 안 따라잡은) 항목을

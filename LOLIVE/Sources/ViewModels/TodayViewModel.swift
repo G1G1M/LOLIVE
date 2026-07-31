@@ -114,10 +114,15 @@ final class TodayViewModel {
     /// - Parameter forceRefresh: true면 일정 캐시(15분 TTL)를 무시하고 강제로 새로 받아온다.
     ///   당겨서 새로고침(pull-to-refresh)이 캐시 때문에 실제로는 아무것도 안 바뀌는 문제를 막기 위함 —
     ///   캐시가 남아있으면 API 재호출도, Leaguepedia 보정도 다시 안 타서 "새로고침해도 그대로"가 된다.
+    ///   일정 캐시뿐 아니라 Leaguepedia 결과 캐시(fetchLiveTournamentResults, 15분)도 같이 지워야
+    ///   보정 로직이 오래된 Leaguepedia 응답을 그대로 재사용하지 않는다.
     func loadTodayMatches(forceRefresh: Bool = false) async {
         if forceRefresh {
-            for league in cachedLeagues {
-                AppDiskCache.clear(.schedule(leagueId: league.id))
+            await withTaskGroup(of: Void.self) { group in
+                for league in cachedLeagues {
+                    AppDiskCache.clear(.schedule(leagueId: league.id))
+                    group.addTask { await LeaguepediaService.shared.clearLiveResultsCache(for: league) }
+                }
             }
         } else if !preloadFromCache() {
             isLoading = true
