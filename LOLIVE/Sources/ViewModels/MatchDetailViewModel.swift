@@ -166,6 +166,10 @@ final class MatchDetailViewModel {
 
     // MARK: - Static Preload
 
+    /// 화면 진입 시 미리 로드할 완료 경기 개수 — TodayViewModel/LeagueDetailViewModel/
+    /// TournamentDetailViewModel/AppPreloadService가 전부 이 값을 참조한다.
+    static let preloadCount = 8
+
     /// 경기 목록 화면에서 완료된 경기 데이터를 백그라운드로 미리 캐싱.
     /// 이미 캐시된 경기는 건너뜀.
     static func preload(match: Match) {

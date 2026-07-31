@@ -70,7 +70,7 @@ final class AppPreloadService {
             let completed = schedule
                 .filter { $0.state == .completed }
                 .sorted { $0.startTime > $1.startTime }
-            for match in completed.prefix(8) {
+            for match in completed.prefix(MatchDetailViewModel.preloadCount) {
                 await MainActor.run { MatchDetailViewModel.preload(match: match) }
             }
         }

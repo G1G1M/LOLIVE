@@ -146,7 +146,7 @@ final class TournamentDetailViewModel {
         isLoading = false  // Riot API 데이터로 즉시 화면 표시
 
         // 현재 토너먼트 완료 경기 백그라운드 프리로드
-        for match in tournamentMatches.filter({ $0.state == .completed }).prefix(8) {
+        for match in tournamentMatches.filter({ $0.state == .completed }).prefix(MatchDetailViewModel.preloadCount) {
             MatchDetailViewModel.preload(match: match)
         }
 

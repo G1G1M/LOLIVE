@@ -125,7 +125,7 @@ final class LeagueDetailViewModel {
             .sorted { $0.startTime > $1.startTime }
 
         // 최근 완료 경기 상세 데이터 백그라운드 프리로드
-        for match in completedMatches.prefix(8) {
+        for match in completedMatches.prefix(MatchDetailViewModel.preloadCount) {
             MatchDetailViewModel.preload(match: match)
         }
 

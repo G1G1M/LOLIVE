@@ -79,6 +79,9 @@ struct FavoriteTeamEntry: TimelineEntry {
 
 struct FavoriteTeamProvider: TimelineProvider {
 
+    /// 경기 시작 몇 초 전부터 라이브 API 확인을 시작할지 — 예정 시각보다 일찍 시작하는 경기 감지용
+    private static let earlyLiveCheckWindow: TimeInterval = 90 * 60
+
     func placeholder(in context: Context) -> FavoriteTeamEntry { .placeholder }
 
     func getSnapshot(in context: Context, completion: @escaping (FavoriteTeamEntry) -> Void) {
@@ -95,9 +98,9 @@ struct FavoriteTeamProvider: TimelineProvider {
                     nextUpdate = .now.addingTimeInterval(900)
                 } else {
                     let timeToMatch = match.startTime.timeIntervalSinceNow
-                    if timeToMatch > 5400 {
+                    if timeToMatch > Self.earlyLiveCheckWindow {
                         // 예정 1.5시간 이상 전: 라이브 체크 시작 시점에 갱신
-                        nextUpdate = match.startTime.addingTimeInterval(-5400)
+                        nextUpdate = match.startTime.addingTimeInterval(-Self.earlyLiveCheckWindow)
                     } else {
                         // 1.5시간 이내 또는 이미 지남: 5분마다 (일찍 시작 즉시 감지)
                         nextUpdate = .now.addingTimeInterval(300)
@@ -139,7 +142,7 @@ struct FavoriteTeamProvider: TimelineProvider {
         // sharedMatch 없는 팀이 있거나, 예정 1.5시간 이내인 팀이 있으면 라이브 API 1회 호출
         let noSharedData = teams.contains { allSharedMatches[$0.teamCode.uppercased()] == nil }
         let needsLiveCheck = noSharedData || allSharedMatches.values.contains {
-            !$0.isLive && $0.startTime.timeIntervalSinceNow < 5400
+            !$0.isLive && $0.startTime.timeIntervalSinceNow < Self.earlyLiveCheckWindow
         }
 
         async let liveInfoTask = WidgetNetworkService.fetchAllLiveMatchInfo(onlyIf: needsLiveCheck)
@@ -152,7 +155,7 @@ struct FavoriteTeamProvider: TimelineProvider {
         // 우선순위: 라이브 API 확인 > App Group 데이터 > 스케줄 API fallback
         // sharedMatch 없을 때도 liveInfo 활용 (MSI 등 홈 리그 외 경기 커버)
         let shouldCheckLive = currentSharedMatch == nil || (currentSharedMatch.map {
-            !$0.isLive && $0.startTime.timeIntervalSinceNow < 5400
+            !$0.isLive && $0.startTime.timeIntervalSinceNow < Self.earlyLiveCheckWindow
         } ?? false)
         let liveCheck = shouldCheckLive ? liveInfo[fav.teamCode.uppercased()] : nil
         let match = liveCheck ?? currentSharedMatch.map {
@@ -198,7 +201,7 @@ struct FavoriteTeamProvider: TimelineProvider {
             for (i, fav) in teams.enumerated() {
                 let sharedMatch = sharedMatches[fav.teamCode.uppercased()]
                 let shouldCheckLive = sharedMatch == nil || (sharedMatch.map {
-                    !$0.isLive && $0.startTime.timeIntervalSinceNow < 5400
+                    !$0.isLive && $0.startTime.timeIntervalSinceNow < Self.earlyLiveCheckWindow
                 } ?? false)
                 let liveCheck = shouldCheckLive ? liveInfo[fav.teamCode.uppercased()] : nil
 

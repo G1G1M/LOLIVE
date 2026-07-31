@@ -323,7 +323,7 @@ final class TodayViewModel {
             $0.state == .completed && $0.startTime >= fiveDaysAgo
         }.sorted { $0.startTime > $1.startTime }
 
-        for match in completedMatches.prefix(8) {
+        for match in completedMatches.prefix(MatchDetailViewModel.preloadCount) {
             MatchDetailViewModel.preload(match: match)
         }
 
