@@ -163,12 +163,21 @@ final class TodayViewModel {
                     let newFavoriteLive = live.filter { favoriteTeamCode(for: $0.match) != nil }
 
                     // 라이브에서 사라진 즐겨찾기 경기 → 결과 알림
+                    // Riot이 스코어를 끝까지 안 알려준 채로(0:0) 라이브 목록에서 빠지는 경우가 실제로
+                    // 있었다 — 5분 주기 보정이 미처 못 끼어든 채로 Riot이 먼저 목록에서 지워버리면
+                    // "마지막으로 알던 값"이 틀린 채로 통보된다. 그래서 아직 보정이 없는 경우
+                    // 사라지는 이 순간에 Leaguepedia를 한 번 더 확인해 최종 점수를 확정한다.
                     for lm in prevFavoriteLive where !newLiveIds.contains(lm.match.id) {
-                        if let code = favoriteTeamCode(for: lm.match) {
-                            await MatchNotificationService.shared.sendResultNotification(
-                                for: lm.match, favoriteTeamCode: code
-                            )
+                        guard let code = favoriteTeamCode(for: lm.match) else { continue }
+                        var finalMatch = leaguepediaOverrides[lm.match.id]
+                        if finalMatch == nil {
+                            finalMatch = await LeaguepediaService.shared.reconcileStuckLiveMatch(lm.match)
                         }
+                        let resolvedMatch = finalMatch ?? lm.match
+                        leaguepediaOverrides[lm.match.id] = resolvedMatch
+                        await MatchNotificationService.shared.sendResultNotification(
+                            for: resolvedMatch, favoriteTeamCode: code
+                        )
                     }
 
                     // 즐겨찾기 경기의 시작/세트 진행 알림
@@ -197,8 +206,9 @@ final class TodayViewModel {
 
                     // 라이브에서 사라진 모든 경기 → 다음 전체 스케줄 리로드 전까지도
                     // 화면에서 사라지지 않도록 로컬에서 즉시 완료 상태로 승격
+                    // (즐겨찾기 경기는 위에서 이미 Leaguepedia로 최종 확정한 점수가 있으면 그걸 사용)
                     for lm in prevLive where !newLiveIds.contains(lm.match.id) {
-                        markCompleted(lm.match)
+                        markCompleted(leaguepediaOverrides[lm.match.id] ?? lm.match)
                     }
 
                     // Riot 라이브 목록에서 스스로 빠지면(뒤늦게라도 따라잡으면) override 기록도 정리
