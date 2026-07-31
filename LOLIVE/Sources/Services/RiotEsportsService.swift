@@ -4,6 +4,9 @@
 //
 
 import Foundation
+import os
+
+private let reconcileLogger = Logger(subsystem: "com.lolive", category: "Reconcile")
 
 // MARK: - APIError
 
@@ -124,16 +127,32 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         // 흔하지만, 일단 시작한 경기가 90분 넘게 스코어 변화가 없는 건 Bo5를 감안해도 의심스럽다.
         // (실제로 Leaguepedia에 완료 기록이 없으면 아래에서 그냥 원본 그대로 반환되니 오탐 위험은 낮음)
         let inProgressCutoff = Date().addingTimeInterval(-90 * 60)
-        let hasStale = matches.contains {
+        let staleOnes = matches.filter {
             ($0.state == .unstarted && $0.startTime < unstartedCutoff) ||
             ($0.state == .completed && $0.scoreA == 0 && $0.scoreB == 0) ||
             ($0.state == .inProgress && $0.startTime < inProgressCutoff)
         }
-        guard hasStale else { return matches }
+        guard !staleOnes.isEmpty else { return matches }
+        #if DEBUG
+        for m in staleOnes {
+            reconcileLogger.debug("🔎 [Reconcile] \(league.name) 보정 대상: \(m.teamA.code) vs \(m.teamB.code) state=\(m.state.rawValue) score=\(m.scoreA)-\(m.scoreB)")
+        }
+        #endif
 
         let lpMatches = await LeaguepediaService.shared.fetchLiveTournamentResults(for: league)
+        #if DEBUG
+        reconcileLogger.debug("🔎 [Reconcile] \(league.name) Leaguepedia 응답 \(lpMatches.count)건")
+        #endif
         guard !lpMatches.isEmpty else { return matches }
-        return LeaguepediaService.shared.reconcileResults(riotMatches: matches, leaguepediaMatches: lpMatches)
+        let result = LeaguepediaService.shared.reconcileResults(riotMatches: matches, leaguepediaMatches: lpMatches)
+        #if DEBUG
+        for m in staleOnes {
+            if let fixed = result.first(where: { $0.id == m.id }) {
+                reconcileLogger.debug("🔎 [Reconcile] \(fixed.teamA.code) vs \(fixed.teamB.code) 결과: state=\(fixed.state.rawValue) score=\(fixed.scoreA)-\(fixed.scoreB)")
+            }
+        }
+        #endif
+        return result
     }
 
     // 국제 대회(Worlds/MSI) 전용: 모든 페이지를 순회하여 전체 경기 목록 반환

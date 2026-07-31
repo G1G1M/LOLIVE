@@ -17,6 +17,9 @@
 //
 
 import Foundation
+import os
+
+private let reconcileLPLogger = Logger(subsystem: "com.lolive", category: "Reconcile")
 
 extension LeaguepediaService {
 
@@ -100,14 +103,35 @@ extension LeaguepediaService {
     /// 현재 진행 중인 대회의 Leaguepedia 실제 결과를 가져온다.
     /// Worlds/MSI 과거 기록용 30일 캐시와 달리, 진행 중 대회라 15분 TTL로 짧게 캐싱한다.
     func fetchLiveTournamentResults(for league: League) async -> [Match] {
-        guard let leagueName = leaguepediaName(for: league) else { return [] }
+        guard let leagueName = leaguepediaName(for: league) else {
+            #if DEBUG
+            reconcileLPLogger.debug("🔎 [Reconcile] leaguepediaName(for: \(league.name)) = nil — 리그명 매핑 실패")
+            #endif
+            return []
+        }
         let pages = await cachedOrFetchPages(leagueName: leagueName)
-        guard let currentPage = pages.first else { return [] }
+        guard let currentPage = pages.first else {
+            #if DEBUG
+            reconcileLPLogger.debug("🔎 [Reconcile] \(leagueName) 대회 페이지 목록이 비어있음 (pages.count=\(pages.count))")
+            #endif
+            return []
+        }
+        #if DEBUG
+        reconcileLPLogger.debug("🔎 [Reconcile] \(leagueName) 현재 페이지: \(currentPage.page)")
+        #endif
 
         let cacheKey = "lpresults_\(leagueName)_\(currentPage.page)"
-        if let cached: [Match] = AppDiskCache.get(key: cacheKey, maxAge: 15 * 60) { return cached }
+        if let cached: [Match] = AppDiskCache.get(key: cacheKey, maxAge: 15 * 60) {
+            #if DEBUG
+            reconcileLPLogger.debug("🔎 [Reconcile] \(currentPage.page) 캐시 히트 \(cached.count)건 (15분 이내)")
+            #endif
+            return cached
+        }
 
         let matches = await matchesForOverviewPage(currentPage.page, league: league)
+        #if DEBUG
+        reconcileLPLogger.debug("🔎 [Reconcile] \(currentPage.page) API 조회 \(matches.count)건")
+        #endif
         if !matches.isEmpty { AppDiskCache.set(key: cacheKey, value: matches) }
         return matches
     }
@@ -141,7 +165,15 @@ extension LeaguepediaService {
                 lp.state == .completed &&
                 sameTeams(riot, lp) &&
                 abs(lp.startTime.timeIntervalSince(riot.startTime)) < 6 * 3600
-            }) else { return riot }
+            }) else {
+                #if DEBUG
+                reconcileLPLogger.debug("🔎 [Reconcile] \(riot.teamA.code) vs \(riot.teamB.code) — Leaguepedia \(leaguepediaMatches.count)건 중 매칭되는 completed 경기 없음")
+                for lp in leaguepediaMatches where sameTeams(riot, lp) {
+                    reconcileLPLogger.debug("🔎 [Reconcile]   팀은 일치하나 state=\(lp.state.rawValue) 또는 시간차 큼 (lp.startTime=\(lp.startTime.description))")
+                }
+                #endif
+                return riot
+            }
 
             let sameOrder = teamsMatch(riot.teamA, lp.teamA)
             let scoreA = sameOrder ? lp.scoreA : lp.scoreB
