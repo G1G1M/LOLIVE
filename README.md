@@ -245,6 +245,18 @@ TournamentDetailViewModel.load()
 
 앱 재실행 시 로딩 스피너 없이 즉시 데이터를 표시하기 위해 전 계층에 디스크 캐시를 적용했습니다.
 
+### 캐시 키 중앙 관리 (`CacheKey`)
+
+여러 파일이 같은 캐시를 참조하는 키(`leagues`/`schedule_{id}`/`tournaments_{id}`/`standings_{id}`/`roster_{id}`/
+`all_schedule_{id}`/`live`/`lp_playerimg_{name}`)는 문자열·TTL이 `AppDiskCache.swift`의 `CacheKey` enum
+한 곳에만 정의돼 있고, `RiotEsportsService`와 각 ViewModel의 `preloadFromCache()`가 전부 이걸 참조합니다.
+예전엔 서비스가 캐시를 쓰는 쪽과 ViewModel이 선로딩용으로 같은 캐시를 읽는 쪽에 키/TTL 리터럴이 각각
+복사돼 있어서(예: `"leagues"` + `24 * 3600`이 8개 파일에 중복), 한쪽만 고치면 서로 어긋날 수 있었습니다.
+이 정리 과정에서 `StandingsViewModel.refreshStandings()`가 `standings_{league.id}`를 지우고 있었는데
+실제 저장 키는 `standings_{tournament.id}`라 캐시가 전혀 안 지워지던 버그도 함께 발견해 고쳤습니다.
+(즐겨찾기 여부와 무관한 `players_all`/`search_teams`/`search_players`/`league_players_{id}`/
+`event_detail_v2_{id}` 등은 한 파일에서만 읽고 쓰는 캐시라 중복 위험이 없어 `CacheKey`에는 포함하지 않았습니다.)
+
 ### 캐시 레이어
 
 | 데이터 | 캐시 키 | TTL | 저장소 |
