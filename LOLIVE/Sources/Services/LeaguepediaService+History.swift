@@ -136,16 +136,6 @@ extension LeaguepediaService {
         return matches
     }
 
-    /// forceRefresh용 — fetchLiveTournamentResults의 15분 캐시를 지워서 다음 호출이 진짜로
-    /// API를 다시 부르게 한다. (schedule 캐시만 지우고 이 안쪽 캐시를 안 지우면, 오래된 Leaguepedia
-    /// 결과가 그대로 남아있어서 새로고침해도 여전히 옛날 값을 보정 결과로 쓰게 된다)
-    func clearLiveResultsCache(for league: League) async {
-        guard let leagueName = leaguepediaName(for: league) else { return }
-        let pages = await cachedOrFetchPages(leagueName: leagueName)
-        guard let currentPage = currentTournamentPage(from: pages) else { return }
-        AppDiskCache.clear(key: "lpresults_\(leagueName)_\(currentPage.page)")
-    }
-
     /// pages는 DateStart 내림차순 정렬돼 있음 — 그중 "이미 시작한" 대회 중 가장 최근 것을 고른다.
     /// 정규시즌 도중에도 플레이오프 페이지가 미래 DateStart로 이미 등록돼 있는 경우가 있어서,
     /// 그냥 pages.first(가장 최근 DateStart)를 쓰면 아직 시작도 안 한 플레이오프를 "현재 대회"로

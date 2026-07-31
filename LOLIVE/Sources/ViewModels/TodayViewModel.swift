@@ -112,17 +112,17 @@ final class TodayViewModel {
     // MARK: - Public
 
     /// - Parameter forceRefresh: true면 일정 캐시(15분 TTL)를 무시하고 강제로 새로 받아온다.
-    ///   당겨서 새로고침(pull-to-refresh)이 캐시 때문에 실제로는 아무것도 안 바뀌는 문제를 막기 위함 —
-    ///   캐시가 남아있으면 API 재호출도, Leaguepedia 보정도 다시 안 타서 "새로고침해도 그대로"가 된다.
-    ///   일정 캐시뿐 아니라 Leaguepedia 결과 캐시(fetchLiveTournamentResults, 15분)도 같이 지워야
-    ///   보정 로직이 오래된 Leaguepedia 응답을 그대로 재사용하지 않는다.
+    ///   당겨서 새로고침(pull-to-refresh)이 캐시 때문에 실제로는 아무것도 안 바뀌는 문제를 막기 위함.
+    ///
+    ///   Leaguepedia 결과 캐시(fetchLiveTournamentResults, 15분)는 여기서 따로 안 지운다 — 한때
+    ///   추적 중인 모든 리그에 대해 한꺼번에 지우려고 시도했었는데, 리그 수가 많다 보니 새로고침
+    ///   한 번에 Leaguepedia를 왕창 두드리게 돼서 서버 레이트리밋에 걸려 오히려 결과가 랜덤하게
+    ///   실패하는 부작용이 있었다. 일정 캐시만 지워도 reconcileUnreportedResults가 다시 돌면서
+    ///   실제로 대조가 필요한 리그에 한해서만(hasStale 조건) 자연스럽게 Leaguepedia를 호출한다.
     func loadTodayMatches(forceRefresh: Bool = false) async {
         if forceRefresh {
-            await withTaskGroup(of: Void.self) { group in
-                for league in cachedLeagues {
-                    AppDiskCache.clear(.schedule(leagueId: league.id))
-                    group.addTask { await LeaguepediaService.shared.clearLiveResultsCache(for: league) }
-                }
+            for league in cachedLeagues {
+                AppDiskCache.clear(.schedule(leagueId: league.id))
             }
         } else if !preloadFromCache() {
             isLoading = true
