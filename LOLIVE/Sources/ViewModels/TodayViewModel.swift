@@ -85,6 +85,7 @@ final class TodayViewModel {
     private let liveStatsService: LiveStatsServiceProtocol
     private var pollingTask: Task<Void, Never>?
     private var syncTask: Task<Void, Never>?
+    private var reconcileTask: Task<Void, Never>?
     private var cachedLeagues: [League] = []
 
     // 라이브 스탯 피드가 멈췄는지 판단하기 위한 상태 (즐겨찾기 라이브 경기 전용)
@@ -142,13 +143,32 @@ final class TodayViewModel {
                 }
             }
 
-            let allMatches = try await withThrowingTaskGroup(of: [Match].self) { group in
+            // 1단계: Riot 원본으로 화면을 즉시 채운다 (Leaguepedia 보정을 기다리지 않음 — 여러 리그가
+            // 동시에 보정이 필요한 상황이면 레이트리밋 재시도로 리그당 최대 36초까지 걸릴 수 있는데,
+            // 그걸 화면 전체가 기다리게 하지 않기 위함)
+            let rawMatches = try await withThrowingTaskGroup(of: [Match].self) { group in
                 for league in leagues {
-                    group.addTask { try await svc.fetchSchedule(league: league) }
+                    group.addTask { try await svc.fetchScheduleRaw(league: league) }
                 }
                 return try await group.reduce(into: [Match]()) { $0.append(contentsOf: $1) }
             }
-            classify(matches: allMatches)
+            classify(matches: rawMatches)
+            isLoading = false
+
+            // 2단계: Leaguepedia 보정까지 포함한 결과를 백그라운드에서 마저 받아와서, 끝나는 대로
+            // 화면을 한 번 더 갱신한다. fetchSchedule은 캐시가 이미 있으면 캐시를 즉시 반환하므로
+            // 보정이 필요 없는 대부분의 상황에서는 이 2단계가 사실상 즉시 끝난다.
+            reconcileTask?.cancel()
+            reconcileTask = Task {
+                let reconciled = try? await withThrowingTaskGroup(of: [Match].self) { group in
+                    for league in leagues {
+                        group.addTask { try await svc.fetchSchedule(league: league) }
+                    }
+                    return try await group.reduce(into: [Match]()) { $0.append(contentsOf: $1) }
+                }
+                guard let reconciled, !Task.isCancelled else { return }
+                classify(matches: reconciled)
+            }
         } catch {
             // 화면에 데이터가 전혀 없을 때만 에러 표시
             // 캐시 데이터가 이미 있으면 에러 알림 없이 유지

@@ -22,6 +22,9 @@ enum APIError: Error {
 protocol RiotEsportsServiceProtocol: Sendable {
     func fetchLeagues() async throws -> [League]
     func fetchSchedule(league: League) async throws -> [Match]
+    /// 캐시·Leaguepedia 보정 없이 Riot 원본 일정만 가져온다 — 화면을 우선 즉시 채우고,
+    /// 보정된 결과(fetchSchedule)는 백그라운드에서 나중에 반영하는 용도.
+    func fetchScheduleRaw(league: League) async throws -> [Match]
     func fetchAllSchedule(league: League) async throws -> [Match]
     func fetchLive() async throws -> [LiveMatch]
     func fetchEventDetails(matchId: String) async throws -> EventDetailInfo
@@ -61,6 +64,14 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         let cacheKey = CacheKey.schedule(leagueId: league.id)
         if let cached: [Match] = AppDiskCache.get(cacheKey) { return cached }
 
+        let raw = try await fetchScheduleRaw(league: league)
+        let reconciled = await reconcileUnreportedResults(raw, league: league)
+
+        AppDiskCache.set(cacheKey, value: reconciled)
+        return reconciled
+    }
+
+    func fetchScheduleRaw(league: League) async throws -> [Match] {
         var allMatches: [Match] = []
         var seen = Set<String>()
 
@@ -109,9 +120,6 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
             olderCount += 1
         }
 
-        allMatches = await reconcileUnreportedResults(allMatches, league: league)
-
-        AppDiskCache.set(cacheKey, value: allMatches)
         return allMatches
     }
 
