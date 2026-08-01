@@ -37,7 +37,6 @@ struct SearchView: View {
                 .searchFocused($isSearchFocused)
                 .task(id: focusTrigger) {
                     guard focusTrigger > 0 else { return }
-                    try? await Task.sleep(for: .milliseconds(150))
                     isSearchFocused = true
                 }
         } else {
