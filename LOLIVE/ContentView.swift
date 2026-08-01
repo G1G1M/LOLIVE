@@ -24,7 +24,7 @@ struct ContentView: View {
         tabs
         .tint(themeColor)
         .onChange(of: selectedTab) { _, new in
-            if new == 5 {
+            if new == 4 {
                 searchFocusTrigger += 1
             }
         }
@@ -56,6 +56,9 @@ struct ContentView: View {
     /// 방식엔 없던 기능). iOS 26에서는 하단 탭바 자체도 자동으로 새 유리 재질로 바뀐다(별도 코드 불필요).
     /// Search 탭은 `role: .search`를 줘서 iOS 26에서 나머지 탭 캡슐과 분리된 원형 유리 버튼으로
     /// 따로 표시되게 함 (애플 표준 Search Role 탭바 스타일).
+    /// iOS는 탭바에 최대 5개까지만 바로 보여주고 그 이상은 자동으로 "더보기"에 몰아넣는다
+    /// (search role 탭도 이 5개 슬롯 중 하나를 차지함). 그래서 메인 탭은 4개(Today/Leagues/
+    /// Standings/Players)까지만 유지하고, Favorites는 탭에서 빼서 Today 상단 별 아이콘으로 옮겼다.
     /// 배포 타깃(17.6)을 지원해야 해서 iOS 17은 기존 `.tabItem` 방식으로 폴백한다.
     @ViewBuilder
     private var tabs: some View {
@@ -65,8 +68,7 @@ struct ContentView: View {
                 Tab("Leagues", systemImage: "trophy.fill", value: 1) { LeaguesView() }
                 Tab("Standings", systemImage: "list.number", value: 2) { StandingsView() }
                 Tab("Players", systemImage: "person.fill", value: 3) { PlayersView() }
-                Tab("Favorites", systemImage: "star.fill", value: 4) { FavoritesView() }
-                Tab(value: 5, role: .search) {
+                Tab(value: 4, role: .search) {
                     SearchView(focusTrigger: searchFocusTrigger)
                 } label: {
                     Label("Search", systemImage: "magnifyingglass")
@@ -91,12 +93,8 @@ struct ContentView: View {
                     .tag(3)
                     .tabItem { Label("Players", systemImage: "person.fill") }
 
-                FavoritesView()
-                    .tag(4)
-                    .tabItem { Label("Favorites", systemImage: "star.fill") }
-
                 SearchView(focusTrigger: searchFocusTrigger)
-                    .tag(5)
+                    .tag(4)
                     .tabItem { Label("Search", systemImage: "magnifyingglass") }
             }
         }

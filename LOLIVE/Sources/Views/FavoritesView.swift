@@ -11,6 +11,7 @@ struct FavoritesView: View {
     @Query(sort: \FavoritePlayer.addedAt, order: .reverse) private var favoritePlayers: [FavoritePlayer]
     @Environment(\.modelContext) private var modelContext
     @Environment(TodayViewModel.self) private var todayViewModel
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
     @State private var showingTeamSearch = false
     @State private var showLiveOnly = false
@@ -27,10 +28,6 @@ struct FavoritesView: View {
         return favoritePlayers.filter { liveInfo(teamCode: $0.teamCode) != nil }
     }
 
-    // iOS가 하단 탭 6개 중 5·6번째(Favorites/Search)를 자동으로 "더보기"로 묶는데,
-    // "더보기" 목록 자체가 이미 UINavigationController를 제공하므로 여기서 NavigationStack을
-    // 또 씌우면 백버튼이 2개(더보기 것 + 이 화면 것) 겹쳐 보인다. 그래서 NavigationStack 없이
-    // "더보기"가 제공하는 네비게이션 컨텍스트에 NavigationLink를 바로 얹는다.
     var body: some View {
         VStack(spacing: 0) {
             if hasFavorites { liveFilterBar }
@@ -117,6 +114,9 @@ struct FavoritesView: View {
         .navigationTitle("즐겨찾기")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("닫기") { dismiss() }
+            }
             if hasFavorites {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

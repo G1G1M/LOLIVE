@@ -8,6 +8,7 @@ import SwiftUI
 struct TodayView: View {
     @Environment(TodayViewModel.self) private var viewModel
     @State private var showMenu = false
+    @State private var showFavorites = false
     @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
     @State private var showLiveOnly = false
 
@@ -46,6 +47,7 @@ struct TodayView: View {
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showMenu) { AppMenuView() }
+            .sheet(isPresented: $showFavorites) { NavigationStack { FavoritesView() } }
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(
                     match: match,
@@ -66,6 +68,12 @@ struct TodayView: View {
                 .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(Color(.label))
             Spacer()
+            Button { showFavorites = true } label: {
+                Image(systemName: "star")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Color(.label))
+                    .frame(width: 36, height: 36)
+            }
             Button { showMenu = true } label: {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 17, weight: .medium))
