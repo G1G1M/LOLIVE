@@ -413,7 +413,8 @@ final class TodayViewModel {
                 id: lm.match.id, league: enrichedLeague,
                 teamA: lm.match.teamA, teamB: lm.match.teamB,
                 scoreA: lm.match.scoreA, scoreB: lm.match.scoreB,
-                startTime: lm.match.startTime, state: lm.match.state
+                startTime: lm.match.startTime, state: lm.match.state,
+                blockName: lm.match.blockName
             )
             return LiveMatch(match: enrichedMatch, currentSet: lm.currentSet, lastUpdated: lm.lastUpdated, currentGameId: lm.currentGameId)
         }
