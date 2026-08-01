@@ -164,7 +164,24 @@ struct TodayView: View {
 
     // MARK: - Fixed: Favorites Toggle
 
+    /// Liquid Glass 시범 적용 지점 — iOS 26 미만은 기존 단색 캡슐 스타일 그대로 유지.
+    /// GlassEffectContainer로 감싸야 인접한 필들이 서로 자연스럽게 이어지는 유리 느낌이 남.
     private var favoritesToggle: some View {
+        Group {
+            if #available(iOS 26.0, *) {
+                GlassEffectContainer(spacing: 8) { pillsRow }
+            } else {
+                pillsRow
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
+        .animation(.easeInOut(duration: 0.15), value: viewModel.showFavoritesOnly)
+        .animation(.easeInOut(duration: 0.15), value: showLiveOnly)
+    }
+
+    private var pillsRow: some View {
         HStack(spacing: 8) {
             filterPill(title: "전체", isSelected: !viewModel.showFavoritesOnly && !showLiveOnly) {
                 viewModel.showFavoritesOnly = false
@@ -179,43 +196,71 @@ struct TodayView: View {
             liveFilterPill
             Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
-        .animation(.easeInOut(duration: 0.15), value: viewModel.showFavoritesOnly)
-        .animation(.easeInOut(duration: 0.15), value: showLiveOnly)
     }
 
-    private func filterPill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline).fontWeight(.semibold)
-                .padding(.horizontal, 14).padding(.vertical, 6)
-                .background(isSelected ? Color.accentColor : Color(.secondarySystemGroupedBackground))
-                .foregroundStyle(isSelected ? Color.white : Color.secondary)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var liveFilterPill: some View {
-        Button {
-            showLiveOnly = true
-            viewModel.showFavoritesOnly = false
-        } label: {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(showLiveOnly ? Color.white : Color.red)
-                    .frame(width: 6, height: 6)
-                Text("LIVE")
-            }
+    private func filterPillLabel(_ title: String, isSelected: Bool) -> some View {
+        Text(title)
             .font(.subheadline).fontWeight(.semibold)
             .padding(.horizontal, 14).padding(.vertical, 6)
-            .background(showLiveOnly ? Color.red : Color(.secondarySystemGroupedBackground))
-            .foregroundStyle(showLiveOnly ? Color.white : Color.secondary)
-            .clipShape(Capsule())
+            .foregroundStyle(isSelected ? Color.white : Color.secondary)
+    }
+
+    @ViewBuilder
+    private func filterPill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        if #available(iOS 26.0, *) {
+            Button(action: action) { filterPillLabel(title, isSelected: isSelected) }
+                .buttonStyle(.plain)
+                .glassEffect(
+                    isSelected ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
+                    in: Capsule()
+                )
+        } else {
+            Button(action: action) {
+                filterPillLabel(title, isSelected: isSelected)
+                    .background(isSelected ? Color.accentColor : Color(.secondarySystemGroupedBackground))
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+    }
+
+    private var liveFilterLabel: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(showLiveOnly ? Color.white : Color.red)
+                .frame(width: 6, height: 6)
+            Text("LIVE")
+        }
+        .font(.subheadline).fontWeight(.semibold)
+        .padding(.horizontal, 14).padding(.vertical, 6)
+        .foregroundStyle(showLiveOnly ? Color.white : Color.secondary)
+    }
+
+    @ViewBuilder
+    private var liveFilterPill: some View {
+        if #available(iOS 26.0, *) {
+            Button {
+                showLiveOnly = true
+                viewModel.showFavoritesOnly = false
+            } label: {
+                liveFilterLabel
+            }
+            .buttonStyle(.plain)
+            .glassEffect(
+                showLiveOnly ? .regular.tint(.red).interactive() : .regular.interactive(),
+                in: Capsule()
+            )
+        } else {
+            Button {
+                showLiveOnly = true
+                viewModel.showFavoritesOnly = false
+            } label: {
+                liveFilterLabel
+                    .background(showLiveOnly ? Color.red : Color(.secondarySystemGroupedBackground))
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     // MARK: - Data Structures
