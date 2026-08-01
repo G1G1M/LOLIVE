@@ -8,9 +8,12 @@ import SwiftData
 
 struct SearchView: View {
     let focusTrigger: Int
+    /// X(취소) 버튼을 눌러 검색을 닫을 때 호출 — ContentView가 Today 탭으로 전환하는 데 사용
+    var onCancel: () -> Void = {}
 
     @State private var viewModel = SearchViewModel()
     @State private var searchText = ""
+    @State private var isSearchPresented = false
     @FocusState private var isSearchFocused: Bool
     @Query private var favoriteTeams: [FavoriteTeam]
     @Query private var favoritePlayers: [FavoritePlayer]
@@ -26,6 +29,8 @@ struct SearchView: View {
     // ContentView가 탭 선택마다 올려주는 focusTrigger를 대신 신호로 써서 .searchFocused로
     // 직접 포커스를 준다. .searchFocused는 iOS 18+ 전용이라 iOS 17 폴백 탭바에선 자동 포커스 없이
     // 기존처럼 동작한다.
+    // 반대로 X(취소) 버튼을 누르면 isPresented가 true→false로 바뀌는 건 실기기에서도 확실히
+    // 감지되길래, 이 전환을 감지해서 Today 탭으로 이동시킨다.
     var body: some View {
         if #available(iOS 18.0, *) {
             searchableContent
@@ -60,7 +65,10 @@ struct SearchView: View {
             .navigationTitle("검색")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .searchable(text: $searchText, prompt: "리그, 팀, 선수 검색")
+        .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "리그, 팀, 선수 검색")
+        .onChange(of: isSearchPresented) { wasPresented, presented in
+            if wasPresented && !presented { onCancel() }
+        }
         .task { await viewModel.load() }
     }
 
