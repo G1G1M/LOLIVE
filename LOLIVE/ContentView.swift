@@ -14,7 +14,6 @@ struct ContentView: View {
     @Environment(TodayViewModel.self) private var todayViewModel
     @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
     @State private var selectedTab = 0
-    @State private var searchFocusTrigger = 0
 
     private var themeColor: Color {
         primaryTeamCode.isEmpty ? Color.accentColor : TeamTheme.color(for: primaryTeamCode)
@@ -23,11 +22,6 @@ struct ContentView: View {
     var body: some View {
         tabs
         .tint(themeColor)
-        .onChange(of: selectedTab) { _, new in
-            if new == 4 {
-                searchFocusTrigger += 1
-            }
-        }
         .task {
             syncFavoritedTeamIds()
             todayViewModel.startLivePolling()   // favoritedTeamIds 설정 직후 시작
@@ -69,7 +63,7 @@ struct ContentView: View {
                 Tab("Standings", systemImage: "list.number", value: 2) { StandingsView() }
                 Tab("Players", systemImage: "person.fill", value: 3) { PlayersView() }
                 Tab(value: 4, role: .search) {
-                    SearchView(focusTrigger: searchFocusTrigger)
+                    SearchView()
                 } label: {
                     Label("Search", systemImage: "magnifyingglass")
                 }
@@ -93,7 +87,7 @@ struct ContentView: View {
                     .tag(3)
                     .tabItem { Label("Players", systemImage: "person.fill") }
 
-                SearchView(focusTrigger: searchFocusTrigger)
+                SearchView()
                     .tag(4)
                     .tabItem { Label("Search", systemImage: "magnifyingglass") }
             }
