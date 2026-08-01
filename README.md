@@ -63,8 +63,8 @@
   즐겨찾기 화면에도 동일한 LIVE 필터를 추가해 즐겨찾기한 팀/선수 중 라이브 중인 항목만 볼 수 있음
 - **Liquid Glass 시범 적용**: 필터 필(전체/★즐겨찾기/LIVE)에 iOS 26의 새 유리 재질(`glassEffect`)을
   시범 적용. `if #available(iOS 26.0, *)`로 분기해서 iOS 26 미만 기기는 기존 단색 캡슐 스타일 그대로
-  유지 (배포 타깃 17.6은 안 바뀜). `GlassEffectContainer`로 감싸서 인접한 필들이 서로 자연스럽게
-  이어지는 느낌을 살림
+  유지 (배포 타깃 17.6은 안 바뀜). `GlassEffectContainer`는 일부러 안 씀 — 서로 배타적으로 선택하는
+  필들이 눌릴 때 옆 필이랑 액체처럼 이어져 보여서 헷갈릴 수 있어, 각 필을 독립된 유리로 유지
 - 예정 경기(unstarted) 날짜 제한 없음 — API가 반환하는 모든 미래 경기 표시
 - 타이틀 · 날짜 스트립 · 필터 고정, 경기 목록만 스크롤
 - 빈 상태 화면(경기 없음/즐겨찾기 없음/라이브 없음)을 즐겨찾기 화면과 동일한 공용 `EmptyStateView`로 통일
@@ -262,6 +262,15 @@
 
 - 디스크 캐시 복원 시 `playerImageURLs`가 비어있으면 Leaguepedia에서 재시도 후 캐시 갱신
 - 이미지 URL 없을 때 `ChampionImageView`로 폴백 (챔피언 아이콘 표시)
+
+### 탭바 (iOS 18+ / iOS 26+ 이중 대응)
+
+`ContentView`의 `TabView`는 iOS 버전에 따라 두 가지 구현을 씀 (`#available` 분기):
+- **iOS 18 이상**: 새 `Tab(_:systemImage:value:)` 기반 API + `.tabViewStyle(.sidebarAdaptable)`.
+  아이패드에서 사이드바로 자동 전환, 탭 순서/표시 여부를 사용자가 직접 편집 가능 (예전 `.tabItem`
+  방식엔 없던 기능). iOS 26에서는 하단 탭바 자체도 시스템이 자동으로 새 유리 재질로 그려줌
+  (앱 쪽 코드 변경 불필요).
+- **iOS 17**: 배포 타깃(17.6)을 지원해야 해서 기존 `.tabItem` 방식 그대로 유지.
 
 ## 대회 일정 아키텍처 (Worlds / MSI)
 
