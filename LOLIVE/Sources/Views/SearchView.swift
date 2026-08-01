@@ -38,6 +38,11 @@ struct SearchView: View {
                 .task(id: focusTrigger) {
                     guard focusTrigger > 0 else { return }
                     isSearchFocused = true
+                    // 앱 첫 실행 직후 첫 탭 선택 시에는 검색창 뷰가 이 시점에 막 생성되는
+                    // 중이라 포커스 요청이 씹힐 수 있음 — 뷰가 자리잡을 시간을 준 뒤 안 잡혀
+                    // 있으면 한 번 더 시도. 이미 포커스됐으면 그대로라 체감 속도엔 영향 없음
+                    try? await Task.sleep(for: .milliseconds(200))
+                    if !isSearchFocused { isSearchFocused = true }
                 }
         } else {
             searchableContent
