@@ -5,6 +5,9 @@
 
 import Foundation
 import Observation
+import os
+
+private let livePollLogger = Logger(subsystem: "com.lolive", category: "LivePoll")
 
 @MainActor
 @Observable
@@ -194,6 +197,16 @@ final class TodayViewModel {
                     let newLiveIds = Set(live.map { $0.match.id })
                     let newFavoriteLive = live.filter { favoriteTeamCode(for: $0.match) != nil }
 
+                    #if DEBUG
+                    livePollLogger.debug("🔴 [LivePoll] fetchLive 성공 — 전체 \(live.count)건, 즐겨찾기 팀 경기 \(newFavoriteLive.count)건")
+                    if newFavoriteLive.isEmpty && !favoritedTeamIds.isEmpty {
+                        livePollLogger.debug("🔴 [LivePoll] 즐겨찾기 팀이 지금 getLive 응답엔 없음 (아직 시작 전이거나 API 미반영)")
+                    }
+                    for lm in newFavoriteLive {
+                        livePollLogger.debug("🔴 [LivePoll] \(lm.match.teamA.code) \(lm.match.scoreA) - \(lm.match.scoreB) \(lm.match.teamB.code) · Game \(lm.currentSet) · state=\(lm.match.state.rawValue)")
+                    }
+                    #endif
+
                     // 라이브에서 사라진 즐겨찾기 경기 → 결과 알림
                     // Riot이 스코어를 끝까지 안 알려준 채로(0:0) 라이브 목록에서 빠지는 경우가 실제로
                     // 있었다 — 5분 주기 보정이 미처 못 끼어든 채로 Riot이 먼저 목록에서 지워버리면
@@ -207,6 +220,9 @@ final class TodayViewModel {
                         }
                         let resolvedMatch = finalMatch ?? lm.match
                         leaguepediaOverrides[lm.match.id] = resolvedMatch
+                        #if DEBUG
+                        livePollLogger.debug("🏁 [LivePoll] 라이브에서 사라짐 → 결과 알림: \(code) 최종 \(resolvedMatch.scoreA)-\(resolvedMatch.scoreB)")
+                        #endif
                         await MatchNotificationService.shared.sendResultNotification(
                             for: resolvedMatch, favoriteTeamCode: code
                         )
@@ -221,6 +237,9 @@ final class TodayViewModel {
                         if let prev = prevFavoriteLive.first(where: { $0.match.id == lm.match.id }) {
                             // 세트 번호가 늘었으면 이전 세트 종료 + 새 세트 시작 알림
                             if lm.currentSet > prev.currentSet {
+                                #if DEBUG
+                                livePollLogger.debug("🎮 [LivePoll] 세트 변경 감지: \(code) Game \(prev.currentSet) → \(lm.currentSet), 스코어 \(lm.match.scoreA)-\(lm.match.scoreB) → 세트 종료+시작 알림 발송")
+                                #endif
                                 await MatchNotificationService.shared.sendSetEndNotification(
                                     for: lm.match, favoriteTeamCode: code, endedSet: prev.currentSet
                                 )
@@ -230,6 +249,9 @@ final class TodayViewModel {
                             }
                         } else {
                             // 직전 폴링엔 없었는데 지금 라이브 → 경기 시작
+                            #if DEBUG
+                            livePollLogger.debug("🟢 [LivePoll] 경기 시작 감지: \(code) → 경기 시작 알림 발송")
+                            #endif
                             await MatchNotificationService.shared.sendMatchStartNotification(
                                 for: lm.match, favoriteTeamCode: code
                             )
@@ -267,6 +289,9 @@ final class TodayViewModel {
                     await LiveActivityService.shared.syncActivities(liveMatches, overdueMatches: overdueMatches, favoritedTeamIds: favoritedTeamIds)
                 } catch {
                     // 폴링 중 에러는 무시 (기존 데이터 유지)
+                    #if DEBUG
+                    livePollLogger.debug("⚠️ [LivePoll] fetchLive 실패: \(error.localizedDescription) — 30초 뒤 재시도")
+                    #endif
                 }
                 try? await Task.sleep(for: .seconds(30))
             }
