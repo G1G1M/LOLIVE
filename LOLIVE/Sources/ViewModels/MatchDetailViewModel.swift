@@ -154,7 +154,9 @@ final class MatchDetailViewModel {
             await loadKillTimelines(for: playableGames, liveStats: liveStats)
 
             // 완료 경기는 디스크에 저장 (다음 진입 시 즉시 표시)
-            if match.state == .completed {
+            // Riot API가 아직 안 채워진 상태(밴픽/승자 없음)면 캐싱하지 않는다 —
+            // 여기서 캐싱해버리면 나중에 Riot이 채워줘도 30일 동안 빈 상태로 고정된다.
+            if match.state == .completed && Self.isGenuinelyComplete(detail) {
                 AppDiskCache.set(key: "event_detail_v2_\(match.id)", value: detail)
             }
 
@@ -170,6 +172,14 @@ final class MatchDetailViewModel {
     /// TournamentDetailViewModel/AppPreloadService가 전부 이 값을 참조한다.
     static let preloadCount = 8
 
+    /// completed로 표시된 경기인데 Riot의 상세 API(getEventDetails)는 아직 안 채워진 경우
+    /// (밴픽·승자 정보 없음)를 구분한다. 이런 "덜 채워진" 응답을 30일 캐시에 그대로 저장하면,
+    /// 나중에 Riot이 채워줘도 캐시가 만료될 때까지 계속 빈 상태로 보이게 된다 — 실제로 겪은 버그.
+    /// 여러 세트 중 하나라도 완료+승자 확정이면 "충분히 채워졌다"고 본다.
+    private nonisolated static func isGenuinelyComplete(_ detail: EventDetailInfo) -> Bool {
+        detail.games.contains { $0.state == .completed && $0.winnerTeamId != nil }
+    }
+
     /// 경기 목록 화면에서 완료된 경기 데이터를 백그라운드로 미리 캐싱.
     /// 이미 캐시된 경기는 건너뜀.
     static func preload(match: Match) {
@@ -181,6 +191,9 @@ final class MatchDetailViewModel {
             let esports = RiotEsportsService()
             let liveStats = LiveStatsService()
             guard let detail = try? await esports.fetchEventDetails(matchId: match.id) else { return }
+            // 아직 안 채워진 상태면 캐싱 안 하고 넘어감 — 다음 preload 시도(스케줄 새로고침마다)에
+            // 다시 확인해서, Riot이 채워주는 대로 자연스럽게 잡히게 한다.
+            guard isGenuinelyComplete(detail) else { return }
             AppDiskCache.set(key: detailKey, value: detail)
 
             let cache = GameWindowCache.shared
@@ -219,7 +232,8 @@ final class MatchDetailViewModel {
     // MARK: - Cache helpers
 
     private func tryLoadFromCache() async -> Bool {
-        guard let detail: EventDetailInfo = AppDiskCache.get(key: "event_detail_v2_\(match.id)", maxAge: 30 * 24 * 3600)
+        guard let detail: EventDetailInfo = AppDiskCache.get(key: "event_detail_v2_\(match.id)", maxAge: 30 * 24 * 3600),
+              Self.isGenuinelyComplete(detail)
         else { return false }
 
         eventDetail = detail
