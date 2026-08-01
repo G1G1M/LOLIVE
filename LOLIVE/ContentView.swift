@@ -54,6 +54,8 @@ struct ContentView: View {
     /// iOS 18+에선 새 `Tab` 기반 API + `.sidebarAdaptable` 스타일을 사용 — 아이패드에서 사이드바로
     /// 자동 전환되고, 탭 순서/표시 여부를 사용자가 직접 편집할 수 있는 기능이 생긴다(예전 `.tabItem`
     /// 방식엔 없던 기능). iOS 26에서는 하단 탭바 자체도 자동으로 새 유리 재질로 바뀐다(별도 코드 불필요).
+    /// Search 탭은 `role: .search`를 줘서 iOS 26에서 나머지 탭 캡슐과 분리된 원형 유리 버튼으로
+    /// 따로 표시되게 함 (애플 표준 Search Role 탭바 스타일).
     /// 배포 타깃(17.6)을 지원해야 해서 iOS 17은 기존 `.tabItem` 방식으로 폴백한다.
     @ViewBuilder
     private var tabs: some View {
@@ -64,8 +66,10 @@ struct ContentView: View {
                 Tab("Standings", systemImage: "list.number", value: 2) { StandingsView() }
                 Tab("Players", systemImage: "person.fill", value: 3) { PlayersView() }
                 Tab("Favorites", systemImage: "star.fill", value: 4) { FavoritesView() }
-                Tab("Search", systemImage: "magnifyingglass", value: 5) {
+                Tab(value: 5, role: .search) {
                     SearchView(focusTrigger: searchFocusTrigger)
+                } label: {
+                    Label("Search", systemImage: "magnifyingglass")
                 }
             }
             .tabViewStyle(.sidebarAdaptable)
