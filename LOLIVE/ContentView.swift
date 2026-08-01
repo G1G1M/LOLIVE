@@ -21,31 +21,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            TodayView()
-                .tag(0)
-                .tabItem { Label("Today", systemImage: "house.fill") }
-
-            LeaguesView()
-                .tag(1)
-                .tabItem { Label("Leagues", systemImage: "trophy.fill") }
-
-            StandingsView()
-                .tag(2)
-                .tabItem { Label("Standings", systemImage: "list.number") }
-
-            PlayersView()
-                .tag(3)
-                .tabItem { Label("Players", systemImage: "person.fill") }
-
-            FavoritesView()
-                .tag(4)
-                .tabItem { Label("Favorites", systemImage: "star.fill") }
-
-            SearchView(focusTrigger: searchFocusTrigger)
-                .tag(5)
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
-        }
+        tabs
         .tint(themeColor)
         .onChange(of: selectedTab) { _, new in
             if new == 5 {
@@ -72,6 +48,53 @@ struct ContentView: View {
         }
         .onChange(of: todayViewModel.liveMatches) { _, _ in
             saveWidgetNextMatches()
+        }
+    }
+
+    /// iOS 18+에선 새 `Tab` 기반 API + `.sidebarAdaptable` 스타일을 사용 — 아이패드에서 사이드바로
+    /// 자동 전환되고, 탭 순서/표시 여부를 사용자가 직접 편집할 수 있는 기능이 생긴다(예전 `.tabItem`
+    /// 방식엔 없던 기능). iOS 26에서는 하단 탭바 자체도 자동으로 새 유리 재질로 바뀐다(별도 코드 불필요).
+    /// 배포 타깃(17.6)을 지원해야 해서 iOS 17은 기존 `.tabItem` 방식으로 폴백한다.
+    @ViewBuilder
+    private var tabs: some View {
+        if #available(iOS 18.0, *) {
+            TabView(selection: $selectedTab) {
+                Tab("Today", systemImage: "house.fill", value: 0) { TodayView() }
+                Tab("Leagues", systemImage: "trophy.fill", value: 1) { LeaguesView() }
+                Tab("Standings", systemImage: "list.number", value: 2) { StandingsView() }
+                Tab("Players", systemImage: "person.fill", value: 3) { PlayersView() }
+                Tab("Favorites", systemImage: "star.fill", value: 4) { FavoritesView() }
+                Tab("Search", systemImage: "magnifyingglass", value: 5) {
+                    SearchView(focusTrigger: searchFocusTrigger)
+                }
+            }
+            .tabViewStyle(.sidebarAdaptable)
+        } else {
+            TabView(selection: $selectedTab) {
+                TodayView()
+                    .tag(0)
+                    .tabItem { Label("Today", systemImage: "house.fill") }
+
+                LeaguesView()
+                    .tag(1)
+                    .tabItem { Label("Leagues", systemImage: "trophy.fill") }
+
+                StandingsView()
+                    .tag(2)
+                    .tabItem { Label("Standings", systemImage: "list.number") }
+
+                PlayersView()
+                    .tag(3)
+                    .tabItem { Label("Players", systemImage: "person.fill") }
+
+                FavoritesView()
+                    .tag(4)
+                    .tabItem { Label("Favorites", systemImage: "star.fill") }
+
+                SearchView(focusTrigger: searchFocusTrigger)
+                    .tag(5)
+                    .tabItem { Label("Search", systemImage: "magnifyingglass") }
+            }
         }
     }
 

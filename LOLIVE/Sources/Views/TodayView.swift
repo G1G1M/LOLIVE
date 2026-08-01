@@ -165,20 +165,16 @@ struct TodayView: View {
     // MARK: - Fixed: Favorites Toggle
 
     /// Liquid Glass 시범 적용 지점 — iOS 26 미만은 기존 단색 캡슐 스타일 그대로 유지.
-    /// GlassEffectContainer로 감싸야 인접한 필들이 서로 자연스럽게 이어지는 유리 느낌이 남.
+    /// GlassEffectContainer는 일부러 안 씀 — 서로 배타적으로 선택하는 필들이 눌릴 때 옆 필이랑
+    /// 시각적으로 이어져 보여서(액체처럼 합쳐지는 효과) 헷갈릴 수 있음. 애플 가이드도 이 효과는
+    /// "하나로 묶인 느낌이 필요한" 경우에 쓰라고 권장 — 지금처럼 독립적인 선택지엔 안 맞음.
     private var favoritesToggle: some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                GlassEffectContainer(spacing: 8) { pillsRow }
-            } else {
-                pillsRow
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
-        .animation(.easeInOut(duration: 0.15), value: viewModel.showFavoritesOnly)
-        .animation(.easeInOut(duration: 0.15), value: showLiveOnly)
+        pillsRow
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color(.systemGroupedBackground))
+            .animation(.easeInOut(duration: 0.15), value: viewModel.showFavoritesOnly)
+            .animation(.easeInOut(duration: 0.15), value: showLiveOnly)
     }
 
     private var pillsRow: some View {
