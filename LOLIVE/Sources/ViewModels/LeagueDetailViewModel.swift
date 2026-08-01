@@ -212,30 +212,9 @@ final class LeagueDetailViewModel {
         return true
     }
 
+    /// GD·승패를 완료 경기 스코어로 직접 재계산 — 자세한 이유는 Standing.reconciled(_:schedule:) 참고.
     private func applyGD(_ standings: [Standing], schedule: [Match]) -> [Standing] {
-        let completed = schedule.filter { $0.state == .completed }
-        var gameWinsMap: [String: Int] = [:]
-        var gameLossesMap: [String: Int] = [:]
-        for match in completed {
-            let aCode = match.teamA.code.uppercased()
-            let bCode = match.teamB.code.uppercased()
-            gameWinsMap[aCode, default: 0] += match.scoreA
-            gameLossesMap[aCode, default: 0] += match.scoreB
-            gameWinsMap[bCode, default: 0] += match.scoreB
-            gameLossesMap[bCode, default: 0] += match.scoreA
-        }
-        return standings.map { s in
-            var s = s
-            let code = s.team.code.uppercased()
-            s.gameWins = gameWinsMap[code] ?? 0
-            s.gameLosses = gameLossesMap[code] ?? 0
-            return s
-        }.sorted {
-            if $0.rank != $1.rank { return $0.rank < $1.rank }
-            if $0.wins != $1.wins { return $0.wins > $1.wins }
-            if $0.gameDiff != $1.gameDiff { return $0.gameDiff > $1.gameDiff }
-            return $0.team.name < $1.team.name
-        }
+        Standing.reconciled(standings, schedule: schedule)
     }
 
 }

@@ -159,7 +159,10 @@ struct TodayViewModelMarkCompletedTests {
 @Suite("StandingsViewModel.applyGD")
 struct StandingsViewModelApplyGDTests {
 
-    @Test func 개별_승패가_있으면_Riot_순위를_그대로_쓰고_GD만_채운다() {
+    @Test func 완료경기가_있으면_Riot_원본_승패_대신_직접_계산한_값을_쓴다() {
+        // Riot의 순위 API는 팀별로 반영 시점이 어긋날 수 있다 (실제 관측: 같은 경기인데
+        // 한쪽 팀 기록만 갱신되고 반대쪽은 안 됨) — 그래서 Riot이 내려준 개별 승패(5승1패/3승3패)를
+        // 그대로 믿지 않고, 완료 경기 스코어로 직접 계산한 값(1승0패/0승1패)을 항상 우선한다.
         let vm = StandingsViewModel()
         let standings = [
             Fixture.standing(team: Fixture.t1, wins: 5, losses: 1, rank: 1),
@@ -170,9 +173,12 @@ struct StandingsViewModelApplyGDTests {
         ]
         let result = vm.applyGD(standings, schedule: schedule)
 
+        let t1 = result.first { $0.team.id == "T1" }
+        let gen = result.first { $0.team.id == "GEN" }
+        #expect(t1?.wins == 1 && t1?.losses == 0)
+        #expect(gen?.wins == 0 && gen?.losses == 1)
+        #expect(t1?.gameWins == 2 && t1?.gameLosses == 0)
         #expect(result.map(\.rank) == [1, 2])
-        #expect(result.first { $0.team.id == "T1" }?.gameWins == 2)
-        #expect(result.first { $0.team.id == "T1" }?.gameLosses == 0)
     }
 
     @Test func 케스파컵처럼_전원_0승0패면_완료경기로_재계산한다() {

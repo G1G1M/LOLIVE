@@ -154,91 +154,10 @@ final class StandingsViewModel {
         return applyGD(fetched, schedule: schedule)
     }
 
+    /// GD·승패를 완료 경기 스코어로 직접 재계산 — 자세한 이유는 Standing.reconciled(_:schedule:) 참고.
     func applyGD(_ standings: [Standing], schedule: [Match]) -> [Standing] {
-        let completed = schedule.filter { $0.state == .completed }
-        var gameWinsMap: [String: Int] = [:]
-        var gameLossesMap: [String: Int] = [:]
-        for match in completed {
-            let aCode = match.teamA.code.uppercased()
-            let bCode = match.teamB.code.uppercased()
-            gameWinsMap[aCode, default: 0] += match.scoreA
-            gameLossesMap[aCode, default: 0] += match.scoreB
-            gameWinsMap[bCode, default: 0] += match.scoreB
-            gameLossesMap[bCode, default: 0] += match.scoreA
-        }
-        let withGD = standings.map { s -> Standing in
-            var s = s
-            let code = s.team.code.uppercased()
-            s.gameWins = gameWinsMap[code] ?? 0
-            s.gameLosses = gameLossesMap[code] ?? 0
-            return s
-        }
-
-        // 케스파컵처럼 Riot Standings API가 전 팀을 0승 0패로 묶어 내려주는 대회 대응:
-        // 완료된 경기 결과로 승패를 직접 계산하고, 그 기준으로 그룹별 순위를 재부여한다.
-        // 정상적으로 개별 승패가 내려오는 리그(대부분)는 Riot 원본 순위·타이브레이크를 그대로 사용한다.
-        guard !withGD.isEmpty, !completed.isEmpty,
-              withGD.allSatisfy({ $0.wins + $0.losses == 0 })
-        else {
-            return withGD.sorted {
-                if $0.rank != $1.rank { return $0.rank < $1.rank }
-                if $0.wins != $1.wins { return $0.wins > $1.wins }
-                if $0.gameDiff != $1.gameDiff { return $0.gameDiff > $1.gameDiff }
-                return $0.team.name < $1.team.name
-            }
-        }
-        return recomputeRecordsAndRanks(withGD, completed: completed)
+        Standing.reconciled(standings, schedule: schedule)
     }
-
-    /// 완료된 경기로부터 팀별 승패를 직접 집계하고, 그룹별로 승수 → 세트 득실 → 팀명 순 정렬해
-    /// 순번을 다시 매긴다 (Riot이 동률로 묶어 내려준 rank를 실제 성적 기준 순위로 대체).
-    func recomputeRecordsAndRanks(_ standings: [Standing], completed: [Match]) -> [Standing] {
-        var wins: [String: Int] = [:]
-        var losses: [String: Int] = [:]
-        for match in completed {
-            let aCode = match.teamA.code.uppercased()
-            let bCode = match.teamB.code.uppercased()
-            if match.scoreA > match.scoreB {
-                wins[aCode, default: 0] += 1
-                losses[bCode, default: 0] += 1
-            } else if match.scoreB > match.scoreA {
-                wins[bCode, default: 0] += 1
-                losses[aCode, default: 0] += 1
-            }
-        }
-
-        let recomputed = standings.map { s -> Standing in
-            let code = s.team.code.uppercased()
-            let w = wins[code] ?? 0
-            let l = losses[code] ?? 0
-            let total = w + l
-            return Standing(team: s.team, wins: w, losses: l, rank: s.rank,
-                             winRate: total > 0 ? Double(w) / Double(total) : 0,
-                             gameWins: s.gameWins, gameLosses: s.gameLosses, group: s.group)
-        }
-
-        let groups = Dictionary(grouping: recomputed, by: { $0.group })
-        var reranked: [Standing] = []
-        for (_, group) in groups {
-            let sorted = group.sorted {
-                if $0.wins != $1.wins { return $0.wins > $1.wins }
-                if $0.gameDiff != $1.gameDiff { return $0.gameDiff > $1.gameDiff }
-                return $0.team.name < $1.team.name
-            }
-            for (idx, s) in sorted.enumerated() {
-                reranked.append(Standing(team: s.team, wins: s.wins, losses: s.losses, rank: idx + 1,
-                                          winRate: s.winRate, gameWins: s.gameWins,
-                                          gameLosses: s.gameLosses, group: s.group))
-            }
-        }
-        return reranked.sorted {
-            if $0.group != $1.group { return ($0.group ?? "") < ($1.group ?? "") }
-            if $0.rank != $1.rank { return $0.rank < $1.rank }
-            if $0.wins != $1.wins { return $0.wins > $1.wins }
-            return $0.team.name < $1.team.name
-        }
-    }
-
 
     private func regionOrder(_ region: String) -> Int {
         switch region {
