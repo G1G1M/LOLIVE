@@ -9,6 +9,8 @@ import SwiftData
 struct SearchView: View {
     @State private var viewModel = SearchViewModel()
     @State private var searchText = ""
+    @State private var isSearchPresented = false
+    @FocusState private var isSearchFocused: Bool
     @Query private var favoriteTeams: [FavoriteTeam]
     @Query private var favoritePlayers: [FavoritePlayer]
     @Environment(\.modelContext) private var modelContext
@@ -19,7 +21,22 @@ struct SearchView: View {
 
     // role: .search 탭이 .searchable을 인식하려면 이 탭의 콘텐츠가 자체 NavigationStack을
     // 가져야 한다 (ContentView의 TabView를 또 NavigationStack으로 감싸면 안 됨).
+    // .searchable 자체는 탭을 누르면 검색창을 펼쳐주기만 할 뿐 키보드까지 자동으로 띄워주진
+    // 않아서, isPresented가 true로 바뀌는 시점(탭 선택)에 .searchFocused로 직접 포커스를 준다.
+    // .searchFocused는 iOS 18+ 전용이라 iOS 17 폴백 탭바에선 자동 포커스 없이 기존처럼 동작한다.
     var body: some View {
+        if #available(iOS 18.0, *) {
+            searchableContent
+                .searchFocused($isSearchFocused)
+                .onChange(of: isSearchPresented) { _, presented in
+                    if presented { isSearchFocused = true }
+                }
+        } else {
+            searchableContent
+        }
+    }
+
+    private var searchableContent: some View {
         NavigationStack {
             ZStack {
                 Color(.systemGroupedBackground).ignoresSafeArea()
@@ -39,7 +56,7 @@ struct SearchView: View {
             .navigationTitle("검색")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .searchable(text: $searchText, prompt: "리그, 팀, 선수 검색")
+        .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "리그, 팀, 선수 검색")
         .task { await viewModel.load() }
     }
 
