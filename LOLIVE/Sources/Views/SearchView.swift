@@ -7,9 +7,10 @@ import SwiftUI
 import SwiftData
 
 struct SearchView: View {
+    let focusTrigger: Int
+
     @State private var viewModel = SearchViewModel()
     @State private var searchText = ""
-    @State private var isSearchPresented = false
     @FocusState private var isSearchFocused: Bool
     @Query private var favoriteTeams: [FavoriteTeam]
     @Query private var favoritePlayers: [FavoritePlayer]
@@ -21,15 +22,18 @@ struct SearchView: View {
 
     // role: .search 탭이 .searchable을 인식하려면 이 탭의 콘텐츠가 자체 NavigationStack을
     // 가져야 한다 (ContentView의 TabView를 또 NavigationStack으로 감싸면 안 됨).
-    // .searchable 자체는 탭을 누르면 검색창을 펼쳐주기만 할 뿐 키보드까지 자동으로 띄워주진
-    // 않아서, isPresented가 true로 바뀌는 시점(탭 선택)에 .searchFocused로 직접 포커스를 준다.
-    // .searchFocused는 iOS 18+ 전용이라 iOS 17 폴백 탭바에선 자동 포커스 없이 기존처럼 동작한다.
+    // .searchable의 isPresented 바인딩은 탭 선택만으로는 true로 안 바뀌어서(실기기 확인),
+    // ContentView가 탭 선택마다 올려주는 focusTrigger를 대신 신호로 써서 .searchFocused로
+    // 직접 포커스를 준다. .searchFocused는 iOS 18+ 전용이라 iOS 17 폴백 탭바에선 자동 포커스 없이
+    // 기존처럼 동작한다.
     var body: some View {
         if #available(iOS 18.0, *) {
             searchableContent
                 .searchFocused($isSearchFocused)
-                .onChange(of: isSearchPresented) { _, presented in
-                    if presented { isSearchFocused = true }
+                .task(id: focusTrigger) {
+                    guard focusTrigger > 0 else { return }
+                    try? await Task.sleep(for: .milliseconds(150))
+                    isSearchFocused = true
                 }
         } else {
             searchableContent
@@ -56,7 +60,7 @@ struct SearchView: View {
             .navigationTitle("검색")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "리그, 팀, 선수 검색")
+        .searchable(text: $searchText, prompt: "리그, 팀, 선수 검색")
         .task { await viewModel.load() }
     }
 
@@ -228,6 +232,6 @@ struct SearchView: View {
 }
 
 #Preview {
-    SearchView()
+    SearchView(focusTrigger: 0)
         .preferredColorScheme(.dark)
 }
