@@ -269,7 +269,8 @@
 - **iOS 18 이상**: 새 `Tab(_:systemImage:value:)` 기반 API + `.tabViewStyle(.sidebarAdaptable)`.
   아이패드에서 사이드바로 자동 전환, 탭 순서/표시 여부를 사용자가 직접 편집 가능 (예전 `.tabItem`
   방식엔 없던 기능). iOS 26에서는 하단 탭바 자체도 시스템이 자동으로 새 유리 재질로 그려줌
-  (앱 쪽 코드 변경 불필요).
+  (앱 쪽 코드 변경 불필요). Search 탭은 `role: .search`를 줘서 iOS 26에서 나머지 탭 캡슐과
+  분리된 원형 유리 버튼으로 따로 표시됨 (애플 표준 Search Role 탭바 스타일).
 - **iOS 17**: 배포 타깃(17.6)을 지원해야 해서 기존 `.tabItem` 방식 그대로 유지.
 
 ## 대회 일정 아키텍처 (Worlds / MSI)
