@@ -23,6 +23,9 @@ struct ContentView: View {
     var body: some View {
         tabs
         .tint(themeColor)
+        // 탭 전환(특히 Search 원형 버튼 → 검색창 모핑) 애니메이션이 굼떠 보인다는 피드백으로
+        // selectedTab이 바뀌는 트랜잭션 자체의 애니메이션을 꺼서 즉시 전환되게 함
+        .transaction(value: selectedTab) { $0.disablesAnimations = true }
         .onChange(of: selectedTab) { _, new in
             if new == 4 {
                 searchFocusTrigger += 1
