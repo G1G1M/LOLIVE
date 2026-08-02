@@ -256,7 +256,7 @@
 - **DEBUG 전용 테스트 섹션** (배포 빌드 미포함): 테스트 알림 5초 발송 / 경기 시작·종료 알림 즉시 발송 / Live Activity 시작·스코어 업데이트(세트 종료·시작 알림 + Dynamic Island 배너 동시 트리거)·종료 — 실제 경기 시간 없이 알림·Live Activity·위젯 검증 가능
 - **실시간 폴링 진단 로그** (`[LivePoll]` 태그, DEBUG 전용): 실제 라이브 경기로 검증할 때 Xcode 콘솔에서 팀 코드로 필터링하면 매 폴링(30초)마다 즐겨찾기 경기의 스코어·세트·상태, 경기 시작/세트 변경/결과 알림 발송 시점, `fetchLive()` 실패 여부를 바로 확인 가능
 
-### 백그라운드 푸시 알림 (진행 중 — 서버는 배포 완료, 앱 연동 대기)
+### 백그라운드 푸시 알림 (서버·앱 연동 완료)
 기존 알림 4종(위 참고)은 `TodayViewModel.startLivePolling()`의 30초 클라이언트 폴링 기반이라 앱이
 foreground로 살아있을 때만 동작 — 백그라운드 진입 시 iOS가 프로세스를 정지시켜 폴링도 멈추고,
 앱을 다시 열 때 그동안 놓친 변화를 뒤늦게 감지한다. 앱이 꺼져 있어도 즉시 알림을 받으려면 서버가
@@ -273,10 +273,11 @@ foreground로 살아있을 때만 동작 — 백그라운드 진입 시 iOS가 �
   자동 삭제
 - 비용: FCM·APNs 자체는 완전 무료. `syncLive` 호출 빈도(1분 주기)는 그대로라 Cloud Functions
   무료 한도(월 200만 회) 안에서 여유롭게 처리됨
-- **앱 쪽 연동은 아직 미완성** — `pending-firebase-integration/AppDelegate.swift`,
-  `pending-firebase-integration/PushNotificationService.swift` 두 파일을 작성해뒀지만, 이 프로젝트가
-  Xcode 16 동기화 폴더 방식이라 `LOLIVE/` 안에 넣으면 Firebase SDK 없이는 즉시 빌드가 깨져서
-  일부러 프로젝트 폴더 밖에 대기시켜 둠. Firebase iOS SDK 추가 후 옮기면 됨 (위 "Xcode 설정 (수동)" 참고)
+- **앱 쪽 연동**: `AppDelegate.swift`(`FirebaseApp.configure()` + APNs 등록) + `LOLIVEApp`에
+  `@UIApplicationDelegateAdaptor` 연결. `PushNotificationService.swift`가 FCM 토큰을 받아
+  `registerDeviceToken` Callable로 서버에 등록 — `ContentView`의 즐겨찾기 변경 지점(`.task`,
+  `.onChange(of: favoriteTeams)`)에서 최신 즐겨찾기 팀 코드로 재등록 트리거
+- **아직 실기기에서 "앱 완전 종료 상태로 푸시 도착" 검증은 안 해봄** — 다음 라이브 경기로 확인 필요
 
 ### 홈 화면·잠금화면 위젯 (LOLIVEWidgets)
 - 즐겨찾기한 팀의 다음 경기 일정 표시
@@ -556,8 +557,9 @@ LOLIVE/
 │       ├── MatchDetailView (+Draft / +Stats / +Timeline 기능별 extension 분리), PlayerDetailView
 │       ├── StateViews (ErrorRetryView / EmptyStateView 공통 상태 컴포넌트, EmptyStateView는 선택적 액션 버튼 지원)
 │       └── MatchCardView, LeagueSectionHeader, CachedAsyncImage, LoadingView, PlayerAvatarView, ...
-├── ContentView.swift        — TabView 진입점 (Today/Leagues/Standings/Players/Favorites/Search 6탭,
-│                              5개 초과라 Favorites·Search는 iOS가 자동으로 "더보기" 탭에 편입)
+├── ContentView.swift        — TabView 진입점 (Today/Leagues/Standings/Players + Search role 5탭,
+│                              Favorites는 탭에서 빠지고 Today 상단 별 아이콘 시트로 이동)
+├── AppDelegate.swift        — FirebaseApp.configure() + APNs 등록 (@UIApplicationDelegateAdaptor)
 ├── LOLIVEApp.swift          — 앱 진입점
 └── LOLIVEWidgets/           — Widget Extension
     ├── FavoriteTeamWidget.swift
@@ -575,9 +577,6 @@ LOLIVE/
 - **NSSupportsLiveActivities**: LOLIVE 타겟 Info에 `YES` 설정
 - **NSSupportsLiveActivitiesFrequentUpdates**: LOLIVE 타겟 Info에 `YES` 설정
 - **API Key**: `APIKeys.swift` (gitignore됨) — `RiotAPIKey` 상수 정의 필요
-- **(예정) Firebase 푸시 알림 SDK 추가** — 아래 "백그라운드 푸시 알림" 참고. Xcode → File →
-  Add Package Dependencies → `https://github.com/firebase/firebase-ios-sdk` → `FirebaseCore`,
-  `FirebaseMessaging`, `FirebaseFunctions` 3개 제품 선택 → LOLIVE 타겟에 추가. 완료되면
-  `pending-firebase-integration/`의 두 파일(`AppDelegate.swift`, `PushNotificationService.swift`)을
-  `LOLIVE/`, `LOLIVE/Sources/Services/`로 각각 옮기면 동기화 폴더 방식이라 자동으로 타겟에 포함됨
-  (`GoogleService-Info.plist`는 이미 `LOLIVE/`에 있음, gitignore됨)
+- **Firebase 푸시 알림 SDK**: `firebase-ios-sdk` 패키지 추가 완료 (`FirebaseCore`/`FirebaseMessaging`/
+  `FirebaseFunctions` 3개 제품이 LOLIVE 타겟에 연결됨, `Package.resolved` 커밋됨).
+  `GoogleService-Info.plist`는 `LOLIVE/`에 있음(gitignore됨, 새로 세팅할 땐 Firebase 콘솔에서 다시 받아야 함)
