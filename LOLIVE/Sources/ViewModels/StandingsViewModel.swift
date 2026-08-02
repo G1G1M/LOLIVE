@@ -5,6 +5,9 @@
 
 import Foundation
 import Observation
+import os
+
+private let standingsLogger = Logger(subsystem: "com.lolive", category: "Standings")
 
 @MainActor
 @Observable
@@ -121,10 +124,20 @@ final class StandingsViewModel {
         let fetched = (try? await standingsFetch) ?? []
         let schedule = (try? await scheduleFetch) ?? []
 
-        let sorted = applyGD(
-            fetched, schedule: schedule,
-            seasonStartDate: seasonStartDate(from: tournaments, active: tournament)
-        )
+        let seasonStart = seasonStartDate(from: tournaments, active: tournament)
+        #if DEBUG
+        let seasonCompletedCount = schedule.filter { $0.state == .completed && $0.startTime >= seasonStart }.count
+        standingsLogger.debug("""
+            🏆 [Standings] \(league.name) tournament=\(tournament.slug) seasonStart=\(seasonStart.description) \
+            seasonMatches=\(schedule.count) seasonCompleted=\(seasonCompletedCount)
+            """)
+        #endif
+        let sorted = applyGD(fetched, schedule: schedule, seasonStartDate: seasonStart)
+        #if DEBUG
+        for s in sorted {
+            standingsLogger.debug("🏆 [Standings]   \(s.group ?? "-") #\(s.rank) \(s.team.code) \(s.wins)승\(s.losses)패 GD\(s.gameDiff)")
+        }
+        #endif
         standingsCache[league.id] = sorted
         standings = sorted
     }
