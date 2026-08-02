@@ -591,8 +591,12 @@ LOLIVE/
 - **Firebase 푸시 알림 SDK**: `firebase-ios-sdk` 패키지 추가 완료 (`FirebaseCore`/`FirebaseMessaging`/
   `FirebaseFunctions` 3개 제품이 LOLIVE 타겟에 연결됨, `Package.resolved` 커밋됨).
   `GoogleService-Info.plist`는 `LOLIVE/`에 있음(gitignore됨, 새로 세팅할 땐 Firebase 콘솔에서 다시 받아야 함)
-- **Push Notifications entitlement**: `LOLIVE.entitlements`에 `aps-environment = development` 직접 추가
-  (레포에 커밋됨). Xcode의 "Push Notifications" capability를 UI로 켜지 않고 entitlements 파일에
-  직접 써서 대체함 — 이게 없으면 `registerForRemoteNotifications()`가 조용히 실패해서(APNs가 진짜
-  기기 토큰을 안 줌) 서버에 등록되는 기기 토큰이 아예 없는 상태가 됨(실제로 겪은 문제). 앱 스토어
-  배포 시에는 Xcode가 배포용 프로비저닝에 맞춰 `production`으로 다시 서명해야 할 수 있음
+- **Push Notifications entitlement — 보류 (무료 Apple ID로 불가능)**: `aps-environment`를
+  `LOLIVE.entitlements`에 추가했다가 다시 뺐음. 무료 Apple ID(Personal Team)는 Push Notifications
+  capability 자체를 지원하지 않아서("Personal development teams... do not support the Push
+  Notifications capability") 이 entitlement가 있으면 프로비저닝 프로파일을 아예 못 만들어 빌드가
+  실패함(실제로 겪음). Apple Developer Program 유료 등록(연 $99) 후에만 다시 추가 가능 — 등록하면
+  이 키만 다시 넣으면 됨. 그 전까지는 `PushNotificationService`/`AppDelegate`의 FCM 등록 코드가
+  존재는 하지만 `registerForRemoteNotifications()`가 계속 조용히 실패해서(로그는 남음) 아무 기기도
+  서버에 등록되지 않는 상태 — 서버 쪽(`syncLive` 푸시 로직)은 그대로 두되 실제로는 아무도 못 받음.
+  그동안은 기존 로컬 알림(`MatchNotificationService`, 앱이 켜져 있을 때만 동작)만 사용
