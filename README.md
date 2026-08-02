@@ -591,3 +591,8 @@ LOLIVE/
 - **Firebase 푸시 알림 SDK**: `firebase-ios-sdk` 패키지 추가 완료 (`FirebaseCore`/`FirebaseMessaging`/
   `FirebaseFunctions` 3개 제품이 LOLIVE 타겟에 연결됨, `Package.resolved` 커밋됨).
   `GoogleService-Info.plist`는 `LOLIVE/`에 있음(gitignore됨, 새로 세팅할 땐 Firebase 콘솔에서 다시 받아야 함)
+- **Push Notifications entitlement**: `LOLIVE.entitlements`에 `aps-environment = development` 직접 추가
+  (레포에 커밋됨). Xcode의 "Push Notifications" capability를 UI로 켜지 않고 entitlements 파일에
+  직접 써서 대체함 — 이게 없으면 `registerForRemoteNotifications()`가 조용히 실패해서(APNs가 진짜
+  기기 토큰을 안 줌) 서버에 등록되는 기기 토큰이 아예 없는 상태가 됨(실제로 겪은 문제). 앱 스토어
+  배포 시에는 Xcode가 배포용 프로비저닝에 맞춰 `production`으로 다시 서명해야 할 수 있음
