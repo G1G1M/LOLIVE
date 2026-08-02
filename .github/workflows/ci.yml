@@ -27,6 +27,45 @@ jobs:
           EOF
           cp LOLIVE/APIKeys.swift LOLIVEWidgets/APIKeys.swift
 
+      - name: Prepare Firebase config
+        # GoogleService-Info.plist도 저장소엔 커밋 안 됨 (.gitignore). 이게 없으면 앱이 시작할 때
+        # AppDelegate의 FirebaseApp.configure()가 즉시 크래시해서 테스트가 전부 실행도 못 됨.
+        # 값 자체는 클라이언트 설정 파일이라 민감정보 아님(Firebase 보안은 Firestore 규칙/Cloud
+        # Functions 쪽에서 처리) — Riot 키와 동일한 이유로 GitHub Secrets 불필요.
+        run: |
+          cat > LOLIVE/GoogleService-Info.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+          	<key>API_KEY</key>
+          	<string>AIzaSyD0Jo1iiDfBPh0oY6CCvmMayIfEagamRa8</string>
+          	<key>GCM_SENDER_ID</key>
+          	<string>360576014333</string>
+          	<key>PLIST_VERSION</key>
+          	<string>1</string>
+          	<key>BUNDLE_ID</key>
+          	<string>com.ian.jiwonkim.LOLIVE</string>
+          	<key>PROJECT_ID</key>
+          	<string>lolive-967cb</string>
+          	<key>STORAGE_BUCKET</key>
+          	<string>lolive-967cb.firebasestorage.app</string>
+          	<key>IS_ADS_ENABLED</key>
+          	<false></false>
+          	<key>IS_ANALYTICS_ENABLED</key>
+          	<false></false>
+          	<key>IS_APPINVITE_ENABLED</key>
+          	<true></true>
+          	<key>IS_GCM_ENABLED</key>
+          	<true></true>
+          	<key>IS_SIGNIN_ENABLED</key>
+          	<true></true>
+          	<key>GOOGLE_APP_ID</key>
+          	<string>1:360576014333:ios:478743fcc30c1ed619ab94</string>
+          </dict>
+          </plist>
+          EOF
+
       - name: Pick an available iOS Simulator
         # 러너에 설치된 Xcode/시뮬레이터 버전이 바뀌어도 안 깨지도록
         # 기종을 하드코딩하지 않고 그때그때 설치된 iPhone 시뮬레이터를 simctl로 직접 조회한다.
