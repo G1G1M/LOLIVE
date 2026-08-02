@@ -26,8 +26,17 @@ extension Standing {
     /// 0승1패만 반영, 총 경기 수 자체가 안 맞음). 그래서 Riot이 내려주는 wins/losses를 그대로
     /// 믿지 않고, 완료된 경기 스코어에서 직접 집계한 값을 항상 우선한다. 완료된 경기가 하나도
     /// 없으면(시즌 시작 전 등) 재계산할 근거가 없으므로 Riot 원본 순위를 그대로 사용한다.
-    static func reconciled(_ standings: [Standing], schedule: [Match]) -> [Standing] {
-        let completed = schedule.filter { $0.state == .completed }
+    ///
+    /// LCK 등 일부 리그는 스플릿 단위로 리셋되지 않고 "레전드/라이즈 그룹" 같은 시즌 전체 누적
+    /// 순위표를 쓴다(Leaguepedia에 공개된 실제 순위표 기준 — HLE 15승4패처럼 한 스플릿 경기 수를
+    /// 훨씬 넘는 누적 기록). 그래서 `schedule`(반드시 `fetchAllSchedule`로 시즌 전체를 가져온 것)에서
+    /// `seasonStartDate` 이후의 완료 경기를 전부 합산한다 — 특정 스플릿 하나로 좁히면(과거에 시도했던
+    /// 방식) 오히려 시즌 누적 기록과 안 맞게 된다. 상대적으로 그룹(레전드/라이즈)은 현재 시즌
+    /// `standings`(Riot가 최신 스플릿에서 배정한 그룹)를 그대로 따른다.
+    static func reconciled(_ standings: [Standing], schedule: [Match], seasonStartDate: Date) -> [Standing] {
+        let completed = schedule.filter {
+            $0.state == .completed && $0.startTime >= seasonStartDate
+        }
         guard !standings.isEmpty, !completed.isEmpty else {
             return standings.sorted {
                 if $0.rank != $1.rank { return $0.rank < $1.rank }

@@ -57,6 +57,13 @@ private enum Fixture {
                  winRate: wins + losses == 0 ? 0 : Double(wins) / Double(wins + losses),
                  group: group)
     }
+
+    /// 테스트용 넓은 범위 시즌 시작일 — 기본값 daysAgo(30)이라 이 파일의 모든 daysAgo(n) 픽스처
+    /// 경기를 다 포함한다. Standing.reconciled가 이보다 이전 경기를 걸러내므로, 시즌 시작 경계를
+    /// 테스트하고 싶을 때만 좁혀서 쓴다.
+    static func seasonStart(daysAgo days: Int = 30) -> Date {
+        daysAgo(days)
+    }
 }
 
 // MARK: - TodayViewModel.classify
@@ -171,7 +178,7 @@ struct StandingsViewModelApplyGDTests {
         let schedule = [
             Fixture.match(id: "s1", scoreA: 2, scoreB: 0, startTime: Fixture.daysAgo(1), state: .completed),
         ]
-        let result = vm.applyGD(standings, schedule: schedule)
+        let result = vm.applyGD(standings, schedule: schedule, seasonStartDate: Fixture.seasonStart())
 
         let t1 = result.first { $0.team.id == "T1" }
         let gen = result.first { $0.team.id == "GEN" }
@@ -195,7 +202,7 @@ struct StandingsViewModelApplyGDTests {
             Fixture.match(id: "k2", league: Fixture.kespa, teamA: Fixture.t1, teamB: Fixture.hle,
                           scoreA: 1, scoreB: 0, startTime: Fixture.daysAgo(1), state: .completed),
         ]
-        let result = vm.applyGD(standings, schedule: schedule)
+        let result = vm.applyGD(standings, schedule: schedule, seasonStartDate: Fixture.seasonStart())
 
         let t1 = result.first { $0.team.id == "T1" }
         let gen = result.first { $0.team.id == "GEN" }
@@ -210,7 +217,7 @@ struct StandingsViewModelApplyGDTests {
     @Test func 완료경기가_없으면_재계산하지_않고_원본을_유지한다() {
         let vm = StandingsViewModel()
         let standings = [Fixture.standing(team: Fixture.t1, wins: 0, losses: 0, rank: 1)]
-        let result = vm.applyGD(standings, schedule: [])
+        let result = vm.applyGD(standings, schedule: [], seasonStartDate: Fixture.seasonStart())
         #expect(result.first?.rank == 1)
         #expect(result.first?.wins == 0)
     }
@@ -227,10 +234,29 @@ struct StandingsViewModelApplyGDTests {
             Fixture.match(id: "g2", league: Fixture.kespa, teamA: Fixture.gen, teamB: Fixture.hle,
                           scoreA: 1, scoreB: 0, startTime: Fixture.daysAgo(1), state: .completed),
         ]
-        let result = vm.applyGD(standings, schedule: schedule)
+        let result = vm.applyGD(standings, schedule: schedule, seasonStartDate: Fixture.seasonStart())
         // 각 팀이 자기 그룹 안에서 1위를 유지해야 한다 (그룹 간 랭크가 서로 간섭하지 않음)
         #expect(result.first { $0.team.id == "T1" }?.rank == 1)
         #expect(result.first { $0.team.id == "GEN" }?.rank == 1)
+    }
+
+    @Test func 시즌_시작일_이전_경기는_승패_집계에서_제외된다() {
+        // LCK 레전드/라이즈 그룹처럼 스플릿을 넘어 누적되는 순위표라도, "작년 시즌" 경기까지
+        // 끼어들면 안 된다 — seasonStartDate 이전 경기는 걸러낸다.
+        let vm = StandingsViewModel()
+        let standings = [Fixture.standing(team: Fixture.t1, wins: 0, losses: 0, rank: 1)]
+        let schedule = [
+            // 작년 시즌 경기 (seasonStartDate보다 훨씬 이전) — 집계에서 빠져야 함
+            Fixture.match(id: "last-season", scoreA: 2, scoreB: 0, startTime: Fixture.daysAgo(60), state: .completed),
+            // 이번 시즌 경기 — 집계에 포함돼야 함
+            Fixture.match(id: "this-season", scoreA: 2, scoreB: 1, startTime: Fixture.daysAgo(1), state: .completed),
+        ]
+        let seasonStart = Fixture.seasonStart(daysAgo: 10)
+        let result = vm.applyGD(standings, schedule: schedule, seasonStartDate: seasonStart)
+
+        let t1 = result.first { $0.team.id == "T1" }
+        #expect(t1?.wins == 1 && t1?.losses == 0)
+        #expect(t1?.gameWins == 2 && t1?.gameLosses == 1)
     }
 }
 

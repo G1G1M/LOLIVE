@@ -141,8 +141,14 @@ final class LeagueDetailViewModel {
         // 현재 토너먼트로 순위 + 선수 조회
         guard let tournament = activeTournament(from: tournaments) else { return }
 
+        // 순위(특히 LCK 레전드/라이즈 그룹처럼 스플릿 넘어 누적되는 표)는 fetchSchedule의 좁은
+        // 윈도우로는 부족해서, 시즌 전체를 순회하는 fetchAllSchedule로 따로 가져온다.
+        let seasonMatches = (try? await service.fetchAllSchedule(league: league)) ?? allMatches
         let fetchedStandings = (try? await service.fetchStandings(tournamentId: tournament.id)) ?? []
-        standings = applyGD(fetchedStandings, schedule: allMatches)
+        standings = applyGD(
+            fetchedStandings, schedule: seasonMatches,
+            seasonStartDate: seasonStartDate(from: tournaments, active: tournament)
+        )
 
         let teamIds = fetchedStandings.map { $0.team.id }
         let svc = service
@@ -231,7 +237,11 @@ final class LeagueDetailViewModel {
         if let tournaments: [Tournament] = AppDiskCache.get(.tournaments(leagueId: league.id)),
            let tournament = activeTournament(from: tournaments),
            let fetched: [Standing] = AppDiskCache.get(.standings(tournamentId: tournament.id)) {
-            standings = applyGD(fetched, schedule: allMatches)
+            let seasonMatches: [Match] = AppDiskCache.get(.allSchedule(leagueId: league.id)) ?? allMatches
+            standings = applyGD(
+                fetched, schedule: seasonMatches,
+                seasonStartDate: seasonStartDate(from: tournaments, active: tournament)
+            )
         }
         if let cachedPlayers: [Player] = AppDiskCache.get(key: "league_players_\(league.id)", maxAge: 12 * 3600) {
             players = cachedPlayers
@@ -251,14 +261,18 @@ final class LeagueDetailViewModel {
         if let tournaments: [Tournament] = AppDiskCache.getStale(.tournaments(leagueId: league.id)),
            let tournament = activeTournament(from: tournaments),
            let fetched: [Standing] = AppDiskCache.getStale(.standings(tournamentId: tournament.id)) {
-            standings = applyGD(fetched, schedule: allMatches)
+            let seasonMatches: [Match] = AppDiskCache.getStale(.allSchedule(leagueId: league.id)) ?? allMatches
+            standings = applyGD(
+                fetched, schedule: seasonMatches,
+                seasonStartDate: seasonStartDate(from: tournaments, active: tournament)
+            )
         }
         return true
     }
 
     /// GD·승패를 완료 경기 스코어로 직접 재계산 — 자세한 이유는 Standing.reconciled(_:schedule:) 참고.
-    private func applyGD(_ standings: [Standing], schedule: [Match]) -> [Standing] {
-        Standing.reconciled(standings, schedule: schedule)
+    private func applyGD(_ standings: [Standing], schedule: [Match], seasonStartDate: Date) -> [Standing] {
+        Standing.reconciled(standings, schedule: schedule, seasonStartDate: seasonStartDate)
     }
 
 }

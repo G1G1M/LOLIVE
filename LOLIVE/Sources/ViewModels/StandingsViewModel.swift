@@ -113,13 +113,18 @@ final class StandingsViewModel {
         }
         tournamentIdByLeague[league.id] = tournament.id
 
+        // 순위(특히 LCK 레전드/라이즈 그룹처럼 스플릿 넘어 누적되는 표)는 fetchSchedule의 좁은
+        // 윈도우로는 부족해서, 시즌 전체를 순회하는 fetchAllSchedule을 쓴다.
         async let standingsFetch = service.fetchStandings(tournamentId: tournament.id)
-        async let scheduleFetch = service.fetchSchedule(league: league)
+        async let scheduleFetch = service.fetchAllSchedule(league: league)
 
         let fetched = (try? await standingsFetch) ?? []
         let schedule = (try? await scheduleFetch) ?? []
 
-        let sorted = applyGD(fetched, schedule: schedule)
+        let sorted = applyGD(
+            fetched, schedule: schedule,
+            seasonStartDate: seasonStartDate(from: tournaments, active: tournament)
+        )
         standingsCache[league.id] = sorted
         standings = sorted
     }
@@ -150,13 +155,17 @@ final class StandingsViewModel {
               let fetched: [Standing] = AppDiskCache.get(.standings(tournamentId: tournament.id))
         else { return nil }
         tournamentIdByLeague[league.id] = tournament.id
-        let schedule: [Match] = AppDiskCache.get(.schedule(leagueId: league.id)) ?? []
-        return applyGD(fetched, schedule: schedule)
+        let schedule: [Match] = AppDiskCache.get(.allSchedule(leagueId: league.id))
+            ?? AppDiskCache.get(.schedule(leagueId: league.id)) ?? []
+        return applyGD(
+            fetched, schedule: schedule,
+            seasonStartDate: seasonStartDate(from: tournaments, active: tournament)
+        )
     }
 
     /// GD·승패를 완료 경기 스코어로 직접 재계산 — 자세한 이유는 Standing.reconciled(_:schedule:) 참고.
-    func applyGD(_ standings: [Standing], schedule: [Match]) -> [Standing] {
-        Standing.reconciled(standings, schedule: schedule)
+    func applyGD(_ standings: [Standing], schedule: [Match], seasonStartDate: Date) -> [Standing] {
+        Standing.reconciled(standings, schedule: schedule, seasonStartDate: seasonStartDate)
     }
 
     private func regionOrder(_ region: String) -> Int {
