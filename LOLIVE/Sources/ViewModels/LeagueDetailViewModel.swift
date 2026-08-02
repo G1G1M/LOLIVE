@@ -5,6 +5,9 @@
 
 import Foundation
 import Observation
+import os
+
+private let standingsLogger = Logger(subsystem: "com.lolive", category: "Standings")
 
 @MainActor
 @Observable
@@ -145,10 +148,20 @@ final class LeagueDetailViewModel {
         // 윈도우로는 부족해서, 시즌 전체를 순회하는 fetchAllSchedule로 따로 가져온다.
         let seasonMatches = (try? await service.fetchAllSchedule(league: league)) ?? allMatches
         let fetchedStandings = (try? await service.fetchStandings(tournamentId: tournament.id)) ?? []
-        standings = applyGD(
-            fetchedStandings, schedule: seasonMatches,
-            seasonStartDate: seasonStartDate(from: tournaments, active: tournament)
-        )
+        let seasonStart = seasonStartDate(from: tournaments, active: tournament)
+        #if DEBUG
+        let seasonCompletedCount = seasonMatches.filter { $0.state == .completed && $0.startTime >= seasonStart }.count
+        standingsLogger.debug("""
+            🏆 [Standings] \(self.league.name) tournament=\(tournament.slug) seasonStart=\(seasonStart.description) \
+            seasonMatches=\(seasonMatches.count) seasonCompleted=\(seasonCompletedCount)
+            """)
+        #endif
+        standings = applyGD(fetchedStandings, schedule: seasonMatches, seasonStartDate: seasonStart)
+        #if DEBUG
+        for s in standings {
+            standingsLogger.debug("🏆 [Standings]   \(s.group ?? "-") #\(s.rank) \(s.team.code) \(s.wins)승\(s.losses)패 GD\(s.gameDiff)")
+        }
+        #endif
 
         let teamIds = fetchedStandings.map { $0.team.id }
         let svc = service
