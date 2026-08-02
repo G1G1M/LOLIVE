@@ -99,9 +99,13 @@
   하나도 없으면(시즌 시작 전) Riot 원본 순위를 그대로 사용. Standings·리그 상세 순위 탭이 로직을 공유
 
 ### 리그 상세
-- **탭 기반 레이아웃**: 탭 바(순위 / 일정 / 팀 / 선수) — 각 탭은 `LeagueDetailView+Standings`/`+Schedule`/`+Teams` extension으로 분리
+- **탭 기반 레이아웃**: 탭 바(순위 / 일정 / 팀 / 선수 / 기록) — 각 탭은 `LeagueDetailView+Standings`/`+Schedule`/`+Teams`/`+History` extension으로 분리
 - 탭바 선택 밑줄·배경색을 `TeamDetailView`/`LeaguePlayerDetailView`와 동일한 구조로 통일
   (기존엔 구조가 달라 밑줄이 텍스트와 어긋나 보이고 배경색도 미묘하게 달랐음)
+- **기록 탭 (신규)**: 이 리그(LCK/LPL/LEC 등)의 과거 시즌 기록 — 연도 칩 선택 → 날짜별 경기 목록.
+  `getHistoricalYears`/`getHistoricalMatches` Callable로 서버(Firestore 백필 데이터)에서만 조회하고
+  Leaguepedia를 직접 호출하지 않음 — 대회 상세(Worlds/MSI)에만 있던 "과거 연도 보기"를 정규 리그까지 확장.
+  아직 백필이 안 된 리그는 빈 상태로 표시됨(위 "백그라운드 푸시 알림" 섹션 옆 lolive-firebase 작업 참고)
 
 ### Players
 - 전 세계 선수 통합 목록
