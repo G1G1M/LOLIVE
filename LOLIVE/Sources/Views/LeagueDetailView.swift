@@ -95,6 +95,7 @@ struct LeagueDetailView: View {
         case .schedule:  scheduleContent    // +Schedule.swift
         case .teams:     teamsContent       // +Teams.swift
         case .players:   playersContent     // +Teams.swift
+        case .history:   historyContent     // +History.swift
         }
     }
 }

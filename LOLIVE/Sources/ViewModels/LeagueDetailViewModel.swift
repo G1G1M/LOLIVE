@@ -13,7 +13,7 @@ final class LeagueDetailViewModel {
     // MARK: - Tab
 
     enum Tab: CaseIterable {
-        case standings, schedule, teams, players
+        case standings, schedule, teams, players, history
 
         var title: String {
             switch self {
@@ -21,6 +21,7 @@ final class LeagueDetailViewModel {
             case .schedule:  return "일정"
             case .teams:     return "팀"
             case .players:   return "선수"
+            case .history:   return "기록"
             }
         }
     }
@@ -31,6 +32,14 @@ final class LeagueDetailViewModel {
     var showBracket: Bool = false
     var standings: [Standing] = []
     var loadFailed = false
+
+    // MARK: - 기록(과거 시즌) 탭
+
+    var historicalYears: [Int] = []
+    var selectedHistoricalYear: Int? = nil
+    var historicalMatches: [Match] = []
+    var isLoadingHistoricalYears = false
+    var isLoadingHistoricalMatches = false
 
     var standingGroups: [(name: String, standings: [Standing])] {
         var seen = Set<String>()
@@ -171,6 +180,41 @@ final class LeagueDetailViewModel {
             return r0 != r1 ? r0 < r1 : $0.summonerName < $1.summonerName
         }
         AppDiskCache.set(key: "league_players_\(league.id)", value: players)
+    }
+
+    // MARK: - 기록(과거 시즌) 탭
+
+    /// 과거 시즌이 존재하는 연도 목록을 서버(Firestore 백필 데이터)에서 조회.
+    /// Leaguepedia를 직접 호출하지 않는다 — 백필이 안 된 리그는 빈 목록으로 온다.
+    func loadHistoricalYears() async {
+        guard historicalYears.isEmpty,
+              let leagueName = LeaguepediaService.shared.leaguepediaName(for: league)
+        else { return }
+        isLoadingHistoricalYears = true
+        defer { isLoadingHistoricalYears = false }
+
+        historicalYears = await FirebaseHistoricalService.fetchYears(leagueName: leagueName)
+        if selectedHistoricalYear == nil {
+            selectedHistoricalYear = historicalYears.first
+        }
+        if let year = selectedHistoricalYear {
+            await loadHistoricalMatches(year: year)
+        }
+    }
+
+    func selectHistoricalYear(_ year: Int) {
+        guard selectedHistoricalYear != year else { return }
+        selectedHistoricalYear = year
+        historicalMatches = []
+        Task { await loadHistoricalMatches(year: year) }
+    }
+
+    private func loadHistoricalMatches(year: Int) async {
+        guard let leagueName = LeaguepediaService.shared.leaguepediaName(for: league) else { return }
+        isLoadingHistoricalMatches = true
+        defer { isLoadingHistoricalMatches = false }
+        historicalMatches = await FirebaseHistoricalService.fetchMatches(leagueName: leagueName, year: year)
+            .sorted { $0.startTime < $1.startTime }
     }
 
     // MARK: - Private
