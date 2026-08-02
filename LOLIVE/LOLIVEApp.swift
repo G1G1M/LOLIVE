@@ -55,6 +55,7 @@ final class LOLIVENotificationDelegate: NSObject, UNUserNotificationCenterDelega
 
 @main
 struct LOLIVEApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var phase: AppPhase = .splash
     @State private var todayViewModel = TodayViewModel()

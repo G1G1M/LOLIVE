@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F8143487301ED7DB00246DC8 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = F8143486301ED7DB00246DC8 /* FirebaseCore */; };
+		F8143489301ED7E200246DC8 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = F8143488301ED7E200246DC8 /* FirebaseMessaging */; };
+		F814348B301ED7EC00246DC8 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = F814348A301ED7EC00246DC8 /* FirebaseFunctions */; };
 		F8D275422FB8BC1C00D35C21 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8D275412FB8BC1C00D35C21 /* WidgetKit.framework */; };
 		F8D275442FB8BC1C00D35C21 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8D275432FB8BC1C00D35C21 /* SwiftUI.framework */; };
 		F8D275552FB8BC1C00D35C21 /* LOLIVEWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F8D2753F2FB8BC1C00D35C21 /* LOLIVEWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -111,6 +114,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F814348B301ED7EC00246DC8 /* FirebaseFunctions in Frameworks */,
+				F8143489301ED7E200246DC8 /* FirebaseMessaging in Frameworks */,
+				F8143487301ED7DB00246DC8 /* FirebaseCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -195,6 +201,9 @@
 			);
 			name = LOLIVE;
 			packageProductDependencies = (
+				F8143486301ED7DB00246DC8 /* FirebaseCore */,
+				F8143488301ED7E200246DC8 /* FirebaseMessaging */,
+				F814348A301ED7EC00246DC8 /* FirebaseFunctions */,
 			);
 			productName = LOLIVE;
 			productReference = F8D274952FB7354B00D35C21 /* LOLIVE.app */;
@@ -304,6 +313,7 @@
 			mainGroup = F8D2748C2FB7354B00D35C21;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				F8143485301E2CB300246DC8 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F8D274962FB7354B00D35C21 /* Products */;
@@ -831,6 +841,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F8143485301E2CB300246DC8 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.17.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F8143486301ED7DB00246DC8 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F8143485301E2CB300246DC8 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		F8143488301ED7E200246DC8 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F8143485301E2CB300246DC8 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		F814348A301ED7EC00246DC8 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F8143485301E2CB300246DC8 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F8D2748D2FB7354B00D35C21 /* Project object */;
 }

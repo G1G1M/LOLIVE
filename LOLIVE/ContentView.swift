@@ -38,6 +38,7 @@ struct ContentView: View {
             WidgetCenter.shared.reloadAllTimelines()
             await MatchNotificationService.shared.requestPermission()
             await MatchNotificationService.shared.reschedule(for: favoriteTeams)
+            PushNotificationService.shared.updateFavoriteTeamCodes(favoriteTeams.map { $0.teamCode })
         }
         .onChange(of: favoriteTeams) { _, newValue in
             syncFavoritedTeamIds()
@@ -45,6 +46,7 @@ struct ContentView: View {
             saveWidgetNextMatches()
             todayViewModel.syncLiveActivitiesNow()
             Task { await MatchNotificationService.shared.reschedule(for: newValue) }
+            PushNotificationService.shared.updateFavoriteTeamCodes(newValue.map { $0.teamCode })
         }
         .onChange(of: todayViewModel.upcomingMatches) { _, _ in
             saveWidgetNextMatches()
