@@ -52,16 +52,22 @@ func activeTournament(from tournaments: [Tournament]) -> Tournament? {
     return sorted.first
 }
 
-/// `active` 토너먼트와 같은 해에 시작한 "특수 대회가 아닌"(정규 스플릿) 토너먼트 중 가장 이른
-/// 시작일을 시즌 시작일로 본다. LCK처럼 스플릿이 바뀌어도 리셋되지 않고 누적되는 순위표
-/// (레전드/라이즈 그룹)를 계산할 때, 이 시점 이후의 완료 경기를 전부 합산하는 기준으로 쓴다.
+/// LCK처럼 스플릿이 바뀌어도 리셋되지 않고 누적되는 순위표(레전드/라이즈 그룹)를 계산할 때 쓰는
+/// 집계 시작일. "같은 해 첫 스플릿부터 전부"로 했더니 실측(Leaguepedia 실제 표)보다 경기 수가
+/// 훨씬 많이 나왔다 — 확인해보니 스플릿마다 대회 형식 자체가 다르다(예: 2026 LCK는 Split 1이
+/// "알파/오메가 그룹", Split 2가 "그룹 없는 단일 정규리그", Split 3이 "레전드/라이즈 그룹"으로
+/// 서로 다른 스테이지 구조). 실측 경기 수와 대조해보니 "바로 직전 스플릿부터 현재 스플릿까지"가
+/// 잘 맞아서, 같은 해 첫 스플릿이 아니라 활성 스플릿 바로 이전(시작일 기준) 정규 스플릿의 시작일을
+/// 쓴다. 이전 스플릿이 없으면(그 해 첫 스플릿이 곧 활성 스플릿) 활성 스플릿 자체의 시작일로 폴백.
 func seasonStartDate(from tournaments: [Tournament], active: Tournament) -> Date {
     let fmt = tournamentDateFormat
     guard let activeStart = fmt.date(from: active.startDate) else { return .distantPast }
-    let year = Calendar.current.component(.year, from: activeStart)
-    let sameYearStarts = tournaments.compactMap { t -> Date? in
-        guard !isSpecialTournament(t), let d = fmt.date(from: t.startDate) else { return nil }
-        return Calendar.current.component(.year, from: d) == year ? d : nil
+
+    let previousStarts = tournaments.compactMap { t -> Date? in
+        guard !isSpecialTournament(t), t.id != active.id,
+              let d = fmt.date(from: t.startDate), d < activeStart
+        else { return nil }
+        return d
     }
-    return sameYearStarts.min() ?? activeStart
+    return previousStarts.max() ?? activeStart
 }
