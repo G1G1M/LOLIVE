@@ -86,8 +86,11 @@ final class MatchDetailViewModel {
             return
         }
 
-        // 완료된 경기: 디스크 캐시 먼저 확인 → 있으면 로딩 없이 즉시 표시
-        if match.state == .completed, await tryLoadFromCache() { return }
+        // 완료된 경기: 디스크 캐시 → 서버(Firestore) 캐시 순으로 확인, 있으면 Riot 재호출 없이 표시
+        if match.state == .completed {
+            if await tryLoadFromCache() { return }
+            if await tryLoadFromServerCache() { return }
+        }
 
         isLoading = true
         errorMessage = nil
@@ -190,10 +193,19 @@ final class MatchDetailViewModel {
         Task.detached(priority: .background) {
             let esports = RiotEsportsService()
             let liveStats = LiveStatsService()
-            guard let detail = try? await esports.fetchEventDetails(matchId: match.id) else { return }
-            // 아직 안 채워진 상태면 캐싱 안 하고 넘어감 — 다음 preload 시도(스케줄 새로고침마다)에
-            // 다시 확인해서, Riot이 채워주는 대로 자연스럽게 잡히게 한다.
-            guard isGenuinelyComplete(detail) else { return }
+
+            let detail: EventDetailInfo
+            if let serverDetail = await FirebaseMatchDetailService.fetchCachedDetail(matchId: match.id),
+               isGenuinelyComplete(serverDetail) {
+                detail = serverDetail
+            } else if let riotDetail = try? await esports.fetchEventDetails(matchId: match.id),
+                      isGenuinelyComplete(riotDetail) {
+                // 아직 안 채워진 상태면 캐싱 안 하고 넘어감 — 다음 preload 시도(스케줄 새로고침마다)에
+                // 다시 확인해서, Riot/서버가 채워주는 대로 자연스럽게 잡히게 한다.
+                detail = riotDetail
+            } else {
+                return
+            }
             AppDiskCache.set(key: detailKey, value: detail)
 
             let cache = GameWindowCache.shared
@@ -255,6 +267,16 @@ final class MatchDetailViewModel {
 
         await fetchLeaguepediaBans(for: detail.games.filter { $0.state == .completed })
         return true
+    }
+
+    /// 서버(getMatchDetail Callable)에 이 경기의 상세가 이미 캐싱돼 있으면 그걸 디스크에
+    /// 저장하고 tryLoadFromCache()로 나머지(게임 윈도우 등)까지 일관되게 로딩한다.
+    private func tryLoadFromServerCache() async -> Bool {
+        guard let detail = await FirebaseMatchDetailService.fetchCachedDetail(matchId: match.id),
+              Self.isGenuinelyComplete(detail)
+        else { return false }
+        AppDiskCache.set(key: "event_detail_v2_\(match.id)", value: detail)
+        return await tryLoadFromCache()
     }
 
     private func loadKillTimelines(for games: [GameInfo], liveStats: LiveStatsServiceProtocol) async {
