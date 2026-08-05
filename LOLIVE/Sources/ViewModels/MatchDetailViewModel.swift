@@ -78,6 +78,11 @@ final class MatchDetailViewModel {
     // MARK: - Public
 
     func load() async {
+        // 백필된 과거 시즌 경기(oe_/lp_ 접두사)는 Riot API의 실제 경기 ID가 아니라 상세 조회가
+        // 불가능 — 애초에 밴픽/타임라인 데이터 없이 스코어만 있는 기록이라 요청 자체를 생략하고
+        // 스코어 카드만 표시한다(에러 카드 노출 방지).
+        guard !Self.isBackfilledMatchId(match.id) else { return }
+
         // 예정 경기: game window 폴링 불필요, eventDetail만 fetch (TeamDetailView 로스터용 실제 team ID 확보)
         if match.state == .unstarted {
             if eventDetail == nil {
@@ -175,6 +180,12 @@ final class MatchDetailViewModel {
     /// TournamentDetailViewModel/AppPreloadService가 전부 이 값을 참조한다.
     static let preloadCount = 8
 
+    /// 과거 시즌 백필 데이터(Leaguepedia/datalisk.io 경유)로 생성된 매치 ID인지 판별.
+    /// 이런 매치는 Riot esports API가 알지 못하는 ID라 상세 조회를 시도하면 항상 실패한다.
+    nonisolated static func isBackfilledMatchId(_ id: String) -> Bool {
+        id.hasPrefix("oe_") || id.hasPrefix("lp_")
+    }
+
     /// completed로 표시된 경기인데 Riot의 상세 API(getEventDetails)는 아직 안 채워진 경우
     /// (밴픽·승자 정보 없음)를 구분한다. 이런 "덜 채워진" 응답을 30일 캐시에 그대로 저장하면,
     /// 나중에 Riot이 채워줘도 캐시가 만료될 때까지 계속 빈 상태로 보이게 된다 — 실제로 겪은 버그.
@@ -186,7 +197,7 @@ final class MatchDetailViewModel {
     /// 경기 목록 화면에서 완료된 경기 데이터를 백그라운드로 미리 캐싱.
     /// 이미 캐시된 경기는 건너뜀.
     static func preload(match: Match) {
-        guard match.state == .completed else { return }
+        guard match.state == .completed, !isBackfilledMatchId(match.id) else { return }
         let detailKey = "event_detail_v2_\(match.id)"
         guard (AppDiskCache.get(key: detailKey, maxAge: 30 * 24 * 3600) as EventDetailInfo?) == nil else { return }
 

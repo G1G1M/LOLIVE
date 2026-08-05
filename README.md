@@ -115,10 +115,15 @@
 - **탭 기반 레이아웃**: 탭 바(순위 / 일정 / 팀 / 선수 / 기록) — 각 탭은 `LeagueDetailView+Standings`/`+Schedule`/`+Teams`/`+History` extension으로 분리
 - 탭바 선택 밑줄·배경색을 `TeamDetailView`/`LeaguePlayerDetailView`와 동일한 구조로 통일
   (기존엔 구조가 달라 밑줄이 텍스트와 어긋나 보이고 배경색도 미묘하게 달랐음)
-- **기록 탭 (신규)**: 이 리그(LCK/LPL/LEC 등)의 과거 시즌 기록 — 연도 칩 선택 → 날짜별 경기 목록.
+- **기록 탭**: 이 리그(LCK/LPL/LEC 등)의 과거 시즌 기록 — 연도 칩 선택 → 날짜별 경기 목록.
   `getHistoricalYears`/`getHistoricalMatches` Callable로 서버(Firestore 백필 데이터)에서만 조회하고
   Leaguepedia를 직접 호출하지 않음 — 대회 상세(Worlds/MSI)에만 있던 "과거 연도 보기"를 정규 리그까지 확장.
-  아직 백필이 안 된 리그는 빈 상태로 표시됨(위 "백그라운드 푸시 알림" 섹션 옆 lolive-firebase 작업 참고)
+  백필 진행 상황은 아래 "과거 시즌 백필 (oe.datalisk.io)" 섹션 참고
+- **백필된 과거 경기는 상세 화면에서 스코어만 표시**: 백필 매치 ID(`oe_`/`lp_` 접두사)는 Riot esports API가
+  아는 실제 경기 ID가 아니라서, 상세 화면 진입 시 밴픽·타임라인을 Riot에 물어보면 항상 실패한다 —
+  실제로 겪은 문제: "The operation couldn't be completed. (LOLIVE.APIError error 1.)" 에러 카드가 그대로
+  노출됨. `MatchDetailViewModel.load()`/`preload()`에서 이 접두사를 감지하면 Riot 호출 자체를 생략하도록
+  수정 — 스코어 카드만 표시되고 에러는 안 뜸(애초에 백필 데이터엔 밴픽 정보가 없음)
 
 ### Players
 - 전 세계 선수 통합 목록
@@ -302,6 +307,35 @@ foreground로 살아있을 때만 동작 — 백그라운드 진입 시 iOS가 �
   `registerDeviceToken` Callable로 서버에 등록 — `ContentView`의 즐겨찾기 변경 지점(`.task`,
   `.onChange(of: favoriteTeams)`)에서 최신 즐겨찾기 팀 코드로 재등록 트리거
 - **아직 실기기에서 "앱 완전 종료 상태로 푸시 도착" 검증은 안 해봄** — 다음 라이브 경기로 확인 필요
+
+### 과거 시즌 백필 (oe.datalisk.io) — 진행 중
+"기록 탭"에 채울 과거 시즌 경기 데이터를 서버가 아니라 로컬에서 미리 가져와 Firestore에 주입하는 작업.
+
+- **왜 Leaguepedia Cargo API를 직접 안 쓰나**: `historical.ts`가 원래 Leaguepedia에서 직접 긁어오도록
+  만들어졌지만, Google Cloud Functions의 아시아 리전 공유 IP와 로컬 IP 둘 다 며칠에 걸쳐 반복적으로
+  `ratelimited` 응답을 받음(공식 문서 없음, 커뮤니티 추정 "분당 1회" 수준). 68초 간격까지 늘려도 해결
+  안 돼서 다른 데이터 소스로 전환
+- **대체 소스**: Oracle's Elixir(`oracleselixir.com`)가 내부적으로 쓰는 비공식 REST API
+  `oe.datalisk.io`를 프로덕션 JS 번들 리버스 엔지니어링으로 발견 (공개 문서 없는 API — 안정성 리스크
+  있음을 인지하고 사용). CSV 다운로드 페이지는 React SPA라 스크래핑 불가능해서 이 경로를 택함
+- **데이터 조립 방식**: 이 API는 "리그의 전체 경기 목록"을 직접 안 줌 — 대신 `/teams/gameDetails/<team>`으로
+  팀 단위 전체 개별 게임(밴픽 게임 하나하나) 이력을 준다. 그래서:
+  1. `/tournaments/byLeague`로 리그의 전체 대회 아이디+시작일 확보
+  2. 대회마다 `/stats/teams/byTournament`로 참가팀 이름 수집(역대 팀명 변형 전부 자연히 포함됨)
+  3. 팀마다 `/teams/gameDetails/<team>`을 `beforeTime` 커서로 끝까지 페이지네이션(50개씩)해 전체 게임 이력 확보,
+     `gameId` 접두사로 "이 리그 어느 대회 소속인지" 판별
+  4. `gameId`에서 게임 번호만 뗀 값으로 묶어 매치(BO3/BO5) 단위 재조립, `oeGameId`로 전역 중복 제거
+  5. 연도 단위로 `importHistoricalMatches` Callable에 전송 → Firestore 저장(연도 하나 끝날 때마다 커밋되므로
+     중간에 끊겨도 그때까지 저장된 연도는 남음)
+- **겪은 버그**: 매치 문서 ID에 대회 아이디(`LCK/2026 Season/...`처럼 `/` 포함)를 그대로 써서, Firestore가
+  이걸 하위 컬렉션 경로로 잘못 해석 — 슬래시 개수가 짝수인 경우 에러 없이 "성공"하지만 실제로는
+  `historicalMatches` 컬렉션 밖 엉뚱한 중첩 경로에 저장돼 `getHistoricalMatches` 조회에 안 잡히는 유령
+  데이터가 됨(홀수인 경우만 대놓고 500 에러). `/`를 `-`로 치환하도록 고치고 오염된 컬렉션을 통째로
+  재귀 삭제한 뒤 재백필해서 해결
+- **로컬 스크립트**: `lolive-firebase`에는 포함 안 함(관리자 1회성 로컬 작업, node_modules와 별개 성격) —
+  `backfill_datalisk.py`, 리그별로 실행하며 실패한 리그가 있어도 나머지는 계속 진행
+- **진행 상황** (2026-08-05 기준): LCK · LPL · LEC 완료. LCS 진행 중. PCS / VCS / CBLOL / LJL / LLA /
+  Worlds / MSI / KeSPA Cup 순서로 대기 중
 
 ### 홈 화면·잠금화면 위젯 (LOLIVEWidgets)
 - 즐겨찾기한 팀의 다음 경기 일정 표시
