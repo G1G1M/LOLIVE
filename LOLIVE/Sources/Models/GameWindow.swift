@@ -77,7 +77,7 @@ struct PlayerStats: Identifiable, Hashable, Codable {
     }
 }
 
-struct TeamGameStats: Codable {
+struct TeamGameStats: Codable, Hashable {
     let totalGold: Int
     let towers: Int
     let barons: Int

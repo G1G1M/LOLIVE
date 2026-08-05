@@ -119,11 +119,14 @@
   `getHistoricalYears`/`getHistoricalMatches` Callable로 서버(Firestore 백필 데이터)에서만 조회하고
   Leaguepedia를 직접 호출하지 않음 — 대회 상세(Worlds/MSI)에만 있던 "과거 연도 보기"를 정규 리그까지 확장.
   백필 진행 상황은 아래 "과거 시즌 백필 (oe.datalisk.io)" 섹션 참고
-- **백필된 과거 경기는 상세 화면에서 스코어만 표시**: 백필 매치 ID(`oe_`/`lp_` 접두사)는 Riot esports API가
-  아는 실제 경기 ID가 아니라서, 상세 화면 진입 시 밴픽·타임라인을 Riot에 물어보면 항상 실패한다 —
-  실제로 겪은 문제: "The operation couldn't be completed. (LOLIVE.APIError error 1.)" 에러 카드가 그대로
-  노출됨. `MatchDetailViewModel.load()`/`preload()`에서 이 접두사를 감지하면 Riot 호출 자체를 생략하도록
-  수정 — 스코어 카드만 표시되고 에러는 안 뜸(애초에 백필 데이터엔 밴픽 정보가 없음)
+- **백필된 과거 경기도 상세 화면에서 게임별 실제 스탯 표시**: 백필 매치 ID(`oe_`/`lp_` 접두사)는 Riot
+  esports API가 아는 실제 경기 ID가 아니라서, 처음엔 상세 진입 시 밴픽·타임라인을 Riot에 물어보다 항상
+  실패했음(겪은 문제: "The operation couldn't be completed. (LOLIVE.APIError error 1.)" 에러 카드 노출).
+  `MatchDetailViewModel.load()`/`preload()`에서 이 접두사를 감지하면 Riot 호출 자체를 생략하도록 1차
+  수정했으나, datalisk.io의 `/games/singleGame/<id>`에 실제 KDA·아이템·골드·타워/드래곤/바론까지 있는
+  걸 확인하고 백필 데이터에 `Match.games`(게임별 상세)를 추가 — 지금은 라이브 경기와 동일한 "팀 스탯
+  카드"/"선수 목록 카드" UI를 Riot 호출 없이 로컬 데이터로 그대로 채워서 보여줌. **밴 정보와 킬
+  타임라인만 원본에 없어서 표시 안 됨**(datalisk.io 어떤 엔드포인트에도 밴 데이터 자체가 없음)
 
 ### Players
 - 전 세계 선수 통합 목록
@@ -325,7 +328,10 @@ foreground로 살아있을 때만 동작 — 백그라운드 진입 시 iOS가 �
   3. 팀마다 `/teams/gameDetails/<team>`을 `beforeTime` 커서로 끝까지 페이지네이션(50개씩)해 전체 게임 이력 확보,
      `gameId` 접두사로 "이 리그 어느 대회 소속인지" 판별
   4. `gameId`에서 게임 번호만 뗀 값으로 묶어 매치(BO3/BO5) 단위 재조립, `oeGameId`로 전역 중복 제거
-  5. 연도 단위로 `importHistoricalMatches` Callable에 전송 → Firestore 저장(연도 하나 끝날 때마다 커밋되므로
+  5. **게임(세트)별 실제 상세**: 위에서 모은 `oeGameId` 전체를 대상으로 `/games/singleGame/<id>`를
+     스레드풀(10개 동시)로 병렬 조회 — 팀별 골드/킬/타워/드래곤/바론 + 선수별 챔피언/포지션/KDA/골드/CS를
+     받아 매치의 `games` 필드에 포함. 밴 데이터는 이 API 어디에도 없어서 제외
+  6. 연도 단위로 `importHistoricalMatches` Callable에 전송 → Firestore 저장(연도 하나 끝날 때마다 커밋되므로
      중간에 끊겨도 그때까지 저장된 연도는 남음)
 - **겪은 버그**: 매치 문서 ID에 대회 아이디(`LCK/2026 Season/...`처럼 `/` 포함)를 그대로 써서, Firestore가
   이걸 하위 컬렉션 경로로 잘못 해석 — 슬래시 개수가 짝수인 경우 에러 없이 "성공"하지만 실제로는
@@ -334,8 +340,12 @@ foreground로 살아있을 때만 동작 — 백그라운드 진입 시 iOS가 �
   재귀 삭제한 뒤 재백필해서 해결
 - **로컬 스크립트**: `lolive-firebase`에는 포함 안 함(관리자 1회성 로컬 작업, node_modules와 별개 성격) —
   `backfill_datalisk.py`, 리그별로 실행하며 실패한 리그가 있어도 나머지는 계속 진행
-- **진행 상황** (2026-08-05 기준): LCK · LPL · LEC 완료. LCS 진행 중. PCS / VCS / CBLOL / LJL / LLA /
-  Worlds / MSI / KeSPA Cup 순서로 대기 중
+- **앱 쪽 모델**: `Match.games: [BackfilledGameDetail]?` 추가 — 서버(`historicalMatchToDoc`)가 그대로
+  패스스루, `MatchDetailViewModel`이 이 데이터로 `EventDetailInfo`/`GameWindow`를 로컬 구성해 라이브
+  경기와 같은 UI(팀 스탯 카드, 선수 목록 카드)를 Riot 호출 없이 채움
+- **진행 상황** (2026-08-05 기준): KeSPA Cup 완료(게임 상세 포함 버전 검증). LCK/LPL/LEC/PCS/VCS/CBLOL/
+  LJL/LLA/Worlds/MSI는 게임 상세 포함해서 재백필 진행 중 (LCS는 스코어만 있던 이전 버전이 일부 남아있어
+  같이 재백필)
 
 ### 홈 화면·잠금화면 위젯 (LOLIVEWidgets)
 - 즐겨찾기한 팀의 다음 경기 일정 표시

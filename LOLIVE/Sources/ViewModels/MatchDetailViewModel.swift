@@ -78,10 +78,12 @@ final class MatchDetailViewModel {
     // MARK: - Public
 
     func load() async {
-        // 백필된 과거 시즌 경기(oe_/lp_ 접두사)는 Riot API의 실제 경기 ID가 아니라 상세 조회가
-        // 불가능 — 애초에 밴픽/타임라인 데이터 없이 스코어만 있는 기록이라 요청 자체를 생략하고
-        // 스코어 카드만 표시한다(에러 카드 노출 방지).
-        guard !Self.isBackfilledMatchId(match.id) else { return }
+        // 백필된 과거 시즌 경기(oe_/lp_ 접두사)는 Riot API의 실제 경기 ID가 아니라 상세 조회 자체가
+        // 불가능 — Riot 호출 없이 백필 데이터(match.games, 있으면)로 직접 화면을 채운다.
+        if Self.isBackfilledMatchId(match.id) {
+            loadFromBackfilledGames()
+            return
+        }
 
         // 예정 경기: game window 폴링 불필요, eventDetail만 fetch (TeamDetailView 로스터용 실제 team ID 확보)
         if match.state == .unstarted {
@@ -172,6 +174,35 @@ final class MatchDetailViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// 백필 경기(match.games)를 Riot API 없이 그대로 화면 모델로 변환한다. 밴 데이터는 원본에 없어
+    /// 항상 빈 배열 — 밴 카드는 자연히 표시 안 됨. games가 없으면(구버전 백필) 스코어만 표시.
+    private func loadFromBackfilledGames() {
+        guard let games = match.games, !games.isEmpty else { return }
+
+        eventDetail = EventDetailInfo(
+            strategyCount: games.count,
+            games: games.map {
+                GameInfo(number: $0.number, gameId: $0.gameId, state: .completed,
+                         blueTeamId: $0.blueTeamId, redTeamId: $0.redTeamId,
+                         blueBans: [], redBans: [], winnerTeamId: $0.winnerTeamId)
+            },
+            teamAEsportsId: match.teamA.id,
+            teamBEsportsId: match.teamB.id
+        )
+
+        for g in games {
+            gameWindows[g.gameId] = GameWindow(
+                gameId: g.gameId, gameState: "completed",
+                blueTeamId: g.blueTeamId, redTeamId: g.redTeamId,
+                bluePlayers: g.bluePlayers, redPlayers: g.redPlayers,
+                blueTeamStats: g.blueTeamStats, redTeamStats: g.redTeamStats,
+                gameTime: nil, lastFrameTimestamp: nil
+            )
+        }
+
+        selectedGameId = games.last?.gameId
     }
 
     // MARK: - Static Preload
