@@ -311,7 +311,7 @@ foreground로 살아있을 때만 동작 — 백그라운드 진입 시 iOS가 �
   `.onChange(of: favoriteTeams)`)에서 최신 즐겨찾기 팀 코드로 재등록 트리거
 - **아직 실기기에서 "앱 완전 종료 상태로 푸시 도착" 검증은 안 해봄** — 다음 라이브 경기로 확인 필요
 
-### 과거 시즌 백필 (oe.datalisk.io) — 진행 중
+### 과거 시즌 백필 (oe.datalisk.io) — 완료
 "기록 탭"에 채울 과거 시즌 경기 데이터를 서버가 아니라 로컬에서 미리 가져와 Firestore에 주입하는 작업.
 
 - **왜 Leaguepedia Cargo API를 직접 안 쓰나**: `historical.ts`가 원래 Leaguepedia에서 직접 긁어오도록
@@ -343,9 +343,11 @@ foreground로 살아있을 때만 동작 — 백그라운드 진입 시 iOS가 �
 - **앱 쪽 모델**: `Match.games: [BackfilledGameDetail]?` 추가 — 서버(`historicalMatchToDoc`)가 그대로
   패스스루, `MatchDetailViewModel`이 이 데이터로 `EventDetailInfo`/`GameWindow`를 로컬 구성해 라이브
   경기와 같은 UI(팀 스탯 카드, 선수 목록 카드)를 Riot 호출 없이 채움
-- **진행 상황** (2026-08-05 기준): KeSPA Cup 완료(게임 상세 포함 버전 검증). LCK/LPL/LEC/PCS/VCS/CBLOL/
-  LJL/LLA/Worlds/MSI는 게임 상세 포함해서 재백필 진행 중 (LCS는 스코어만 있던 이전 버전이 일부 남아있어
-  같이 재백필)
+- **완료** (2026-08-06 기준): 앱에 있는 9개 정규 리그(LCK/LPL/LEC/LCS/PCS/VCS/CBLOL/LJL/LLA) +
+  국제대회(Worlds/MSI) + KeSPA Cup까지 총 12개 전부 게임 상세 포함해서 백필 완료. LLA/Worlds는
+  2026년 시즌이 아직 없어서(Worlds는 연말 개최) 최신 연도가 없는 게 정상. 병렬 조회 도중 극소수
+  게임(수천 개 중 개수 단위)만 커넥션 리셋으로 상세 누락 — 해당 게임만 스탯 없이 스킵됨, 매치
+  자체(스코어)는 정상 저장
 
 ### 홈 화면·잠금화면 위젯 (LOLIVEWidgets)
 - 즐겨찾기한 팀의 다음 경기 일정 표시
