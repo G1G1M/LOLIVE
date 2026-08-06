@@ -190,4 +190,23 @@ extension MatchDetailView {
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
+
+    /// 게임 상세(팀 스탯/선수 목록)를 아예 못 가져왔을 때(=selectedGameWindow가 nil)
+    /// 화면이 통째로 비어 보이던 문제 대응 — "다시 시도" 버튼으로 재조회 기회를 준다.
+    var statsUnavailableCard: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+            Text("경기 상세 정보를 불러올 수 없습니다")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button("다시 시도") { Task { await viewModel.retryGameWindow() } }
+                .buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
 }

@@ -66,7 +66,7 @@ struct TeamSearchView: View {
     // MARK: - Row
 
     private func teamRow(_ result: TeamSearchViewModel.TeamResult) -> some View {
-        let isFav = favoriteTeams.contains { $0.teamCode == result.team.code }
+        let isFav = favoriteTeams.contains { $0.teamId == result.team.id }
         return HStack(spacing: 12) {
             CachedAsyncImage(url: URL(string: result.team.imageURL ?? ""))
                 .frame(width: 36, height: 36)
@@ -95,11 +95,11 @@ struct TeamSearchView: View {
 
     private func toggleFavorite(_ result: TeamSearchViewModel.TeamResult, isFav: Bool) {
         if isFav {
-            if let existing = favoriteTeams.first(where: { $0.teamCode == result.team.code }) {
+            if let existing = favoriteTeams.first(where: { $0.teamId == result.team.id }) {
                 modelContext.delete(existing)
             }
         } else {
-            guard !favoriteTeams.contains(where: { $0.teamCode == result.team.code }) else { return }
+            guard !favoriteTeams.contains(where: { $0.teamId == result.team.id }) else { return }
             modelContext.insert(FavoriteTeam(team: result.team, league: result.league))
         }
     }

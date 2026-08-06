@@ -187,14 +187,14 @@ struct TeamDetailView: View {
     // MARK: - Favorite
 
     private func checkFavoriteStatus() {
-        let code = team.code
-        let descriptor = FetchDescriptor<FavoriteTeam>(predicate: #Predicate { $0.teamCode == code })
+        let id = team.id
+        let descriptor = FetchDescriptor<FavoriteTeam>(predicate: #Predicate { $0.teamId == id })
         isFavorited = (try? modelContext.fetch(descriptor))?.isEmpty == false
     }
 
     private func toggleFavorite() {
-        let code = team.code
-        let descriptor = FetchDescriptor<FavoriteTeam>(predicate: #Predicate { $0.teamCode == code })
+        let id = team.id
+        let descriptor = FetchDescriptor<FavoriteTeam>(predicate: #Predicate { $0.teamId == id })
         if let existing = try? modelContext.fetch(descriptor), !existing.isEmpty {
             existing.forEach { modelContext.delete($0) }
             isFavorited = false
@@ -234,17 +234,50 @@ struct TeamDetailView: View {
 
     // MARK: - Roster Card
 
+    /// Riot getTeams 응답엔 주전/후보 구분이 없어 포지션당 여러 명이 그대로 옴(예: T1 BOT 4명).
+    /// viewModel.currentStarterNames(최근 경기 실제 출전 명단)로 구할 수 있으면 주전을 먼저,
+    /// 나머지는 "기타 등록 선수"로 분리 표시. 못 구했으면(원정경기 없음/API 실패) 기존처럼 전체 나열.
+    private func isCurrentStarter(_ player: Player) -> Bool {
+        viewModel.currentStarterNames.contains(player.summonerName.trimmingCharacters(in: .whitespaces).lowercased())
+    }
+
     private var rosterCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(viewModel.players) { player in
+        let starters = viewModel.currentStarterNames.isEmpty
+            ? viewModel.players
+            : viewModel.players.filter(isCurrentStarter)
+        let bench = viewModel.currentStarterNames.isEmpty
+            ? []
+            : viewModel.players.filter { !isCurrentStarter($0) }
+
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(starters) { player in
                 NavigationLink {
                     LeaguePlayerDetailView(player: player, league: league)
                 } label: {
                     playerRow(player)
                 }
                 .buttonStyle(.plain)
-                if player.id != viewModel.players.last?.id {
+                if player.id != starters.last?.id || !bench.isEmpty {
                     Divider().padding(.leading, 68)
+                }
+            }
+
+            if !bench.isEmpty {
+                Text("기타 등록 선수")
+                    .font(.caption).fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 4)
+
+                ForEach(bench) { player in
+                    NavigationLink {
+                        LeaguePlayerDetailView(player: player, league: league)
+                    } label: {
+                        playerRow(player)
+                    }
+                    .buttonStyle(.plain)
+                    if player.id != bench.last?.id {
+                        Divider().padding(.leading, 68)
+                    }
                 }
             }
         }

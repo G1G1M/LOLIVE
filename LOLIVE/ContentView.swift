@@ -14,7 +14,6 @@ struct ContentView: View {
     @Environment(TodayViewModel.self) private var todayViewModel
     @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
     @State private var selectedTab = 0
-    @State private var searchFocusTrigger = 0
 
     private var themeColor: Color {
         primaryTeamCode.isEmpty ? Color.accentColor : TeamTheme.color(for: primaryTeamCode)
@@ -26,11 +25,6 @@ struct ContentView: View {
         // 탭 전환(특히 Search 원형 버튼 → 검색창 모핑) 애니메이션이 굼떠 보인다는 피드백으로
         // selectedTab이 바뀌는 트랜잭션 자체의 애니메이션을 꺼서 즉시 전환되게 함
         .transaction(value: selectedTab) { $0.disablesAnimations = true }
-        .onChange(of: selectedTab) { _, new in
-            if new == 4 {
-                searchFocusTrigger += 1
-            }
-        }
         .task {
             syncFavoritedTeamIds()
             todayViewModel.startLivePolling()   // favoritedTeamIds 설정 직후 시작
@@ -77,7 +71,7 @@ struct ContentView: View {
                 Tab("Standings", systemImage: "list.number", value: 2) { StandingsView() }
                 Tab("Players", systemImage: "person.fill", value: 3) { PlayersView() }
                 Tab(value: 4, role: .search) {
-                    SearchView(focusTrigger: searchFocusTrigger) { selectedTab = 0 }
+                    SearchView { selectedTab = 0 }
                 } label: {
                     Label("Search", systemImage: "magnifyingglass")
                 }
@@ -100,7 +94,7 @@ struct ContentView: View {
                     .tag(3)
                     .tabItem { Label("Players", systemImage: "person.fill") }
 
-                SearchView(focusTrigger: searchFocusTrigger) { selectedTab = 0 }
+                SearchView { selectedTab = 0 }
                     .tag(4)
                     .tabItem { Label("Search", systemImage: "magnifyingglass") }
             }
@@ -119,7 +113,10 @@ struct ContentView: View {
             opponentCode: opponent.code,
             opponentImageURL: opponent.imageURL,
             startTime: match.startTime,
-            isLive: liveMatch != nil,
+            // MatchCardView의 isEffectivelyLive와 동일한 이중 판정 — getLive 응답에만 의존하면
+            // 라이브 폴링 중 순간적으로 getLive 목록에서 빠지는 경기가 위젯엔 "예정"으로 저장돼
+            // 앱 화면(LIVE 배지)과 위젯이 서로 다른 상태를 보여주는 문제가 있었음.
+            isLive: liveMatch != nil || match.state == .inProgress,
             leagueName: match.league.name,
             savedAt: Date(),
             myScore: isTeamA ? match.scoreA : match.scoreB,

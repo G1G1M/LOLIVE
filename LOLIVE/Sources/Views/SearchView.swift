@@ -7,63 +7,60 @@ import SwiftUI
 import SwiftData
 
 struct SearchView: View {
-    let focusTrigger: Int
     /// X(취소) 버튼을 눌러 검색을 닫을 때 호출 — ContentView가 Today 탭으로 전환하는 데 사용
     var onCancel: () -> Void = {}
 
     @State private var viewModel = SearchViewModel()
     @State private var searchText = ""
     @State private var isSearchPresented = false
-    @FocusState private var isSearchFocused: Bool
+    @State private var selectedCategory: SearchCategory? = nil
     @Query private var favoriteTeams: [FavoriteTeam]
     @Query private var favoritePlayers: [FavoritePlayer]
     @Environment(\.modelContext) private var modelContext
 
+    private enum SearchCategory: String, CaseIterable {
+        case league = "리그"
+        case team   = "팀"
+        case player = "선수"
+    }
+
     private var results: [SearchViewModel.SearchResult] {
-        viewModel.results(for: searchText)
+        let all = viewModel.results(for: searchText)
+        guard let selectedCategory else { return all }
+        return all.filter {
+            switch ($0, selectedCategory) {
+            case (.league, .league), (.team, .team), (.player, .player): return true
+            default: return false
+            }
+        }
     }
 
     // role: .search 탭이 .searchable을 인식하려면 이 탭의 콘텐츠가 자체 NavigationStack을
     // 가져야 한다 (ContentView의 TabView를 또 NavigationStack으로 감싸면 안 됨).
-    // .searchable의 isPresented 바인딩은 탭 선택만으로는 true로 안 바뀌어서(실기기 확인),
-    // ContentView가 탭 선택마다 올려주는 focusTrigger를 대신 신호로 써서 .searchFocused로
-    // 직접 포커스를 준다. .searchFocused는 iOS 18+ 전용이라 iOS 17 폴백 탭바에선 자동 포커스 없이
-    // 기존처럼 동작한다.
-    // 반대로 X(취소) 버튼을 누르면 isPresented가 true→false로 바뀌는 건 실기기에서도 확실히
-    // 감지되길래, 이 전환을 감지해서 Today 탭으로 이동시킨다.
+    // 탭을 누르면 검색창이 펼쳐지기만 하고(iOS 표준 Search Role 동작), 키보드는 검색창을
+    // 직접 탭해야 뜬다 — 예전엔 탭 선택 즉시 자동 포커스를 줬는데, 의도치 않게 키보드가
+    // 바로 뜨는 게 불편하다는 피드백으로 되돌림.
+    // X(취소) 버튼을 누르면 isPresented가 true→false로 바뀌는 걸 감지해 Today 탭으로 이동시킨다.
     var body: some View {
-        if #available(iOS 18.0, *) {
-            searchableContent
-                .searchFocused($isSearchFocused)
-                .task(id: focusTrigger) {
-                    guard focusTrigger > 0 else { return }
-                    isSearchFocused = true
-                    // 앱 첫 실행 직후 첫 탭 선택 시에는 검색창 뷰가 이 시점에 막 생성되는
-                    // 중이라 포커스 요청이 씹힐 수 있음 — 뷰가 자리잡을 시간을 준 뒤 안 잡혀
-                    // 있으면 한 번 더 시도. 이미 포커스됐으면 그대로라 체감 속도엔 영향 없음
-                    try? await Task.sleep(for: .milliseconds(200))
-                    if !isSearchFocused { isSearchFocused = true }
-                }
-        } else {
-            searchableContent
-        }
-    }
-
-    private var searchableContent: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                if isSearchPresented {
+                    categoryFilterBar
+                }
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
 
-                if viewModel.isLoading {
-                    LoadingView()
-                } else if viewModel.loadFailed && searchText.isEmpty {
-                    ErrorRetryView("검색 데이터를 불러올 수 없습니다") { Task { await viewModel.load() } }
-                } else if searchText.isEmpty {
-                    emptyPrompt
-                } else if results.isEmpty {
-                    noResults
-                } else {
-                    resultList
+                    if viewModel.isLoading {
+                        LoadingView()
+                    } else if viewModel.loadFailed && searchText.isEmpty {
+                        ErrorRetryView("검색 데이터를 불러올 수 없습니다") { Task { await viewModel.load() } }
+                    } else if searchText.isEmpty {
+                        emptyPrompt
+                    } else if results.isEmpty {
+                        noResults
+                    } else {
+                        resultList
+                    }
                 }
             }
             .navigationTitle("검색")
@@ -71,9 +68,31 @@ struct SearchView: View {
         }
         .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "리그, 팀, 선수 검색")
         .onChange(of: isSearchPresented) { wasPresented, presented in
-            if wasPresented && !presented { onCancel() }
+            if wasPresented && !presented { onCancel(); selectedCategory = nil }
         }
         .task { await viewModel.load() }
+    }
+
+    // MARK: - Category Filter (애플뮤직 스타일)
+
+    private var categoryFilterBar: some View {
+        HStack(spacing: 8) {
+            ForEach(SearchCategory.allCases, id: \.self) { category in
+                SelectableChip(isSelected: selectedCategory == category) {
+                    selectedCategory = selectedCategory == category ? nil : category
+                } label: {
+                    Text(category.rawValue)
+                        .font(.subheadline)
+                        .fontWeight(selectedCategory == category ? .semibold : .regular)
+                        .foregroundStyle(selectedCategory == category ? .white : .primary)
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
+        .animation(.easeInOut(duration: 0.15), value: selectedCategory)
     }
 
     // MARK: - States
@@ -83,7 +102,7 @@ struct SearchView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 44))
                 .foregroundStyle(.tertiary)
-            Text("리그, 팀, 선수를 검색하세요")
+            Text(selectedCategory == nil ? "리그, 팀, 선수를 검색하세요" : "\(selectedCategory!.rawValue) 이름으로 검색하세요")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -152,7 +171,7 @@ struct SearchView: View {
     // MARK: - Team Row
 
     private func teamRow(_ team: Team, league: League) -> some View {
-        let isFav = favoriteTeams.contains { $0.teamCode == team.code }
+        let isFav = favoriteTeams.contains { $0.teamId == team.id }
         return NavigationLink(destination: TeamDetailView(team: team, league: league)) {
             HStack(spacing: 12) {
                 CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
@@ -217,9 +236,9 @@ struct SearchView: View {
 
     private func toggleFavoriteTeam(_ team: Team, league: League, isFav: Bool) {
         if isFav {
-            favoriteTeams.first { $0.teamCode == team.code }.map { modelContext.delete($0) }
+            favoriteTeams.first { $0.teamId == team.id }.map { modelContext.delete($0) }
         } else {
-            guard !favoriteTeams.contains(where: { $0.teamCode == team.code }) else { return }
+            guard !favoriteTeams.contains(where: { $0.teamId == team.id }) else { return }
             modelContext.insert(FavoriteTeam(team: team, league: league))
         }
     }
@@ -234,6 +253,6 @@ struct SearchView: View {
 }
 
 #Preview {
-    SearchView(focusTrigger: 0)
+    SearchView()
         .preferredColorScheme(.dark)
 }

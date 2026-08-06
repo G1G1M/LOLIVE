@@ -34,13 +34,19 @@ extension Standing {
     /// 방식) 오히려 시즌 누적 기록과 안 맞게 된다. 상대적으로 그룹(레전드/라이즈)은 현재 시즌
     /// `standings`(Riot가 최신 스플릿에서 배정한 그룹)를 그대로 따른다.
     static func reconciled(_ standings: [Standing], schedule: [Match], seasonStartDate: Date) -> [Standing] {
+        // 스플릿 누적 순위(레전드/라이즈 그룹 등)에 직전 스플릿의 "Knockouts"(플레이오프) 라운드
+        // 경기까지 합산되고 있던 버그 — 실측 대조로 확인함(2026-08 LCK: 이 라운드를 빼야 네이버
+        // e스포츠 공식 순위표의 승패/GD와 팀별로 정확히 일치함, 포함하면 HLE가 T1을 근소하게
+        // 앞서는 걸로 잘못 계산됨). 플레이오프는 토너먼트 대진이라 라운드로빈처럼 전 팀이 서로
+        // 겨루는 구조가 아니라서 애초에 누적 순위표 집계 대상이 아니다.
         let completed = schedule.filter {
-            $0.state == .completed && $0.startTime >= seasonStartDate
+            $0.state == .completed && $0.startTime >= seasonStartDate && !Standing.isPlayoffBlock($0.blockName)
         }
         guard !standings.isEmpty, !completed.isEmpty else {
             return standings.sorted {
                 if $0.rank != $1.rank { return $0.rank < $1.rank }
                 if $0.wins != $1.wins { return $0.wins > $1.wins }
+                if $0.losses != $1.losses { return $0.losses < $1.losses }
                 if $0.gameDiff != $1.gameDiff { return $0.gameDiff > $1.gameDiff }
                 return $0.team.name < $1.team.name
             }
@@ -82,6 +88,7 @@ extension Standing {
         for (_, group) in groups {
             let sorted = group.sorted {
                 if $0.wins != $1.wins { return $0.wins > $1.wins }
+                if $0.losses != $1.losses { return $0.losses < $1.losses }
                 if $0.gameDiff != $1.gameDiff { return $0.gameDiff > $1.gameDiff }
                 return $0.team.name < $1.team.name
             }
@@ -95,7 +102,22 @@ extension Standing {
             if $0.group != $1.group { return ($0.group ?? "") < ($1.group ?? "") }
             if $0.rank != $1.rank { return $0.rank < $1.rank }
             if $0.wins != $1.wins { return $0.wins > $1.wins }
+            if $0.losses != $1.losses { return $0.losses < $1.losses }
             return $0.team.name < $1.team.name
         }
+    }
+
+    /// LeagueDetailViewModel.isBracketAvailable과 비슷한 키워드 기준이지만, 앱이 Riot API를
+    /// `hl=ko-KR`로 호출해서 실제 blockName은 영어가 아니라 한글로 온다(실측: "토너먼트 스테이지",
+    /// "플레이오프", "결승", "플레이-인", "대표 선발전" 등 — "final"/"playoff" 같은 영어 키워드는
+    /// 하나도 안 걸려서 이 함수가 사실상 죽어있었다). 정규시즌 블록은 전부 "N주 차" 패턴이라
+    /// 그 외는 라운드로빈이 아닌 대진표 방식이라고 보고 제외한다. 영어 키워드도 혹시 몰라 남겨둠.
+    fileprivate static func isPlayoffBlock(_ blockName: String?) -> Bool {
+        guard let raw = blockName, let b = blockName?.lowercased() else { return false }
+        let englishKeywords = ["final", "semi", "quarter", "playoff", "knockout", "bracket", "elimination"]
+        let koreanKeywords = ["결승", "준결승", "플레이오프", "플레이-인", "토너먼트 스테이지", "8강", "4강", "선발전"]
+        if englishKeywords.contains(where: b.contains) { return true }
+        if koreanKeywords.contains(where: raw.contains) { return true }
+        return false
     }
 }

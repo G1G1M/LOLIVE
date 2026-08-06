@@ -64,6 +64,9 @@ struct MatchDetailView: View {
                             if !kills.isEmpty {
                                 killTimelineCard(window: window, kills: kills)
                             }
+                        } else if let game = viewModel.selectedGame, game.state != .unstarted {
+                            // window가 nil인 진짜 실패 케이스만 여기로 옴(unstarted는 위 draftWaitingCard가 이미 처리).
+                            statsUnavailableCard
                         }
                     }
                 }
