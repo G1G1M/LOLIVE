@@ -42,11 +42,6 @@ struct TeamDetailView: View {
 
                 if viewModel.isLoading {
                     LoadingView()
-                } else if viewModel.isBackfilledData {
-                    EmptyStateView(
-                        "과거 시즌 기록 경기는 팀 상세 정보를 지원하지 않습니다",
-                        icon: "clock.arrow.circlepath"
-                    )
                 } else if viewModel.loadFailed {
                     fetchErrorView { Task { await viewModel.load() } }
                 } else {
