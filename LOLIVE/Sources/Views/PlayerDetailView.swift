@@ -62,17 +62,22 @@ struct PlayerDetailView: View {
         .navigationTitle(summonerName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Task { await resolveProfile() }
-                } label: {
-                    if isResolvingProfile {
-                        ProgressView()
-                    } else {
-                        Label("프로필 보기", systemImage: "person.crop.circle")
+            // 백필(과거 시즌 기록) 경기는 team.id/match.id가 실시간 Riot API가 모르는 합성 ID라
+            // resolveProfile()의 fetchTeamRoster 호출이 항상 빈 결과만 준다 — 버튼 자체를 숨겨서
+            // 클릭해도 실패하는 액션을 안 보여준다.
+            if !MatchDetailViewModel.isBackfilledMatchId(match.id) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await resolveProfile() }
+                    } label: {
+                        if isResolvingProfile {
+                            ProgressView()
+                        } else {
+                            Label("프로필 보기", systemImage: "person.crop.circle")
+                        }
                     }
+                    .disabled(isResolvingProfile)
                 }
-                .disabled(isResolvingProfile)
             }
         }
         .navigationDestination(item: $resolvedPlayer) { player in

@@ -201,6 +201,13 @@ extension LeaguepediaService {
         let sameOrder = teamsMatch(match.teamA, lp.teamA)
         let scoreA = sameOrder ? lp.scoreA : lp.scoreB
         let scoreB = sameOrder ? lp.scoreB : lp.scoreA
+        #if DEBUG
+        reconcileLPLogger.debug("""
+            🔁 [Reconcile] stuckLiveMatch \(match.teamA.code) vs \(match.teamB.code) — \
+            lp.teamA=\(lp.teamA.name) lp.teamB=\(lp.teamB.name) sameOrder=\(sameOrder) \
+            리보정전(\(match.scoreA)-\(match.scoreB)) → 리보정후(\(scoreA)-\(scoreB))
+            """)
+        #endif
         return Match(id: match.id, league: match.league, teamA: match.teamA, teamB: match.teamB,
                      scoreA: scoreA, scoreB: scoreB, startTime: match.startTime,
                      state: lp.state, blockName: match.blockName)
