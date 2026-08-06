@@ -178,20 +178,39 @@ struct OnboardingView: View {
                 .tabViewStyle(.page(indexDisplayMode: .always))
                 .indexViewStyle(.page(backgroundDisplayMode: .always))
 
-                Button {
-                    if currentPage < 3 {
-                        withAnimation(.easeInOut(duration: 0.3)) { currentPage += 1 }
+                Group {
+                    if #available(iOS 26.0, *) {
+                        Button {
+                            if currentPage < 3 {
+                                withAnimation(.easeInOut(duration: 0.3)) { currentPage += 1 }
+                            } else {
+                                onComplete()
+                            }
+                        } label: {
+                            Text(currentPage < 3 ? "다음" : "시작하기")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(.blue)
                     } else {
-                        onComplete()
+                        Button {
+                            if currentPage < 3 {
+                                withAnimation(.easeInOut(duration: 0.3)) { currentPage += 1 }
+                            } else {
+                                onComplete()
+                            }
+                        } label: {
+                            Text(currentPage < 3 ? "다음" : "시작하기")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color.blue)
+                                .foregroundStyle(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
                     }
-                } label: {
-                    Text(currentPage < 3 ? "다음" : "시작하기")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.blue)
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
                 .animation(.easeInOut(duration: 0.2), value: currentPage)
                 .padding(.horizontal, 24)

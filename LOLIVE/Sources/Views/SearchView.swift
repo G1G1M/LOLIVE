@@ -54,7 +54,7 @@ struct SearchView: View {
             ZStack {
                 Color(.systemGroupedBackground).ignoresSafeArea()
 
-                if viewModel.isLoading && searchText.isEmpty {
+                if viewModel.isLoading {
                     LoadingView()
                 } else if viewModel.loadFailed && searchText.isEmpty {
                     ErrorRetryView("검색 데이터를 불러올 수 없습니다") { Task { await viewModel.load() } }
@@ -200,7 +200,7 @@ struct SearchView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                roleTag(player.role)
+                RoleBadge(role: player.role)
                 Button {
                     toggleFavoritePlayer(player, league: league, isFav: isFav)
                 } label: {
@@ -214,16 +214,6 @@ struct SearchView: View {
     }
 
     // MARK: - Helpers
-
-    private func roleTag(_ role: String) -> some View {
-        let color = RoleStyle.color(role)
-        return Text(RoleStyle.label(role))
-            .font(.caption2).fontWeight(.bold)
-            .padding(.horizontal, 6).padding(.vertical, 3)
-            .background(color.opacity(0.2))
-            .foregroundStyle(color)
-            .clipShape(Capsule())
-    }
 
     private func toggleFavoriteTeam(_ team: Team, league: League, isFav: Bool) {
         if isFav {

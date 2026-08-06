@@ -10,8 +10,6 @@ struct MatchCardView: View {
     var isLive: Bool = false
     var showDate: Bool = false
 
-    @State private var isPulsing = false
-
     /// getLive 목록에 없어도(일부 대회는 실시간 API 응답 자체가 비어있음) 스케줄 상
     /// 상태가 inProgress면 LIVE로 간주 — 두 신호 중 하나만 맞아도 라이브로 표시한다.
     private var isEffectivelyLive: Bool { isLive || match.state == .inProgress }
@@ -95,22 +93,7 @@ struct MatchCardView: View {
     @ViewBuilder
     private var statusBadge: some View {
         if isEffectivelyLive {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 6, height: 6)
-                    .scaleEffect(isPulsing ? 1.4 : 1.0)
-                    .animation(
-                        .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
-                        value: isPulsing
-                    )
-                    .onAppear { isPulsing = true }
-                Text("LIVE")
-                    .font(.caption).fontWeight(.bold).foregroundStyle(.red)
-            }
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(Color.red.opacity(0.15))
-            .clipShape(Capsule())
+            LiveBadge()
         } else if match.state == .completed {
             Text("종료")
                 .font(.system(size: 11, weight: .medium))

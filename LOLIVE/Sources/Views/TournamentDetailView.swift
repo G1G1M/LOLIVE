@@ -65,7 +65,7 @@ struct TournamentDetailView: View {
                 ForEach(viewModel.tournaments) { tournament in
                     let year = String(tournament.startDate.prefix(4))
                     let isSelected = tournament.id == viewModel.selectedTournamentId
-                    Button {
+                    SelectableChip(isSelected: isSelected) {
                         withAnimation(.easeInOut(duration: 0.15)) {
                             viewModel.selectTournament(tournament)
                         }
@@ -73,12 +73,7 @@ struct TournamentDetailView: View {
                         Text(year)
                             .font(.subheadline).fontWeight(isSelected ? .bold : .regular)
                             .foregroundStyle(isSelected ? .white : .secondary)
-                            .padding(.horizontal, 16).padding(.vertical, 7)
-                            .background(isSelected ? Color.accentColor
-                                        : Color(.secondarySystemGroupedBackground))
-                            .clipShape(Capsule())
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -94,7 +89,7 @@ struct TournamentDetailView: View {
                 ForEach(viewModel.availableRounds, id: \.self) { round in
                     let isSelected = round == viewModel.selectedRound
                     let count = viewModel.tournamentMatches.filter { $0.blockName == round }.count
-                    Button {
+                    SelectableChip(isSelected: isSelected) {
                         withAnimation(.easeInOut(duration: 0.15)) {
                             viewModel.selectedRound = round
                         }
@@ -110,12 +105,7 @@ struct TournamentDetailView: View {
                                 .clipShape(Capsule())
                         }
                         .foregroundStyle(isSelected ? .white : .secondary)
-                        .padding(.horizontal, 14).padding(.vertical, 7)
-                        .background(isSelected ? Color.accentColor
-                                    : Color(.secondarySystemGroupedBackground))
-                        .clipShape(Capsule())
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 10)

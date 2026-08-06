@@ -120,14 +120,11 @@ struct PlayersView: View {
     }
 
     private func filterChip(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        SelectableChip(isSelected: isSelected, action: action) {
             Text(title)
                 .font(.subheadline)
                 .fontWeight(isSelected ? .semibold : .regular)
                 .foregroundStyle(isSelected ? .white : .primary)
-                .padding(.horizontal, 14).padding(.vertical, 7)
-                .background(isSelected ? Color.accentColor : Color(.secondarySystemGroupedBackground))
-                .clipShape(Capsule())
         }
     }
 
@@ -180,12 +177,7 @@ struct PlayersView: View {
                 Text(entry.player.teamCode)
                     .font(.caption).foregroundStyle(.secondary)
 
-                Text(RoleStyle.label(entry.player.role))
-                    .font(.caption2).fontWeight(.bold)
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(RoleStyle.color(entry.player.role).opacity(0.2))
-                    .foregroundStyle(RoleStyle.color(entry.player.role))
-                    .clipShape(Capsule())
+                RoleBadge(role: entry.player.role)
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)

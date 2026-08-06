@@ -35,6 +35,7 @@ extension MatchDetailView {
                                     .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
                                     value: isPulsing
                                 )
+                                .onAppear { isPulsing = true }
                         } else if game.state == .unstarted {
                             Text("예정")
                                 .font(.system(size: 9))

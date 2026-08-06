@@ -16,7 +16,7 @@
 |------|------|
 | 플랫폼 | iOS 17+ |
 | 언어 | Swift 6.0 |
-| UI | SwiftUI (다크모드 고정) |
+| UI | SwiftUI (다크모드 고정), iOS 26 Liquid Glass 적용(배포 타깃 17.6은 유지, `#available` 분기) |
 | 아키텍처 | MVVM + `@Observable` |
 | 네트워크 | URLSession + async/await |
 | 로컬 저장 | SwiftData |
@@ -44,7 +44,6 @@
 - FotMob 스타일 날짜 선택 스트립 + 선택 날짜 기준 리그별 경기 목록
 - LIVE 경기 자동 감지 및 실시간 폴링
 - 전체 / 즐겨찾기 / LIVE 필터 (라디오 버튼처럼 하나만 선택)
-- iOS 26 Liquid Glass 필터 UI 시범 적용
 
 ### Standings
 - 전 세계 리그 순위표 (W-L / GD / 승률), 완료 경기 기준으로 항상 직접 재계산

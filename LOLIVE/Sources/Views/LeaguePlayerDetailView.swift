@@ -84,12 +84,7 @@ struct LeaguePlayerDetailView: View {
                     Text(player.teamCode)
                         .font(.caption).foregroundStyle(.secondary)
 
-                    Text(roleLabel(player.role))
-                        .font(.caption2).fontWeight(.bold)
-                        .padding(.horizontal, 6).padding(.vertical, 3)
-                        .background(roleColor(player.role).opacity(0.2))
-                        .foregroundStyle(roleColor(player.role))
-                        .clipShape(Capsule())
+                    RoleBadge(role: player.role)
                 }
             }
 
@@ -153,7 +148,7 @@ struct LeaguePlayerDetailView: View {
             } else if viewModel.recentResults.isEmpty {
                 EmptyStateView("최근 경기 기록이 없습니다", icon: "calendar.badge.clock")
             } else {
-                recentMatchesCard
+                RecentMatchesCard(items: recentMatchItems)
             }
         }
     }
@@ -302,52 +297,14 @@ struct LeaguePlayerDetailView: View {
 
     // MARK: - Recent Matches Card
 
-    private var recentMatchesCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(viewModel.recentResults) { result in
-                NavigationLink(destination: MatchDetailView(match: result.match)) {
-                    HStack(spacing: 12) {
-                        Text(result.won ? "W" : "L")
-                            .font(.caption2).fontWeight(.bold)
-                            .foregroundStyle(.white)
-                            .frame(width: 24, height: 24)
-                            .background(result.won ? Color.blue : Color.red)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("vs \(result.opponent.name)")
-                                .font(.subheadline).fontWeight(.medium)
-                                .lineLimit(1)
-                            Text(result.date.formatted(.dateTime
-                                .month(.abbreviated).day()
-                                .locale(Locale(identifier: "ko_KR"))))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Text("\(result.myScore)-\(result.oppScore)")
-                            .font(.subheadline).fontWeight(.semibold)
-                            .foregroundStyle(result.won ? .primary : .secondary)
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption2).foregroundStyle(.tertiary)
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                }
-                .buttonStyle(.plain)
-
-                if result.id != viewModel.recentResults.last?.id {
-                    Divider().padding(.leading, 16)
-                }
-            }
+    private var recentMatchItems: [RecentMatchesCard.Item] {
+        viewModel.recentResults.map { result in
+            RecentMatchesCard.Item(id: result.id, match: result.match, opponent: result.opponent,
+                                    myScore: result.myScore, oppScore: result.oppScore,
+                                    won: result.won, date: result.date)
         }
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Helpers
 
-    private func roleLabel(_ role: String) -> String { RoleStyle.label(role) }
-    private func roleColor(_ role: String) -> Color  { RoleStyle.color(role) }
 }

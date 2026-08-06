@@ -78,7 +78,7 @@ struct StandingsView: View {
 
     private func leagueChip(_ league: League) -> some View {
         let isSelected = viewModel.selectedLeague?.id == league.id
-        return Button {
+        return SelectableChip(isSelected: isSelected) {
             Task { await viewModel.selectLeague(league) }
         } label: {
             HStack(spacing: 5) {
@@ -88,10 +88,6 @@ struct StandingsView: View {
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? Color.white : Color.primary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(isSelected ? Color.accentColor : Color(.secondarySystemGroupedBackground))
-            .clipShape(Capsule())
         }
     }
 

@@ -162,12 +162,7 @@ extension LeagueDetailView {
                     Text(player.teamCode)
                         .font(.caption).foregroundStyle(.secondary)
 
-                    Text(roleLabel(player.role))
-                        .font(.caption2).fontWeight(.bold)
-                        .padding(.horizontal, 6).padding(.vertical, 3)
-                        .background(roleColor(player.role).opacity(0.2))
-                        .foregroundStyle(roleColor(player.role))
-                        .clipShape(Capsule())
+                    RoleBadge(role: player.role)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -178,5 +173,4 @@ extension LeagueDetailView {
     // MARK: - 포지션 헬퍼
 
     private func roleLabel(_ role: String) -> String { RoleStyle.label(role) }
-    private func roleColor(_ role: String) -> Color  { RoleStyle.color(role) }
 }

@@ -47,17 +47,13 @@ extension LeagueDetailView {
 
     private func scheduleToggleButton(title: String, sf: String, selected: Bool,
                                       action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        SelectableChip(isSelected: selected, action: action) {
             HStack(spacing: 5) {
                 Image(systemName: sf).font(.system(size: 12))
                 Text(title).font(.subheadline).fontWeight(selected ? .semibold : .regular)
             }
             .foregroundStyle(selected ? .white : .secondary)
-            .padding(.horizontal, 14).padding(.vertical, 6)
-            .background(selected ? Color.accentColor : Color(.secondarySystemGroupedBackground))
-            .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - 브라켓 모드

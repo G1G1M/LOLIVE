@@ -37,7 +37,7 @@ extension LeagueDetailView {
             HStack(spacing: 8) {
                 ForEach(viewModel.historicalYears, id: \.self) { year in
                     let isSelected = year == viewModel.selectedHistoricalYear
-                    Button {
+                    SelectableChip(isSelected: isSelected) {
                         withAnimation(.easeInOut(duration: 0.15)) {
                             viewModel.selectHistoricalYear(year)
                         }
@@ -45,12 +45,7 @@ extension LeagueDetailView {
                         Text(String(year))
                             .font(.subheadline).fontWeight(isSelected ? .bold : .regular)
                             .foregroundStyle(isSelected ? .white : .secondary)
-                            .padding(.horizontal, 16).padding(.vertical, 7)
-                            .background(isSelected ? Color.accentColor
-                                        : Color(.secondarySystemGroupedBackground))
-                            .clipShape(Capsule())
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 10)

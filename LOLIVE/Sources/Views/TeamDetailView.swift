@@ -137,22 +137,31 @@ struct TeamDetailView: View {
     private var tabContent: some View {
         switch selectedTab {
         case .roster:
-            if viewModel.players.isEmpty {
+            if viewModel.isLoading && viewModel.players.isEmpty {
+                LoadingView("선수단 불러오는 중...")
+                    .frame(minHeight: 120)
+            } else if viewModel.players.isEmpty {
                 emptyState(icon: "person.3", message: "선수 정보가 없습니다")
             } else {
                 rosterCard
             }
         case .h2h:
-            if viewModel.h2hRecords.isEmpty {
+            if viewModel.isLoading && viewModel.h2hRecords.isEmpty {
+                LoadingView("상대 전적 불러오는 중...")
+                    .frame(minHeight: 120)
+            } else if viewModel.h2hRecords.isEmpty {
                 emptyState(icon: "arrow.left.arrow.right", message: "맞대결 기록이 없습니다")
             } else {
                 h2hCard
             }
         case .recent:
-            if viewModel.recentMatches.isEmpty {
+            if viewModel.isLoading && viewModel.recentMatches.isEmpty {
+                LoadingView("최근 경기 불러오는 중...")
+                    .frame(minHeight: 120)
+            } else if viewModel.recentMatches.isEmpty {
                 emptyState(icon: "calendar.badge.clock", message: "최근 경기 기록이 없습니다")
             } else {
-                recentMatchesCard
+                RecentMatchesCard(items: recentMatchItems)
             }
         }
     }
@@ -259,12 +268,7 @@ struct TeamDetailView: View {
 
             Spacer()
 
-            Text(roleLabel(player.role))
-                .font(.caption2).fontWeight(.bold)
-                .padding(.horizontal, 6).padding(.vertical, 3)
-                .background(roleColor(player.role).opacity(0.2))
-                .foregroundStyle(roleColor(player.role))
-                .clipShape(Capsule())
+            RoleBadge(role: player.role)
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
     }
@@ -306,67 +310,16 @@ struct TeamDetailView: View {
 
     // MARK: - Recent Matches Card
 
-    private var recentMatchesCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(viewModel.recentMatches.enumerated()), id: \.element.id) { idx, match in
-                let isTeamA  = match.teamA.id == team.id || match.teamA.code == team.code
-                let myScore  = isTeamA ? match.scoreA : match.scoreB
-                let oppScore = isTeamA ? match.scoreB : match.scoreA
-                let opponent = isTeamA ? match.teamB : match.teamA
-                let won      = myScore > oppScore
-
-                NavigationLink(destination: MatchDetailView(match: match)) {
-                    recentMatchRow(opponent: opponent, myScore: myScore,
-                                   oppScore: oppScore, won: won, date: match.startTime)
-                }
-                .buttonStyle(.plain)
-
-                if idx < viewModel.recentMatches.count - 1 {
-                    Divider().padding(.leading, 16)
-                }
-            }
+    private var recentMatchItems: [RecentMatchesCard.Item] {
+        viewModel.recentMatches.map { match in
+            let isTeamA  = match.teamA.id == team.id || match.teamA.code == team.code
+            let myScore  = isTeamA ? match.scoreA : match.scoreB
+            let oppScore = isTeamA ? match.scoreB : match.scoreA
+            let opponent = isTeamA ? match.teamB : match.teamA
+            return RecentMatchesCard.Item(id: match.id, match: match, opponent: opponent,
+                                           myScore: myScore, oppScore: oppScore,
+                                           won: myScore > oppScore, date: match.startTime)
         }
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    private func recentMatchRow(opponent: Team, myScore: Int, oppScore: Int,
-                                won: Bool, date: Date) -> some View {
-        HStack(spacing: 12) {
-            Text(won ? "W" : "L")
-                .font(.caption2).fontWeight(.bold)
-                .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(won ? Color.blue : Color.red)
-                .clipShape(RoundedRectangle(cornerRadius: 5))
-
-            CachedAsyncImage(url: URL(string: opponent.imageURL ?? ""))
-                .frame(width: 32, height: 32)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("vs \(opponent.name)")
-                    .font(.subheadline).fontWeight(.medium)
-                    .lineLimit(1)
-                Text(date.formatted(.dateTime
-                    .month(.abbreviated).day()
-                    .locale(Locale(identifier: "ko_KR"))))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Text("\(myScore) - \(oppScore)")
-                .font(.subheadline).fontWeight(.semibold)
-                .foregroundStyle(won ? .primary : .secondary)
-
-            Image(systemName: "chevron.right")
-                .font(.caption2).foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 16).padding(.vertical, 10)
-    }
-
-    // MARK: - Helpers
-
-    private func roleLabel(_ role: String) -> String { RoleStyle.label(role) }
-    private func roleColor(_ role: String) -> Color  { RoleStyle.color(role) }
 }

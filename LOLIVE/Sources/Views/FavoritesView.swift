@@ -134,22 +134,38 @@ struct FavoritesView: View {
 
     // MARK: - Live Filter Bar
 
+    private var liveFilterLabel: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(showLiveOnly ? Color.white : Color.red)
+                .frame(width: 6, height: 6)
+            Text("LIVE")
+        }
+        .font(.subheadline).fontWeight(.semibold)
+        .foregroundStyle(showLiveOnly ? Color.white : Color.secondary)
+    }
+
+    @ViewBuilder
     private var liveFilterBar: some View {
         HStack(spacing: 8) {
-            Button { showLiveOnly.toggle() } label: {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(showLiveOnly ? Color.white : Color.red)
-                        .frame(width: 6, height: 6)
-                    Text("LIVE")
+            if #available(iOS 26.0, *) {
+                Button { showLiveOnly.toggle() } label: {
+                    liveFilterLabel.padding(.horizontal, 14).padding(.vertical, 6)
                 }
-                .font(.subheadline).fontWeight(.semibold)
-                .padding(.horizontal, 14).padding(.vertical, 6)
-                .background(showLiveOnly ? Color.red : Color(.secondarySystemGroupedBackground))
-                .foregroundStyle(showLiveOnly ? Color.white : Color.secondary)
-                .clipShape(Capsule())
+                .buttonStyle(.plain)
+                .glassEffect(
+                    showLiveOnly ? .regular.tint(.red).interactive() : .regular.interactive(),
+                    in: Capsule()
+                )
+            } else {
+                Button { showLiveOnly.toggle() } label: {
+                    liveFilterLabel
+                        .padding(.horizontal, 14).padding(.vertical, 6)
+                        .background(showLiveOnly ? Color.red : Color(.secondarySystemGroupedBackground))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             Spacer()
         }
         .padding(.horizontal, 16)
@@ -182,11 +198,7 @@ struct FavoritesView: View {
 
             if let live = liveInfo(teamCode: fav.teamCode) {
                 VStack(alignment: .trailing, spacing: 3) {
-                    HStack(spacing: 4) {
-                        Circle().fill(Color.red).frame(width: 6, height: 6)
-                        Text("LIVE")
-                            .font(.caption).fontWeight(.bold).foregroundStyle(.red)
-                    }
+                    LiveBadge(animated: false)
                     Text(live.score)
                         .font(.caption).fontWeight(.semibold)
                     Text("Game \(live.game)")
@@ -251,32 +263,18 @@ struct FavoritesView: View {
 
             if let live = liveInfo(teamCode: fav.teamCode) {
                 VStack(alignment: .trailing, spacing: 3) {
-                    HStack(spacing: 4) {
-                        Circle().fill(Color.red).frame(width: 6, height: 6)
-                        Text("LIVE")
-                            .font(.caption).fontWeight(.bold).foregroundStyle(.red)
-                    }
+                    LiveBadge(animated: false)
                     Text(live.score)
                         .font(.caption).fontWeight(.semibold)
                     Text("Game \(live.game)")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             } else {
-                Text(roleLabel(fav.role))
-                    .font(.caption2).fontWeight(.bold)
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(roleColor(fav.role).opacity(0.2))
-                    .foregroundStyle(roleColor(fav.role))
-                    .clipShape(Capsule())
+                RoleBadge(role: fav.role)
             }
         }
         .padding(.vertical, 4)
     }
-
-    // MARK: - Helpers
-
-    private func roleLabel(_ role: String) -> String { RoleStyle.label(role) }
-    private func roleColor(_ role: String) -> Color  { RoleStyle.color(role) }
 }
 
 #Preview {
