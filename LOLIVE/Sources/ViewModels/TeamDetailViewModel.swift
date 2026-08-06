@@ -26,6 +26,11 @@ final class TeamDetailViewModel {
     var h2hRecords: [H2HRecord] = []
     var isLoading = true
     var loadFailed = false
+    /// 백필된 과거 기록 경기(oe_/lp_ 접두사 ID)에서 진입한 경우 — 이 팀/리그 ID는 Riot 실시간
+    /// API가 모르는 합성 ID라 조회를 시도해도 항상 빈 결과만 온다(실측 확인: roster=0, schedule=0).
+    /// "리그 상세 → 기록 탭 → 과거 경기 → 팀 로고 탭"으로 들어왔을 때만 발생 — Today 탭은 항상
+    /// 실시간 경기만 다뤄서 이 문제가 없었다. 헛 API 호출 없이 바로 안내 상태로 전환한다.
+    var isBackfilledData = false
 
     /// 최근 완료 경기에 실제로 출전한 선수(정규화된 소환사명) — 포지션당 여러 명이 등록돼
     /// 있는 로스터에서 "지금 실제로 뛰는 선수"를 구분하는 용도. Riot의 getTeams 응답 자체엔
@@ -60,7 +65,19 @@ final class TeamDetailViewModel {
         crossLeagueMatches = matches
     }
 
+    /// 과거 시즌 백필 데이터(oe.datalisk.io/Leaguepedia 경유)로 생성된 팀/리그 ID인지 판별.
+    /// MatchDetailViewModel.isBackfilledMatchId와 동일한 접두사 규칙.
+    nonisolated static func isBackfilledId(_ id: String) -> Bool {
+        id.hasPrefix("oe_") || id.hasPrefix("lp_")
+    }
+
     func load() async {
+        if Self.isBackfilledId(team.id) || Self.isBackfilledId(league.id) {
+            isBackfilledData = true
+            isLoading = false
+            return
+        }
+
         let hadCache = preloadFromCache()
         isLoading = !hadCache
         loadFailed = false
