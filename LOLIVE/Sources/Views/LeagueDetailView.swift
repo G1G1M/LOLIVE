@@ -38,6 +38,7 @@ struct LeagueDetailView: View {
                     tabBar
                     Divider()
                     tabContent
+                        .animation(.easeInOut(duration: 0.15), value: viewModel.selectedTab)
                 }
             }
         }
@@ -65,7 +66,7 @@ struct LeagueDetailView: View {
         HStack(spacing: 0) {
             ForEach(LeagueDetailViewModel.Tab.allCases, id: \.self) { tab in
                 Button {
-                    viewModel.selectedTab = tab
+                    withAnimation(.easeInOut(duration: 0.2)) { viewModel.selectedTab = tab }
                 } label: {
                     VStack(spacing: 0) {
                         Text(tab.title)

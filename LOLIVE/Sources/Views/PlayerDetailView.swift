@@ -191,16 +191,9 @@ struct PlayerDetailView: View {
     // MARK: - No Data
 
     private var noDataCard: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "chart.bar.xaxis")
-                .foregroundStyle(.secondary)
-            Text("통계 데이터가 없습니다")
-                .font(.subheadline).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        EmptyStateView("통계 데이터가 없습니다", icon: "chart.bar.xaxis")
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Helpers

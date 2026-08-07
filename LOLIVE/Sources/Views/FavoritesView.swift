@@ -114,7 +114,7 @@ struct FavoritesView: View {
         .navigationTitle("즐겨찾기")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("닫기") { dismiss() }
             }
             if hasFavorites {

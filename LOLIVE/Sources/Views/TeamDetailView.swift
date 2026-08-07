@@ -59,7 +59,7 @@ struct TeamDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { toggleFavorite() } label: {
                     Image(systemName: isFavorited ? "star.fill" : "star")
-                        .foregroundStyle(isFavorited ? .yellow : .primary)
+                        .foregroundStyle(isFavorited ? .yellow : .secondary)
                 }
             }
         }
@@ -141,7 +141,7 @@ struct TeamDetailView: View {
                 LoadingView("선수단 불러오는 중...")
                     .frame(minHeight: 120)
             } else if viewModel.players.isEmpty {
-                emptyState(icon: "person.3", message: "선수 정보가 없습니다")
+                EmptyStateView("선수 정보가 없습니다", icon: "person.3")
             } else {
                 rosterCard
             }
@@ -150,7 +150,7 @@ struct TeamDetailView: View {
                 LoadingView("상대 전적 불러오는 중...")
                     .frame(minHeight: 120)
             } else if viewModel.h2hRecords.isEmpty {
-                emptyState(icon: "arrow.left.arrow.right", message: "맞대결 기록이 없습니다")
+                EmptyStateView("맞대결 기록이 없습니다", icon: "arrow.left.arrow.right")
             } else {
                 h2hCard
             }
@@ -159,23 +159,11 @@ struct TeamDetailView: View {
                 LoadingView("최근 경기 불러오는 중...")
                     .frame(minHeight: 120)
             } else if viewModel.recentMatches.isEmpty {
-                emptyState(icon: "calendar.badge.clock", message: "최근 경기 기록이 없습니다")
+                EmptyStateView("최근 경기 기록이 없습니다", icon: "calendar.badge.clock")
             } else {
                 RecentMatchesCard(items: recentMatchItems)
             }
         }
-    }
-
-    private func emptyState(icon: String, message: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 32))
-                .foregroundStyle(.secondary)
-            Text(message)
-                .font(.subheadline).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
     }
 
     // MARK: - Error
@@ -313,7 +301,7 @@ struct TeamDetailView: View {
             ForEach(viewModel.h2hRecords) { record in
                 HStack(spacing: 12) {
                     CachedAsyncImage(url: URL(string: record.opponent.imageURL ?? ""))
-                        .frame(width: 32, height: 32)
+                        .frame(width: 36, height: 36)
 
                     Text(record.opponent.name)
                         .font(.subheadline)
@@ -333,7 +321,7 @@ struct TeamDetailView: View {
                 .padding(.horizontal, 16).padding(.vertical, 10)
 
                 if record.id != viewModel.h2hRecords.last?.id {
-                    Divider().padding(.leading, 56)
+                    Divider().padding(.leading, 64)
                 }
             }
         }

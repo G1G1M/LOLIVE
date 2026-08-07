@@ -51,7 +51,7 @@ struct LeaguePlayerDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { toggleFavorite() } label: {
                     Image(systemName: isFavorited ? "star.fill" : "star")
-                        .foregroundStyle(isFavorited ? .yellow : .primary)
+                        .foregroundStyle(isFavorited ? .yellow : .secondary)
                 }
             }
         }

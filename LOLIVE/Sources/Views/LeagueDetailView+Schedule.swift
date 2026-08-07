@@ -110,9 +110,9 @@ extension LeagueDetailView {
                 )
             }
             .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 0.5)
             )
         }

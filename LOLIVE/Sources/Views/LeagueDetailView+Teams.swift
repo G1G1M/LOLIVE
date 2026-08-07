@@ -138,7 +138,7 @@ extension LeagueDetailView {
     private func playerRow(_ player: Player) -> some View {
         NavigationLink(value: player) {
             HStack(spacing: 12) {
-                PlayerAvatarView(imageURL: player.imageURL, size: 44)
+                PlayerAvatarView(imageURL: player.imageURL, size: 40)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(player.summonerName)

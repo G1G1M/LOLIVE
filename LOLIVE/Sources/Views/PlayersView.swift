@@ -156,7 +156,7 @@ struct PlayersView: View {
 
     private func playerRow(_ entry: PlayersViewModel.PlayerEntry) -> some View {
         HStack(spacing: 12) {
-            PlayerAvatarView(imageURL: entry.player.imageURL, size: 44)
+            PlayerAvatarView(imageURL: entry.player.imageURL, size: 40)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.player.summonerName)
@@ -184,14 +184,10 @@ struct PlayersView: View {
     }
 
     private var emptyState: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "person.slash")
-                .foregroundStyle(.secondary)
-            Text(viewModel.allPlayers.isEmpty ? "선수 데이터가 없습니다" : "검색 결과가 없습니다")
-                .font(.subheadline).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        EmptyStateView(
+            viewModel.allPlayers.isEmpty ? "선수 데이터가 없습니다" : "검색 결과가 없습니다",
+            icon: "person.slash"
+        )
     }
 }
 

@@ -57,7 +57,7 @@ private struct RecentMatchRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 5))
 
             CachedAsyncImage(url: URL(string: opponent.imageURL ?? ""))
-                .frame(width: 32, height: 32)
+                .frame(width: 36, height: 36)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("vs \(opponent.name)")

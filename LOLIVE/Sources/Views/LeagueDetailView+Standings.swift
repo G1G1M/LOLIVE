@@ -106,10 +106,10 @@ extension LeagueDetailView {
 
                 HStack(spacing: 10) {
                     CachedAsyncImage(url: URL(string: standing.team.imageURL ?? ""))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 36, height: 36)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(standing.team.name)
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.subheadline).fontWeight(.semibold)
                             .lineLimit(1)
                         Text(standing.team.code)
                             .font(.system(size: 11))
@@ -147,7 +147,7 @@ extension LeagueDetailView {
                     .frame(width: 46, alignment: .trailing)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 11)
+            .padding(.vertical, 10)
         }
         .buttonStyle(.plain)
     }

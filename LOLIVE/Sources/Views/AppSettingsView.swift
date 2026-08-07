@@ -154,7 +154,7 @@ struct AppSettingsView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("앱 설정")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -173,7 +173,7 @@ struct LegalTextView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
