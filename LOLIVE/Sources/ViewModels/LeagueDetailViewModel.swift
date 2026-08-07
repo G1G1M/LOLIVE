@@ -43,6 +43,13 @@ final class LeagueDetailViewModel {
     var historicalMatches: [Match] = []
     var isLoadingHistoricalYears = false
     var isLoadingHistoricalMatches = false
+    /// "로딩 시작 전(false)"과 "로딩 끝났는데 데이터가 진짜 없음(true, historicalYears 비어있음)"을
+    /// 구분하기 위한 플래그. 없으면 탭 진입 첫 프레임에 `isLoadingHistoricalYears`가 아직 false라
+    /// "기록 없음" 빈 화면이 잠깐 떴다가 로딩 스피너로, 다시 실제 목록으로 바뀌는 3단 점프가 발생함
+    /// (겹쳐 보이면 위→아래로 화면이 미끄러지는 것처럼 보인다는 피드백으로 발견).
+    var hasAttemptedHistoricalLoad = false
+    /// 선택된 연도 안에서 라운드(플레이오프/그룹 스테이지 등)로 좁혀 볼 수 있게 — nil이면 전체.
+    var selectedHistoricalRound: String? = nil
 
     var standingGroups: [(name: String, standings: [Standing])] {
         var seen = Set<String>()
@@ -206,6 +213,7 @@ final class LeagueDetailViewModel {
     /// 과거 시즌이 존재하는 연도 목록을 서버(Firestore 백필 데이터)에서 조회.
     /// Leaguepedia를 직접 호출하지 않는다 — 백필이 안 된 리그는 빈 목록으로 온다.
     func loadHistoricalYears() async {
+        hasAttemptedHistoricalLoad = true
         guard historicalYears.isEmpty,
               let leagueName = LeaguepediaService.shared.leaguepediaName(for: league)
         else { return }
@@ -225,7 +233,12 @@ final class LeagueDetailViewModel {
         guard selectedHistoricalYear != year else { return }
         selectedHistoricalYear = year
         historicalMatches = []
+        selectedHistoricalRound = nil
         Task { await loadHistoricalMatches(year: year) }
+    }
+
+    var availableHistoricalRounds: [Match.RoundGroup] {
+        Match.roundGroups(from: historicalMatches)
     }
 
     private func loadHistoricalMatches(year: Int) async {

@@ -25,10 +25,7 @@ final class TournamentDetailViewModel {
     var selectedRound: String? = nil
     var allMatches: [Match] = []
     var isLoading = false
-    var isLoadingHistoricalMatches = false  // 과거 연도 탭 선택 시 경기 로딩 표시
     var loadFailed = false
-
-    private var historicalYearSet: Set<Int> = []  // Leaguepedia에 존재하는 연도 집합
 
     // MARK: - Computed: Tournament
 
@@ -77,9 +74,8 @@ final class TournamentDetailViewModel {
 
     // MARK: - Computed: Rounds (결승 → 8강 → 플레이인 순서)
 
-    var availableRounds: [String] {
-        let names = Array(Set(tournamentMatches.compactMap { $0.blockName }))
-        return names.sorted { roundOrder($0) > roundOrder($1) }   // 내림차순: 결승 먼저
+    var availableRounds: [Match.RoundGroup] {
+        Match.roundGroups(from: tournamentMatches)
     }
 
     // MARK: - Computed: 날짜별 그룹 (최신 날짜 먼저)
@@ -87,8 +83,8 @@ final class TournamentDetailViewModel {
     var selectedRoundDateGroups: [DateGroup] {
         // round 없으면 전체 경기 표시 (blockName 없는 과거 데이터 대응)
         let matches: [Match]
-        if let round = selectedRound {
-            matches = tournamentMatches.filter { $0.blockName == round }
+        if let round = selectedRound, let group = availableRounds.first(where: { $0.label == round }) {
+            matches = group.matches
         } else {
             matches = tournamentMatches
         }
@@ -109,7 +105,6 @@ final class TournamentDetailViewModel {
 
     private let league: League
     private let service: RiotEsportsServiceProtocol
-    private var historicalLoadTask: Task<Void, Never>?
 
     init(league: League, service: RiotEsportsServiceProtocol = RiotEsportsService()) {
         self.league = league
@@ -142,7 +137,7 @@ final class TournamentDetailViewModel {
 
         let defaultT = activeTournament(from: fetched) ?? tournaments.first
         if let t = defaultT { selectedTournamentId = t.id }
-        selectedRound = availableRounds.first
+        selectedRound = availableRounds.first?.label
         isLoading = false  // Riot API 데이터로 즉시 화면 표시
 
         // 현재 토너먼트 완료 경기 백그라운드 프리로드
@@ -150,24 +145,46 @@ final class TournamentDetailViewModel {
             MatchDetailViewModel.preload(match: match)
         }
 
-        // Phase 2: Leaguepedia에서 연도 목록만 가져와 탭 즉시 추가 (경기 데이터 제외)
+        // Phase 2: 서버에 미리 백필된 과거 시즌 데이터로 보완 — LeagueDetailView+History(일반 리그
+        // "기록" 탭)와 동일한 getHistoricalYears/getHistoricalMatches Callable 사용. Leaguepedia를
+        // 실시간으로 직접 호출하지 않으므로 레이트리밋(분당 1회 추정) 없이 연도 전체를 한 번에
+        // 병렬로 가져올 수 있다 — 예전엔 Leaguepedia 실시간 호출 + 연도 하나씩 탭을 눌러야만
+        // lazy load되는 구조라 Worlds/MSI처럼 연도가 많은 대회에서 느리거나 레이트리밋에 걸렸음.
+        guard let leagueName = LeaguepediaService.shared.leaguepediaName(for: league) else { return }
+        let backfilledYears = await FirebaseHistoricalService.fetchYears(leagueName: leagueName)
+        guard !backfilledYears.isEmpty else { return }
+
         let riotYearCounts = Dictionary(
             grouping: riotMatches,
             by: { Calendar.current.component(.year, from: $0.startTime) }
         ).mapValues { $0.count }
         let fullyRiotYears = Set(riotYearCounts.filter { $0.value >= 20 }.keys)
+        // Riot API가 완전히 커버하는 연도는 제외, 그 외(전혀 없거나 일부만 있는 연도)는 전부 보완
+        let neededYears = Set(backfilledYears).subtracting(fullyRiotYears)
+        guard !neededYears.isEmpty else { return }
 
-        let lpYears = await LeaguepediaService.shared.historicalYears(for: league)
-        guard !lpYears.isEmpty else { return }
+        let fetchedByYear: [[Match]] = await withTaskGroup(of: [Match].self) { group in
+            for year in neededYears {
+                group.addTask { await FirebaseHistoricalService.fetchMatches(leagueName: leagueName, year: year) }
+            }
+            var results: [[Match]] = []
+            for await matches in group { results.append(matches) }
+            return results
+        }
+        for serverMatches in fetchedByYear {
+            let unique = deduplicateAgainstRiot(serverMatches, riotMatches: riotMatches)
+            if !unique.isEmpty { allMatches.append(contentsOf: unique) }
+        }
 
-        // Riot API가 완전히 커버하지 않는 연도만 탭 추가
+        // Riot API 토너먼트 항목이 아예 없는 연도만 synthetic 탭으로 보완(있는 연도는 실제
+        // API 토너먼트 탭에 위에서 병합한 경기가 그대로 합쳐짐)
         let existingYears = Set(tournaments.compactMap { t -> Int? in
             if t.id.hasPrefix("synthetic_") {
                 return Int(t.id.replacingOccurrences(of: "synthetic_", with: ""))
             }
             return Int(String(t.startDate.prefix(4)))
         })
-        let newYears = Set(lpYears).subtracting(fullyRiotYears).subtracting(existingYears)
+        let newYears = neededYears.subtracting(existingYears)
         if !newYears.isEmpty {
             let synthetics = newYears.map { year in
                 Tournament(id: "synthetic_\(year)", slug: "synthetic_\(year)",
@@ -175,53 +192,11 @@ final class TournamentDetailViewModel {
             }
             tournaments = (tournaments + synthetics).sorted { $0.startDate > $1.startDate }
         }
-        historicalYearSet = Set(lpYears).subtracting(fullyRiotYears)
-
-        // Phase 2b: 캐시된 과거 경기 데이터 즉시 로드 (재진입 시 데이터 유지)
-        for year in historicalYearSet {
-            let cached = await LeaguepediaService.shared.fetchMatchesFromCacheOnly(for: league, year: year)
-            guard !cached.isEmpty else { continue }
-            let unique = deduplicateAgainstRiot(cached, riotMatches: riotMatches)
-            if !unique.isEmpty { allMatches.append(contentsOf: unique) }
-        }
-
-        // Phase 3: Riot API에 경기가 일부만 있는 연도 보완 (예: MSI 2023)
-        let partialYears = Set(riotYearCounts.filter { $0.value > 0 && $0.value < 20 }.keys)
-            .intersection(Set(lpYears))
-        for year in partialYears {
-            let lpMatches = await LeaguepediaService.shared.fetchMatches(for: league, year: year)
-            guard !lpMatches.isEmpty else { continue }
-            let unique = deduplicateAgainstRiot(lpMatches, riotMatches: riotMatches)
-            if !unique.isEmpty { allMatches.append(contentsOf: unique) }
-        }
     }
 
     func selectTournament(_ tournament: Tournament) {
         selectedTournamentId = tournament.id
-        selectedRound = availableRounds.first
-
-        // 과거 연도 탭 선택 시 해당 연도 경기 데이터 lazy load
-        guard tournament.id.hasPrefix("synthetic_"),
-              let year = Int(tournament.id.replacingOccurrences(of: "synthetic_", with: "")),
-              historicalYearSet.contains(year),
-              !allMatches.contains(where: {
-                  Calendar.current.component(.year, from: $0.startTime) == year
-              })
-        else { return }
-        historicalLoadTask?.cancel()
-        isLoadingHistoricalMatches = true
-        historicalLoadTask = Task { await loadHistoricalYear(year) }
-    }
-
-    private func loadHistoricalYear(_ year: Int) async {
-        let matches = await LeaguepediaService.shared.fetchMatches(for: league, year: year)
-        guard !matches.isEmpty else {
-            isLoadingHistoricalMatches = false
-            return
-        }
-        allMatches.append(contentsOf: matches)
-        selectedRound = availableRounds.first
-        isLoadingHistoricalMatches = false
+        selectedRound = availableRounds.first?.label
     }
 
     private func deduplicateAgainstRiot(_ lpMatches: [Match], riotMatches: [Match]) -> [Match] {
@@ -290,32 +265,5 @@ final class TournamentDetailViewModel {
         guard let end = fmt.date(from: tournament.endDate) else { return [] }
         let endExtended = Calendar.current.date(byAdding: .day, value: 1, to: end) ?? end
         return matches.filter { $0.startTime >= start && $0.startTime < endExtended }
-    }
-
-    private func roundOrder(_ name: String) -> Int {
-        let s = name.lowercased()
-        // 한국어
-        if s.contains("플레이-인") || s.contains("플레이인")            { return 0 }
-        if s.contains("스위스") || s.contains("그룹 스테이지")           { return 10 }
-        if s.contains("그룹")                                          { return 11 }
-        if s == "16강"                                                  { return 20 }
-        if s == "8강"                                                   { return 21 }
-        if s == "4강"                                                   { return 22 }
-        if s.contains("그랜드 파이널")                                   { return 24 }
-        if s.contains("결승")                                          { return 23 }
-        // 영어
-        if s.contains("play-in") || s.contains("playin")              { return 0 }
-        if s.contains("swiss") || s.contains("group stage")           { return 10 }
-        if s.contains("group")                                         { return 11 }
-        if s.contains("week") || s.hasPrefix("day")                    { return 12 }
-        if s.contains("round of 16")                                   { return 20 }
-        if s.contains("round of 8") || s.contains("quarter")           { return 21 }
-        if s.contains("semi")                                          { return 22 }
-        if s.contains("grand final")                                   { return 24 }
-        if s.contains("final")                                         { return 23 }
-        if s.contains("playoff") || s.contains("knockout") ||
-           s.contains("bracket stage") || s.contains("elimination")    { return 19 }
-        if s.contains("bracket")                                       { return 20 }
-        return 15
     }
 }

@@ -36,9 +36,9 @@
 ## 주요 기능
 
 ### 대회 상세 (Worlds / MSI)
-- 연도별 탭으로 과거~현재 전체 대회 기록 조회 (Riot API 2023년 이후 + Leaguepedia 과거 데이터 병합)
-- 라운드(플레이-인 / 그룹 / 8강 / 4강 / 결승 등) 칩 선택 → 날짜별 경기 목록
-- 팀 로고 배치 조회, 재진입 시 캐시된 과거 데이터 자동 복원
+- 연도별 탭으로 과거~현재 전체 대회 기록 조회 (Riot API 최신 데이터 + 서버(Firestore) 백필 데이터 병합)
+- 라운드(플레이-인 / 그룹 / 8강 / 4강 / 결승 등) 칩 선택 → 날짜별 경기 목록, 언어(한/영)가 달라도 같은 라운드는 자동으로 하나로 묶임
+- 리그 상세 "기록" 탭과 동일한 서버 경로라 레이트리밋 없이 연도 전체를 한 번에 빠르게 조회
 
 ### Today
 - FotMob 스타일 날짜 선택 스트립 + 선택 날짜 기준 리그별 경기 목록
@@ -52,7 +52,7 @@
 
 ### 리그 상세
 - 탭 기반 레이아웃 (순위 / 일정 / 팀 / 선수 / 기록)
-- 기록 탭: 서버(Firestore) 백필 데이터로 과거 시즌 조회 — 정규 리그(LCK/LPL/LEC 등)까지 지원
+- 기록 탭: 서버(Firestore) 백필 데이터로 과거 시즌 조회 — 정규 리그(LCK/LPL/LEC 등)까지 지원, 연도 + 라운드 필터
 
 ### Players
 - 전 세계 선수 통합 목록, 포지션/리그 필터, 이름 검색
@@ -138,7 +138,7 @@ lolive-firebase/         — Firebase 백엔드 (Cloud Functions + Firestore)
 
 ## 테스트
 
-`LOLIVETests` 타겟, Swift Testing 프레임워크. 44개 케이스 (핵심 ViewModel 로직 + 순수 함수).
+`LOLIVETests` 타겟, Swift Testing 프레임워크. 45개 케이스 (핵심 ViewModel 로직 + 순수 함수).
 
 ```bash
 xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests
@@ -148,5 +148,5 @@ xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기
 
 `.github/workflows/ci.yml` — GitHub Actions, `main` push/PR마다 자동 실행.
 
-1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 44개 실행
+1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 45개 실행
 2. `LOLIVEWidgetsExtension` 별도 빌드 (컴파일 체크만)

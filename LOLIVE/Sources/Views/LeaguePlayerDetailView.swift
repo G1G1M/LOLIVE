@@ -41,8 +41,11 @@ struct LeaguePlayerDetailView: View {
                 ScrollView {
                     tabContent
                         .padding(16)
-                        .animation(.easeInOut(duration: 0.15), value: selectedTab)
                 }
+                // "챔피언풀"/"통계" 탭은 데이터가 늦게 도착해 로딩→콘텐츠로 크기가 크게 바뀌는데,
+                // 탭 전환에 크로스페이드를 걸면 그 크기 변화까지 같이 묶여 어색해 보임(LeagueDetailView와
+                // 동일 원인) — 애니메이션을 꺼서 즉시 전환되도록 통일
+                .transaction(value: selectedTab) { $0.disablesAnimations = true }
             }
         }
         .navigationTitle(player.summonerName)
@@ -100,7 +103,7 @@ struct LeaguePlayerDetailView: View {
         HStack(spacing: 0) {
             ForEach(PlayerTab.allCases, id: \.self) { tab in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { selectedTab = tab }
+                    selectedTab = tab
                 } label: {
                     VStack(spacing: 0) {
                         Text(tab.rawValue)

@@ -93,16 +93,20 @@ struct StandingsView: View {
 
     // MARK: - Standings Body
 
-    @ViewBuilder
     private var standingsBody: some View {
-        if viewModel.isLoadingStandings {
-            LoadingView("순위 불러오는 중...")
-                .frame(minHeight: 120)
-        } else if viewModel.standings.isEmpty {
-            EmptyStateView("순위 데이터가 없습니다")
-        } else {
-            standingsTable
+        Group {
+            if viewModel.isLoadingStandings {
+                LoadingView("순위 불러오는 중...")
+                    .frame(minHeight: 120)
+            } else if viewModel.standings.isEmpty {
+                EmptyStateView("순위 데이터가 없습니다")
+            } else {
+                standingsTable
+            }
         }
+        // 리그 칩을 바꿀 때마다 isLoadingStandings가 토글되는데 애니메이션이 없어 로딩↔순위표가
+        // 매번 "툭" 끊기듯 바뀌었음 — 부드러운 크로스페이드로 전환
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isLoadingStandings)
     }
 
     // MARK: - Table

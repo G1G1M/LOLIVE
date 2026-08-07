@@ -33,8 +33,6 @@ struct TournamentDetailView: View {
 
                     if !viewModel.hasTournamentStarted {
                         notStartedView
-                    } else if viewModel.isLoadingHistoricalMatches {
-                        LoadingView("경기 기록 불러오는 중...")
                     } else if viewModel.selectedRoundDateGroups.isEmpty && viewModel.tournamentMatches.isEmpty {
                         EmptyStateView("경기 데이터가 없습니다")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -86,18 +84,17 @@ struct TournamentDetailView: View {
     private var roundSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(viewModel.availableRounds, id: \.self) { round in
-                    let isSelected = round == viewModel.selectedRound
-                    let count = viewModel.tournamentMatches.filter { $0.blockName == round }.count
+                ForEach(viewModel.availableRounds) { round in
+                    let isSelected = round.label == viewModel.selectedRound
                     SelectableChip(isSelected: isSelected) {
                         withAnimation(.easeInOut(duration: 0.15)) {
-                            viewModel.selectedRound = round
+                            viewModel.selectedRound = round.label
                         }
                     } label: {
                         HStack(spacing: 5) {
-                            Text(round)
+                            Text(round.label)
                                 .font(.subheadline).fontWeight(isSelected ? .semibold : .regular)
-                            Text("\(count)")
+                            Text("\(round.matches.count)")
                                 .font(.caption2).fontWeight(.medium)
                                 .padding(.horizontal, 5).padding(.vertical, 2)
                                 .background(isSelected ? Color.white.opacity(0.25)

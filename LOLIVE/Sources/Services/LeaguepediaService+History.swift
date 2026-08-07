@@ -5,15 +5,13 @@
 //  Worlds / MSI 등 과거 대회 및 리그 히스토리 경기 데이터를 담당하는 Extension.
 //
 //  [설계 원칙]
-//  - Riot API는 ~1년 이내 경기만 제공 → 그 이전 데이터는 Leaguepedia MatchSchedule 테이블 사용
-//  - 완료된 경기 데이터는 변경 가능성이 낮으므로 30일 TTL 캐싱 (시즌 스탯의 24시간보다 길게)
-//  - 연도 탭은 1회 API 호출로 전체 목록을 가져오고, 경기 데이터는 탭 선택 시 on-demand 로드
-//
-//  [호출 흐름]
-//  HistoricalMatchesViewModel.load()
-//    → historicalYears()        ← 연도 탭 즉시 표시
-//    → fetchMatchesFromCacheOnly()  ← 캐시 히트 시 즉시 표시
-//    → fetchMatches()           ← 탭 선택 시 API 호출
+//  - Riot API는 ~1년 이내 경기만 제공 → 그 이전 데이터는 서버(Firestore, 백필된 Leaguepedia
+//    데이터)의 getHistoricalYears/getHistoricalMatches Callable로 조회한다(FirebaseHistoricalService).
+//    이 파일은 더 이상 연도별 과거 경기 목록을 직접 Leaguepedia에서 실시간 조회하지 않는다 —
+//    예전엔 여기서 직접 했었지만(historicalYears/fetchMatches(for:year:) 등), 레이트리밋 때문에
+//    Worlds/MSI처럼 연도가 많은 대회에서 느리거나 자주 막혀서 서버 경로로 전환함(2026-08-07).
+//  - 이 파일에 남은 건 서버가 못 채워주는 "진행 중인 대회의 실시간 결과 보완"(케스파컵 등,
+//    아래 fetchLiveTournamentResults/reconcileResults/reconcileStuckLiveMatch)뿐이다.
 //
 
 import Foundation
@@ -22,80 +20,6 @@ import os
 private let reconcileLPLogger = Logger(subsystem: "com.lolive", category: "Reconcile")
 
 extension LeaguepediaService {
-
-    // MARK: - 연도 목록
-
-    /// 해당 리그의 경기가 있는 연도 목록을 내림차순으로 반환.
-    /// Leaguepedia에 해당 리그 Tournaments 테이블을 1회 조회하고 캐싱한다.
-    func historicalYears(for league: League) async -> [Int] {
-        guard let leagueName = leaguepediaName(for: league) else { return [] }
-        let pages = await cachedOrFetchPages(leagueName: leagueName)
-        return Array(Set(pages.map { $0.year })).sorted(by: >)
-    }
-
-    // MARK: - 캐시 전용 조회 (빠른 첫 화면용)
-
-    /// 디스크 캐시에 있는 연도 경기만 반환 (API 호출 없음).
-    /// HistoricalMatchesViewModel 초기 진입 시 이미 캐시된 경기를 즉시 표시하는 데 사용.
-    func fetchMatchesFromCacheOnly(for league: League, year: Int) async -> [Match] {
-        guard let leagueName = leaguepediaName(for: league) else { return [] }
-        let allPages = await cachedOrFetchPages(leagueName: leagueName)
-        let yearPages = allPages.filter { $0.year == year }
-        var all: [Match] = []
-        for entry in yearPages {
-            let cacheKey = histCacheKey(leagueName: leagueName, page: entry.page)
-            if let cached = await LeaguepediaCache.shared.cachedHistoricalMatches(key: cacheKey) {
-                all.append(contentsOf: cached)
-            }
-        }
-        return deduplicated(all)
-    }
-
-    // MARK: - 연도별 경기 로드
-
-    /// 특정 연도의 모든 경기를 반환 (캐시 미스 시 API 호출).
-    /// 같은 연도에 여러 OverviewPage(예: 플레이오프 + 정규 시즌)가 있으면 전부 합쳐서 반환.
-    func fetchMatches(for league: League, year: Int) async -> [Match] {
-        guard let leagueName = leaguepediaName(for: league) else { return [] }
-        let allPages = await cachedOrFetchPages(leagueName: leagueName)
-        let yearPages = allPages.filter { $0.year == year }
-        guard !yearPages.isEmpty else { return [] }
-
-        var all: [Match] = []
-        for entry in yearPages {
-            let cacheKey = histCacheKey(leagueName: leagueName, page: entry.page)
-            if let cached = await LeaguepediaCache.shared.cachedHistoricalMatches(key: cacheKey) {
-                all.append(contentsOf: cached)
-            } else {
-                let matches = await matchesForOverviewPage(entry.page, league: league)
-                await LeaguepediaCache.shared.setHistoricalMatches(matches, key: cacheKey)
-                all.append(contentsOf: matches)
-            }
-        }
-        return deduplicated(all)
-    }
-
-    // MARK: - 전체 과거 경기 로드
-
-    /// 모든 연도의 경기를 한꺼번에 로드.
-    /// - Parameter excludingYears: 이미 다른 경로에서 로드된 연도를 제외해 중복 요청을 방지.
-    func fetchAllHistoricalMatches(for league: League, excludingYears: Set<Int> = []) async -> [Match] {
-        guard let leagueName = leaguepediaName(for: league) else { return [] }
-        let pages = await cachedOrFetchPages(leagueName: leagueName)
-
-        var all: [Match] = []
-        for entry in pages where !excludingYears.contains(entry.year) {
-            let cacheKey = histCacheKey(leagueName: leagueName, page: entry.page)
-            if let cached = await LeaguepediaCache.shared.cachedHistoricalMatches(key: cacheKey) {
-                all.append(contentsOf: cached)
-            } else {
-                let matches = await matchesForOverviewPage(entry.page, league: league)
-                await LeaguepediaCache.shared.setHistoricalMatches(matches, key: cacheKey)
-                all.append(contentsOf: matches)
-            }
-        }
-        return all
-    }
 
     // MARK: - Riot 미보고 결과 보완 (케스파컵 등)
 
@@ -420,15 +344,6 @@ extension LeaguepediaService {
     }
 
     // MARK: - 유틸리티
-
-    /// histCacheKey: 리그명 + OverviewPage를 조합해 디스크 캐시 키 생성.
-    /// 경로 구분자(/,  )를 _로 치환해 파일명에 사용 가능한 형태로 만든다.
-    private func histCacheKey(leagueName: String, page: String) -> String {
-        let safePage = page
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: " ", with: "_")
-        return "histv2_\(leagueName)_\(safePage)"
-    }
 
     /// 중복 Match 제거 (동일 id 유지, 첫 번째 등장 우선).
     func deduplicated(_ matches: [Match]) -> [Match] {

@@ -150,13 +150,15 @@ final class TeamDetailViewModel {
         }
 
         applyMatches(teamMatches)
-        loadRosterFromHistoricalMatch()
+        await loadRosterFromHistoricalMatch()
     }
 
     /// 가장 최근(연도 내 마지막 게임 번호) 백필 경기의 실제 출전 명단으로 선수단을 채운다.
     /// 백필 데이터는 "그 경기에 실제로 뛴 5명"이 확정값이라 현재 라이브 로스터처럼 주전/후보를
-    /// 역산할 필요가 없다.
-    private func loadRosterFromHistoricalMatch() {
+    /// 역산할 필요가 없다. 백필 소스(Match.games)엔 선수 이미지 URL이 없어서, Leaguepedia에서
+    /// 별도로 조회한다 — 로스터가 그 경기 시점 이후로 안 바뀌는 한 이미지도 그대로라 7일 디스크
+    /// 캐시가 재진입마다 그대로 재사용됨(선수당 최초 1회만 실제 네트워크 요청).
+    private func loadRosterFromHistoricalMatch() async {
         guard let lastMatch = recentMatches.first,
               let games = lastMatch.games,
               let lastGame = games.max(by: { $0.number < $1.number })
@@ -164,9 +166,28 @@ final class TeamDetailViewModel {
 
         let myPlayers = lastGame.blueTeamId == team.id ? lastGame.bluePlayers : lastGame.redPlayers
         guard !myPlayers.isEmpty else { return }
-        players = myPlayers.map {
+
+        let basePlayers = myPlayers.map {
             Player(id: "\($0.participantId)", summonerName: $0.summonerName, firstName: nil, lastName: nil,
                    role: $0.role, imageURL: nil, teamId: team.id, teamCode: team.code)
+        }
+
+        let leaguepedia = LeaguepediaService.shared
+        let imageURLs: [Int: URL] = await withTaskGroup(of: (Int, URL?).self) { group in
+            for (idx, player) in basePlayers.enumerated() {
+                group.addTask { (idx, await leaguepedia.fetchPlayerImageURL(summonerName: player.summonerName)) }
+            }
+            var results: [Int: URL] = [:]
+            for await (idx, url) in group where url != nil {
+                results[idx] = url
+            }
+            return results
+        }
+
+        players = basePlayers.enumerated().map { idx, player in
+            Player(id: player.id, summonerName: player.summonerName, firstName: player.firstName,
+                   lastName: player.lastName, role: player.role,
+                   imageURL: imageURLs[idx]?.absoluteString, teamId: player.teamId, teamCode: player.teamCode)
         }.sorted { roleOrder($0.role) < roleOrder($1.role) }
     }
 

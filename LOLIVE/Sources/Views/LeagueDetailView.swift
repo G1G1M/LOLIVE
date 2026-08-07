@@ -38,8 +38,12 @@ struct LeagueDetailView: View {
                     tabBar
                     Divider()
                     tabContent
-                        .animation(.easeInOut(duration: 0.15), value: viewModel.selectedTab)
                 }
+                // "기록" 탭처럼 진입 시마다 로딩→콘텐츠로 크기가 크게 바뀌는 탭이 섞여있으면,
+                // 탭 전환에 크로스페이드를 걸었을 때 그 크기 변화까지 같이 묶여 밑줄/콘텐츠가
+                // 위에서 아래로 나오는 것처럼 어색하게 보임 — 하단 메인 탭바와 동일한 이유로
+                // 애니메이션을 꺼서 즉시 전환되도록 통일 (ContentView.swift 참고)
+                .transaction(value: viewModel.selectedTab) { $0.disablesAnimations = true }
             }
         }
         .navigationTitle(league.name)
@@ -66,7 +70,7 @@ struct LeagueDetailView: View {
         HStack(spacing: 0) {
             ForEach(LeagueDetailViewModel.Tab.allCases, id: \.self) { tab in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { viewModel.selectedTab = tab }
+                    viewModel.selectedTab = tab
                 } label: {
                     VStack(spacing: 0) {
                         Text(tab.title)
