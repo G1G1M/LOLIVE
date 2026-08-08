@@ -324,7 +324,7 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
             }
         }
         standings = standings.sorted {
-            if $0.group != $1.group { return ($0.group ?? "") < ($1.group ?? "") }
+            if $0.group != $1.group { return Standing.groupSortKey($0.group) < Standing.groupSortKey($1.group) }
             if $0.rank != $1.rank { return $0.rank < $1.rank }
             if $0.wins != $1.wins { return $0.wins > $1.wins }
             return $0.team.name < $1.team.name

@@ -19,6 +19,21 @@ struct Standing: Codable, Identifiable, Hashable {
 }
 
 extension Standing {
+    /// 그룹 정렬 우선순위. 그냥 가나다순으로 정렬하면 LCK의 "라이즈"가 "레전드"보다 앞에
+    /// 오는 것처럼(ㄹㅏ < ㄹㅔ) 상위 그룹이 하위 그룹 뒤로 밀리는 경우가 있어서, 상위 그룹이
+    /// 항상 먼저 오도록 우선순위를 명시한다. 목록에 없는 그룹명은 항상 뒤로 밀리고, 서로는
+    /// 가나다순으로 정렬된다 — 다른 리그에서 비슷한 다단계 그룹(예: 상위/하위 디비전)이
+    /// 발견되면 여기에 추가할 것.
+    private static let groupPriorityOrder = ["레전드", "라이즈"]
+
+    static func groupSortKey(_ group: String?) -> (Int, String) {
+        let name = group ?? ""
+        if let idx = groupPriorityOrder.firstIndex(of: name) {
+            return (idx, name)
+        }
+        return (groupPriorityOrder.count, name)
+    }
+
     /// 완료된 경기 스코어로 세트 득실(GD)과 승패를 직접 계산해서 순위를 보정한다.
     ///
     /// Riot의 순위 API(`getStandings`)는 팀별로 결과 반영 시점이 어긋날 수 있다 — 실제로 같은
@@ -99,7 +114,7 @@ extension Standing {
             }
         }
         return reranked.sorted {
-            if $0.group != $1.group { return ($0.group ?? "") < ($1.group ?? "") }
+            if $0.group != $1.group { return groupSortKey($0.group) < groupSortKey($1.group) }
             if $0.rank != $1.rank { return $0.rank < $1.rank }
             if $0.wins != $1.wins { return $0.wins > $1.wins }
             if $0.losses != $1.losses { return $0.losses < $1.losses }

@@ -184,12 +184,9 @@ extension MatchDetailView {
     }
 
     /// 게임 상세(팀 스탯/선수 목록)를 아예 못 가져왔을 때(=selectedGameWindow가 nil)
-    /// 화면이 통째로 비어 보이던 문제 대응 — "다시 시도" 버튼으로 재조회 기회를 준다.
+    /// 화면이 통째로 비어 보이던 문제 대응.
     var statsUnavailableCard: some View {
-        EmptyStateView(
-            "경기 정보를 아직 준비 중이에요\n곧 확인하실 수 있어요", icon: "clock",
-            actionTitle: "다시 시도"
-        ) { Task { await viewModel.retryGameWindow() } }
+        EmptyStateView("경기 정보를 아직 준비 중이에요\n곧 확인하실 수 있어요", icon: "clock")
             .background(Color(.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 16))
     }

@@ -232,20 +232,6 @@ final class MatchDetailViewModel {
         selectedGameId = games.last?.gameId
     }
 
-    /// 게임 상세 스탯(selectedGameWindow)을 못 가져와 화면이 비어 보일 때 쓰는 수동 재시도.
-    /// 완료 경기는 디스크 캐시(`tryLoadFromCache`)가 `event_detail_v2_`만 기억하고 실패한
-    /// 게임 윈도우는 기억하지 않아서, 최초 진입 시 재시도(§load)를 전부 소진하면 캐시 만료(30일) 전까지
-    /// 다시 시도할 방법이 없었다 — 이 메서드가 그 유일한 탈출구.
-    func retryGameWindow() async {
-        guard let game = selectedGame, game.state != .unstarted else { return }
-        let gameId = game.gameId
-        guard let window = try? await liveStatsService.fetchGameWindow(gameId: gameId, startingTime: nil),
-              window.hasLiveStats || game.state == .inProgress
-        else { return }
-        gameWindows[gameId] = window
-        if game.state == .completed { await GameWindowCache.shared.save(window) }
-    }
-
     // MARK: - Static Preload
 
     /// 화면 진입 시 미리 로드할 완료 경기 개수 — TodayViewModel/LeagueDetailViewModel/
