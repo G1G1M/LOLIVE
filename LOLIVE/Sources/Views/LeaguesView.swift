@@ -117,8 +117,7 @@ struct LeaguesView: View {
 
     private func leagueRow(_ league: League, isInternational: Bool = false) -> some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: league.imageURL ?? ""))
-                .frame(width: 36, height: 36)
+            LogoBadgeView(imageURL: league.imageURL, size: 36)
 
             Text(league.name)
                 .font(.subheadline)

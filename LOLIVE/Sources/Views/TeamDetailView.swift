@@ -80,8 +80,7 @@ struct TeamDetailView: View {
 
     private var teamHeader: some View {
         HStack(spacing: 16) {
-            CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                .frame(width: 60, height: 60)
+            LogoBadgeView(imageURL: team.imageURL, size: 60)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(team.name)
@@ -303,8 +302,7 @@ struct TeamDetailView: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(viewModel.h2hRecords) { record in
                 HStack(spacing: 12) {
-                    CachedAsyncImage(url: URL(string: record.opponent.imageURL ?? ""))
-                        .frame(width: 36, height: 36)
+                    LogoBadgeView(imageURL: record.opponent.imageURL, size: 36)
 
                     Text(record.opponent.name)
                         .font(.subheadline)

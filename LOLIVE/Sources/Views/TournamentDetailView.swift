@@ -158,8 +158,7 @@ struct TournamentDetailView: View {
 
     private var notStartedView: some View {
         VStack(spacing: 20) {
-            CachedAsyncImage(url: URL(string: league.imageURL ?? ""))
-                .frame(width: 72, height: 72)
+            LogoBadgeView(imageURL: league.imageURL, size: 72)
             VStack(spacing: 6) {
                 Text("\(viewModel.selectedYear) \(league.name)")
                     .font(.title3).fontWeight(.bold)

@@ -94,8 +94,7 @@ struct StandingsView: View {
             Task { await viewModel.selectLeague(league) }
         } label: {
             HStack(spacing: 5) {
-                CachedAsyncImage(url: URL(string: league.imageURL ?? ""))
-                    .frame(width: 16, height: 16)
+                LogoBadgeView(imageURL: league.imageURL, size: 16)
                 Text(league.name)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? Color.white : Color.primary)
@@ -218,8 +217,7 @@ struct StandingsView: View {
 
             // 팀 정보
             HStack(spacing: 10) {
-                CachedAsyncImage(url: URL(string: standing.team.imageURL ?? ""))
-                    .frame(width: 36, height: 36)
+                LogoBadgeView(imageURL: standing.team.imageURL, size: 36)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(standing.team.name)
                         .font(.subheadline).fontWeight(.semibold)

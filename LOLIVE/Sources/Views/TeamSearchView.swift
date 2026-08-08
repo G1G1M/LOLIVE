@@ -68,8 +68,7 @@ struct TeamSearchView: View {
     private func teamRow(_ result: TeamSearchViewModel.TeamResult) -> some View {
         let isFav = favoriteTeams.contains { $0.teamId == result.team.id }
         return HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: result.team.imageURL ?? ""))
-                .frame(width: 36, height: 36)
+            LogoBadgeView(imageURL: result.team.imageURL, size: 36)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(result.team.name)

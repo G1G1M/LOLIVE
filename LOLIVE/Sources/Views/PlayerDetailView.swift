@@ -111,8 +111,7 @@ struct PlayerDetailView: View {
 
     private var matchInfoCard: some View {
         HStack(spacing: 16) {
-            CachedAsyncImage(url: URL(string: match.teamA.imageURL ?? ""))
-                .frame(width: 40, height: 40)
+            LogoBadgeView(imageURL: match.teamA.imageURL, size: 40)
             VStack(spacing: 2) {
                 Text("\(match.teamA.code) vs \(match.teamB.code)")
                     .font(.subheadline).fontWeight(.semibold)
@@ -122,8 +121,7 @@ struct PlayerDetailView: View {
             Spacer()
             Text("\(match.scoreA) - \(match.scoreB)")
                 .font(.headline).fontWeight(.bold)
-            CachedAsyncImage(url: URL(string: match.teamB.imageURL ?? ""))
-                .frame(width: 40, height: 40)
+            LogoBadgeView(imageURL: match.teamB.imageURL, size: 40)
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))

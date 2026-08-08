@@ -29,30 +29,25 @@ struct MatchCardView: View {
     // MARK: - Team Side
 
     private func teamSide(team: Team, score: Int, opponentScore: Int, trailing: Bool) -> some View {
-        let dimmed = match.state == .completed && score < opponentScore
-        return HStack(spacing: 12) {
+        HStack(spacing: 12) {
             if trailing {
                 Spacer()
-                teamInfo(team: team, dimmed: dimmed, trailing: true)
-                CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                    .frame(width: 38, height: 38)
-                    .opacity(dimmed ? 0.5 : 1)
+                teamInfo(team: team, trailing: true)
+                LogoBadgeView(imageURL: team.imageURL, size: 38)
             } else {
-                CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                    .frame(width: 38, height: 38)
-                    .opacity(dimmed ? 0.5 : 1)
-                teamInfo(team: team, dimmed: dimmed, trailing: false)
+                LogoBadgeView(imageURL: team.imageURL, size: 38)
+                teamInfo(team: team, trailing: false)
                 Spacer()
             }
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func teamInfo(team: Team, dimmed: Bool, trailing: Bool) -> some View {
+    private func teamInfo(team: Team, trailing: Bool) -> some View {
         VStack(alignment: trailing ? .trailing : .leading, spacing: 2) {
             Text(team.code)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(dimmed ? Color.secondary : Color(.label))
+                .foregroundStyle(Color(.label))
         }
     }
 

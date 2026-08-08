@@ -105,8 +105,7 @@ extension LeagueDetailView {
                     .frame(width: 32, alignment: .center)
 
                 HStack(spacing: 10) {
-                    CachedAsyncImage(url: URL(string: standing.team.imageURL ?? ""))
-                        .frame(width: 36, height: 36)
+                    LogoBadgeView(imageURL: standing.team.imageURL, size: 36)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(standing.team.name)
                             .font(.subheadline).fontWeight(.semibold)

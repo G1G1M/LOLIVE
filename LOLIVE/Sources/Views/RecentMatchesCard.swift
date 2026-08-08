@@ -56,8 +56,7 @@ private struct RecentMatchRow: View {
                 .background(won ? Color.blue : Color.red)
                 .clipShape(RoundedRectangle(cornerRadius: 5))
 
-            CachedAsyncImage(url: URL(string: opponent.imageURL ?? ""))
-                .frame(width: 36, height: 36)
+            LogoBadgeView(imageURL: opponent.imageURL, size: 36)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("vs \(opponent.name)")

@@ -123,8 +123,7 @@ struct MatchDetailView: View {
             TeamDetailView(team: team, league: match.league)
         } label: {
             VStack(spacing: 10) {
-                CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                    .frame(width: 48, height: 48)
+                LogoBadgeView(imageURL: team.imageURL, size: 48)
 
                 Text(team.code)
                     .font(.footnote)

@@ -159,8 +159,7 @@ struct SearchView: View {
     private func leagueRow(_ league: League) -> some View {
         NavigationLink(destination: LeagueDetailView(league: league)) {
             HStack(spacing: 12) {
-                CachedAsyncImage(url: URL(string: league.imageURL ?? ""))
-                    .frame(width: 36, height: 36)
+                LogoBadgeView(imageURL: league.imageURL, size: 36)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(league.name)
                         .font(.subheadline).fontWeight(.semibold)
@@ -185,8 +184,7 @@ struct SearchView: View {
         let isFav = favoriteTeams.contains { $0.teamId == team.id }
         return NavigationLink(destination: TeamDetailView(team: team, league: league)) {
             HStack(spacing: 12) {
-                CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                    .frame(width: 36, height: 36)
+                LogoBadgeView(imageURL: team.imageURL, size: 36)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(team.name)
                         .font(.subheadline).fontWeight(.semibold)

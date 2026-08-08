@@ -52,8 +52,7 @@ extension LeagueDetailView {
         return VStack(spacing: 0) {
             NavigationLink(value: standing.team) {
                 HStack(spacing: 12) {
-                    CachedAsyncImage(url: URL(string: standing.team.imageURL ?? ""))
-                        .frame(width: 44, height: 44)
+                    LogoBadgeView(imageURL: standing.team.imageURL, size: 44)
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(standing.team.name)
@@ -156,8 +155,7 @@ extension LeagueDetailView {
                     // 순위 데이터에서 팀 로고 URL 역참조
                     let teamImageURL = viewModel.standings
                         .first { $0.team.id == player.teamId }?.team.imageURL
-                    CachedAsyncImage(url: URL(string: teamImageURL ?? ""))
-                        .frame(width: 20, height: 20)
+                    LogoBadgeView(imageURL: teamImageURL, size: 20)
 
                     Text(player.teamCode)
                         .font(.caption).foregroundStyle(.secondary)

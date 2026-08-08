@@ -101,8 +101,7 @@ extension MatchDetailView {
         HStack(spacing: 10) {
             HStack(spacing: 4) {
                 Circle().fill(color).frame(width: 6, height: 6)
-                CachedAsyncImage(url: URL(string: team?.imageURL ?? ""))
-                    .frame(width: 18, height: 18)
+                LogoBadgeView(imageURL: team?.imageURL, size: 18)
                 Text(team?.code ?? "—")
                     .font(.caption2).fontWeight(.semibold)
                     .foregroundStyle(.secondary)

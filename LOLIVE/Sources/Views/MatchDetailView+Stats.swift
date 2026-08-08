@@ -151,19 +151,19 @@ extension MatchDetailView {
                 if player.hasStats {
                     Text("\(player.kills)/\(player.deaths)/\(player.assists)")
                         .font(.caption).fontWeight(.medium)
-                        .foregroundStyle(player.deaths == 0 ? .primary : .secondary)
+                        .foregroundStyle(.primary)
                         .frame(width: 68, alignment: .trailing)
                         .lineLimit(1)
 
                     Text(formatGold(player.totalGold))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                         .frame(width: 42, alignment: .trailing)
                         .lineLimit(1)
 
                     Text("\(player.creepScore)CS")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                         .frame(width: 42, alignment: .trailing)
                         .lineLimit(1)
                 }
@@ -187,7 +187,7 @@ extension MatchDetailView {
     /// 화면이 통째로 비어 보이던 문제 대응 — "다시 시도" 버튼으로 재조회 기회를 준다.
     var statsUnavailableCard: some View {
         EmptyStateView(
-            "경기 상세 정보를 불러올 수 없습니다", icon: "exclamationmark.triangle",
+            "경기 정보를 아직 준비 중이에요\n곧 확인하실 수 있어요", icon: "clock",
             actionTitle: "다시 시도"
         ) { Task { await viewModel.retryGameWindow() } }
             .background(Color(.secondarySystemGroupedBackground))

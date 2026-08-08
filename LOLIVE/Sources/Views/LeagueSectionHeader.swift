@@ -10,8 +10,7 @@ struct LeagueSectionHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            CachedAsyncImage(url: URL(string: league.imageURL ?? ""))
-                .frame(width: 18, height: 18)
+            LogoBadgeView(imageURL: league.imageURL, size: 18)
 
             Text(league.name.uppercased())
                 .font(.system(size: 11, weight: .bold))

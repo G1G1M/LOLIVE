@@ -121,8 +121,7 @@ extension LeagueDetailView {
 
     private func bracketTeamRow(team: Team, score: Int, won: Bool, state: MatchState) -> some View {
         HStack(spacing: 8) {
-            CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                .frame(width: 20, height: 20)
+            LogoBadgeView(imageURL: team.imageURL, size: 20)
             Text(team.code)
                 .font(.system(size: 13, weight: won ? .bold : .regular))
                 .foregroundStyle(won ? Color(.label) : .secondary)
