@@ -28,8 +28,10 @@ struct LeaguesView: View {
             // 진짜 네이티브 .searchable(리퀴드 글래스 자동 적용)을 쓰려면 시스템 타이틀이
             // 필요하다 — SwiftUI 구조상 검색창은 항상 네비게이션 바에만 붙기 때문에,
             // 네비게이션 바를 숨기고 커스텀 타이틀을 쓰면 검색창 자체가 안 뜬다(실측 확인).
-            // 인라인+principal 커스텀 뷰로 여백을 줄이는 것도 시도했으나 iOS가 principal
-            // 영역을 항상 중앙 정렬로 강제해서(leading 지정 무시) 큰 타이틀 방식을 유지한다.
+            // 여백을 줄이려고 인라인+principal(가운데 정렬로 강제됨), 인라인+leading
+            // 툴바 아이템(검색 활성 시 "..." 축약 버튼으로 깨짐)도 시도했지만 둘 다
+            // 실패해서 큰 타이틀 방식을 유지한다. 폰트 크기를 줄여도 큰 타이틀의 위쪽
+            // 여백 자체는 줄지 않음(실측 확인) — iOS가 내부적으로 고정 높이를 예약함.
             .navigationTitle("리그")
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "리그 검색")
             .navigationDestination(for: League.self) { league in
