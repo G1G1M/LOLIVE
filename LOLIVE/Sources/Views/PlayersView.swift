@@ -7,6 +7,7 @@ import SwiftUI
 
 struct PlayersView: View {
     @State private var viewModel = PlayersViewModel()
+    @State private var isSearchPresented = false
 
     private let roles: [(label: String, value: String)] = [
         ("TOP", "top"), ("JGL", "jungle"), ("MID", "mid"),
@@ -27,7 +28,10 @@ struct PlayersView: View {
                 }
             }
             .navigationTitle("선수")
-            .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "선수 검색")
+            .searchable(
+                text: $viewModel.searchText, isPresented: $isSearchPresented,
+                placement: .navigationBarDrawer(displayMode: .always), prompt: "선수 검색"
+            )
             // Match.self/League.self는 탭 루트에서 한 번씩만 등록(LeagueDetailView.swift 주석 참고).
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(match: match)
@@ -60,17 +64,20 @@ struct PlayersView: View {
 
     // MARK: - Filter Header
 
+    @ViewBuilder
     private var filterHeader: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                roleMenu
-                leagueMenu
-                Spacer()
+        if isSearchPresented {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    roleMenu
+                    leagueMenu
+                    Spacer()
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                Divider()
             }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            Divider()
+            .background(Color(.systemGroupedBackground))
         }
-        .background(Color(.systemGroupedBackground))
     }
 
     private var roleMenu: some View {

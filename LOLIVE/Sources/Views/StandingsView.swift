@@ -75,6 +75,7 @@ struct StandingsView: View {
     private var leagueSelector: some View {
         VStack(spacing: 0) {
             HStack {
+                Spacer()
                 Menu {
                     ForEach(viewModel.leagues) { league in
                         Button {
@@ -96,7 +97,6 @@ struct StandingsView: View {
                         }
                     }
                 }
-                Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
