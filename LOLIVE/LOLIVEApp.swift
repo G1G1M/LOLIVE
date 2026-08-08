@@ -57,6 +57,7 @@ final class LOLIVENotificationDelegate: NSObject, UNUserNotificationCenterDelega
 struct LOLIVEApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("appTheme") private var appTheme: AppTheme = .system
     @State private var phase: AppPhase = .splash
     @State private var todayViewModel = TodayViewModel()
     @State private var deepLinkTeam: TeamDeepLinkItem?
@@ -119,6 +120,7 @@ struct LOLIVEApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.35), value: phase)
+            .preferredColorScheme(appTheme.colorScheme)
         }
         .onChange(of: scenePhase) { _, newPhase in
             // 포그라운드 복귀 시 즉시 폴링 재시작 → 백그라운드 중 시작된 경기도 즉각 감지

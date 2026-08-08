@@ -16,7 +16,7 @@
 |------|------|
 | 플랫폼 | iOS 17+ |
 | 언어 | Swift 6.0 |
-| UI | SwiftUI (라이트/다크 모드 시스템 설정 자동 대응), iOS 26 Liquid Glass 적용(배포 타깃 17.6은 유지, `#available` 분기) |
+| UI | SwiftUI (라이트/다크 모드 앱 설정에서 시스템 기본/라이트/다크 직접 선택 가능), iOS 26 Liquid Glass 적용(배포 타깃 17.6은 유지, `#available` 분기) |
 | 아키텍처 | MVVM + `@Observable` |
 | 네트워크 | URLSession + async/await |
 | 로컬 저장 | SwiftData |

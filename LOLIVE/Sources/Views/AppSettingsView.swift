@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct AppSettingsView: View {
+    @AppStorage("appTheme") private var appTheme: AppTheme = .system
+
     private var appVersion: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
@@ -114,6 +116,16 @@ struct AppSettingsView: View {
                 testActivityRunning = LiveActivityService.shared.isTestActivityRunning
             }
             #endif
+
+            // MARK: - 화면 모드
+            Section("화면 모드") {
+                Picker("화면 모드", selection: $appTheme) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Text(theme.label).tag(theme)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
 
             // MARK: - 정보
             Section("정보") {
