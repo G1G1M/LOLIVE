@@ -49,7 +49,7 @@ extension OnboardingView {
 
             Spacer().frame(height: 14)
         }
-        .background(Color.white.opacity(0.05))
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.orange.opacity(0.18), lineWidth: 1))
     }
@@ -65,7 +65,7 @@ extension OnboardingView {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(team?.name ?? fallbackName)
-                    .font(.caption).fontWeight(.semibold).foregroundStyle(.white)
+                    .font(.caption).fontWeight(.semibold).foregroundStyle(.primary)
                     .lineLimit(1)
                 Text(team?.code ?? fallbackCode)
                     .font(.caption2).foregroundStyle(.secondary)
@@ -77,7 +77,7 @@ extension OnboardingView {
                 .font(.subheadline).foregroundStyle(.yellow)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(Color.white.opacity(0.05))
+        .background(Color(.tertiarySystemBackground))
     }
 
     private func favPlayerRowLive(player: PlayerStats) -> some View {
@@ -108,7 +108,7 @@ extension OnboardingView {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(player.summonerName)
-                    .font(.caption).fontWeight(.semibold).foregroundStyle(.white)
+                    .font(.caption).fontWeight(.semibold).foregroundStyle(.primary)
                 Text(roleLabel(player.role))
                     .font(.caption2).foregroundStyle(.secondary)
             }
@@ -119,7 +119,7 @@ extension OnboardingView {
                 .font(.subheadline).foregroundStyle(.yellow)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(Color.white.opacity(0.05))
+        .background(Color(.tertiarySystemBackground))
     }
 
     private func favPlayerRowStatic(color: Color, role: String, name: String, team: String) -> some View {
@@ -129,7 +129,7 @@ extension OnboardingView {
                 .frame(width: 36, height: 36)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.caption).fontWeight(.semibold).foregroundStyle(.white)
+                Text(name).font(.caption).fontWeight(.semibold).foregroundStyle(.primary)
                 Text("\(team) · \(role)").font(.caption2).foregroundStyle(.secondary)
             }
 
@@ -139,6 +139,6 @@ extension OnboardingView {
                 .font(.subheadline).foregroundStyle(.yellow)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(Color.white.opacity(0.05))
+        .background(Color(.tertiarySystemBackground))
     }
 }

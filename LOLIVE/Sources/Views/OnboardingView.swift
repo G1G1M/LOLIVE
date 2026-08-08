@@ -22,7 +22,7 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color(.systemBackground).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 TabView(selection: $currentPage) {
@@ -74,7 +74,6 @@ struct OnboardingView: View {
                 .padding(.bottom, 52)
             }
         }
-        .preferredColorScheme(.dark)
         .task { await loader.load() }
     }
 
@@ -121,11 +120,11 @@ struct OnboardingView: View {
             VStack(spacing: 10) {
                 Text(title)
                     .font(.title3).fontWeight(.bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)
                 Text(description)
                     .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
             }
@@ -158,11 +157,11 @@ struct OnboardingView: View {
             }
 
             Text("실시간 경기 · 통계 · 선수 정보")
-                .font(.caption).foregroundStyle(.white.opacity(0.4))
+                .font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
-        .background(Color.white.opacity(0.05))
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Color.yellow.opacity(0.2), lineWidth: 1))
     }

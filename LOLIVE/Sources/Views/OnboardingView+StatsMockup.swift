@@ -40,35 +40,35 @@ extension OnboardingView {
                 }
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(Color.white.opacity(0.07))
+            .background(Color(.tertiarySystemBackground))
 
             // 팀 스탯
             VStack(spacing: 0) {
                 statsRow("킬",   l: "\(bStats?.totalKills ?? 0)",        r: "\(rStats?.totalKills ?? 0)")
-                Divider().background(.white.opacity(0.07))
+                Divider().background(Color(.separator))
                 statsRow("골드", l: goldStr(bStats?.totalGold ?? 0),     r: goldStr(rStats?.totalGold ?? 0))
-                Divider().background(.white.opacity(0.07))
+                Divider().background(Color(.separator))
                 statsRow("타워", l: "\(bStats?.towers ?? 0)",            r: "\(rStats?.towers ?? 0)")
             }
 
-            Divider().background(.white.opacity(0.12))
+            Divider().background(Color(.separator))
 
             // 블루팀 선수
             if !blue.isEmpty {
                 sideLabel("Blue", color: .blue)
                 ForEach(Array(blue.enumerated()), id: \.element.id) { i, p in
                     playerRow(p, sideColor: .blue)
-                    if i < blue.count - 1 { Divider().background(.white.opacity(0.06)).padding(.leading, 44) }
+                    if i < blue.count - 1 { Divider().background(Color(.separator)).padding(.leading, 44) }
                 }
             }
 
             // 레드팀 선수
             if !red.isEmpty {
-                Divider().background(.white.opacity(0.12))
+                Divider().background(Color(.separator))
                 sideLabel("Red", color: .red)
                 ForEach(Array(red.enumerated()), id: \.element.id) { i, p in
                     playerRow(p, sideColor: .red)
-                    if i < red.count - 1 { Divider().background(.white.opacity(0.06)).padding(.leading, 44) }
+                    if i < red.count - 1 { Divider().background(Color(.separator)).padding(.leading, 44) }
                 }
             }
 
@@ -83,7 +83,7 @@ extension OnboardingView {
                 .padding(.vertical, 20)
             }
         }
-        .background(Color.white.opacity(0.05))
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.green.opacity(0.18), lineWidth: 1))
     }
@@ -123,7 +123,7 @@ extension OnboardingView {
                 .frame(width: 24, alignment: .center)
             ChampionImageView(championId: player.championId, size: 24)
             Text(player.summonerName)
-                .font(.caption).fontWeight(.medium).foregroundStyle(.white)
+                .font(.caption).fontWeight(.medium).foregroundStyle(.primary)
                 .lineLimit(1)
             Spacer()
             if player.hasStats {

@@ -27,7 +27,7 @@ extension OnboardingView {
             }
             .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
 
-            Divider().background(.white.opacity(0.08))
+            Divider().background(Color(.separator))
 
             // 팀 스코어
             HStack(alignment: .center, spacing: 0) {
@@ -40,7 +40,7 @@ extension OnboardingView {
                     Text(teamA?.code ?? "—")
                         .font(.subheadline)
                         .fontWeight(wonA ? .bold : .regular)
-                        .foregroundStyle(wonA ? .white : .secondary)
+                        .foregroundStyle(wonA ? .primary : .secondary)
                 }
                 .frame(maxWidth: .infinity)
 
@@ -48,13 +48,13 @@ extension OnboardingView {
                 HStack(spacing: 12) {
                     Text("\(scoreA)")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
-                        .foregroundStyle(wonA ? .white : .white.opacity(0.35))
+                        .foregroundStyle(wonA ? .primary : .secondary)
                     Text(":")
                         .font(.system(size: 28, weight: .light))
                         .foregroundStyle(.secondary)
                     Text("\(scoreB)")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
-                        .foregroundStyle(!wonA ? .white : .white.opacity(0.35))
+                        .foregroundStyle(!wonA ? .primary : .secondary)
                 }
                 .frame(width: 120)
 
@@ -67,13 +67,13 @@ extension OnboardingView {
                     Text(teamB?.code ?? "—")
                         .font(.subheadline)
                         .fontWeight(!wonA ? .bold : .regular)
-                        .foregroundStyle(!wonA ? .white : .secondary)
+                        .foregroundStyle(!wonA ? .primary : .secondary)
                 }
                 .frame(maxWidth: .infinity)
             }
             .padding(.vertical, 16)
 
-            Divider().background(.white.opacity(0.08))
+            Divider().background(Color(.separator))
 
             // 하단 안내
             HStack(spacing: 6) {
@@ -85,7 +85,7 @@ extension OnboardingView {
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
         }
-        .background(Color.white.opacity(0.05))
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.blue.opacity(0.18), lineWidth: 1))
     }

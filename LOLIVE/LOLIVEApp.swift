@@ -119,7 +119,6 @@ struct LOLIVEApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.35), value: phase)
-            .preferredColorScheme(.dark)
         }
         .onChange(of: scenePhase) { _, newPhase in
             // 포그라운드 복귀 시 즉시 폴링 재시작 → 백그라운드 중 시작된 경기도 즉각 감지

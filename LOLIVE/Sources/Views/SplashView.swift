@@ -12,7 +12,7 @@ struct SplashView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color(.systemBackground).ignoresSafeArea()
 
             VStack(spacing: 18) {
                 Image("AppIconImage")
@@ -25,11 +25,11 @@ struct SplashView: View {
                 VStack(spacing: 6) {
                     Text("LOLIVE")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
 
                     Text("LoL Esports Companion")
                         .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.secondary)
                         .opacity(subtitleOpacity)
                 }
             }
@@ -45,7 +45,6 @@ struct SplashView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
 }
 
