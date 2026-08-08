@@ -74,35 +74,32 @@ struct StandingsView: View {
 
     private var leagueSelector: some View {
         VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Menu {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
                     ForEach(viewModel.leagues) { league in
-                        Button {
-                            Task { await viewModel.selectLeague(league) }
-                        } label: {
-                            if viewModel.selectedLeague?.id == league.id {
-                                Label(league.name, systemImage: "checkmark")
-                            } else {
-                                Text(league.name)
-                            }
-                        }
-                    }
-                } label: {
-                    MenuFilterLabel {
-                        if let selected = viewModel.selectedLeague {
-                            LogoBadgeView(imageURL: selected.imageURL, size: 20)
-                            Text(selected.name)
-                                .font(.subheadline.weight(.semibold))
-                        }
+                        leagueChip(league)
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
             Divider()
         }
         .background(Color(.systemGroupedBackground))
+    }
+
+    private func leagueChip(_ league: League) -> some View {
+        let isSelected = viewModel.selectedLeague?.id == league.id
+        return SelectableChip(isSelected: isSelected) {
+            Task { await viewModel.selectLeague(league) }
+        } label: {
+            HStack(spacing: 5) {
+                LogoBadgeView(imageURL: league.imageURL, size: 16)
+                Text(league.name)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+            }
+        }
     }
 
     // MARK: - Standings Body

@@ -14,19 +14,24 @@ struct LeaguesView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                titleHeader
+                searchBar
 
-                if viewModel.isLoading && viewModel.leagues.isEmpty {
-                    LoadingView()
-                } else if viewModel.loadFailed && viewModel.leagues.isEmpty {
-                    ErrorRetryView { Task { await viewModel.load() } }
-                } else {
-                    leagueList
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+
+                    if viewModel.isLoading && viewModel.leagues.isEmpty {
+                        LoadingView()
+                    } else if viewModel.loadFailed && viewModel.leagues.isEmpty {
+                        ErrorRetryView { Task { await viewModel.load() } }
+                    } else {
+                        leagueList
+                    }
                 }
             }
-            .navigationTitle("리그")
-            .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "리그 검색")
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: League.self) { league in
                 // Worlds/MSI는 연도별 히스토리가 있는 TournamentDetailView로 분기
                 if league.isInternationalTournament {
@@ -42,6 +47,43 @@ struct LeaguesView: View {
             }
         }
         .task { await viewModel.load() }
+    }
+
+    // MARK: - 헤더
+
+    private var titleHeader: some View {
+        HStack {
+            Text("리그")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Color(.label))
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("리그 검색", text: $viewModel.searchText)
+                .font(.subheadline)
+            if !viewModel.searchText.isEmpty {
+                Button { viewModel.searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
     }
 
     // MARK: - 리스트

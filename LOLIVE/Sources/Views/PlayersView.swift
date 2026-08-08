@@ -7,7 +7,7 @@ import SwiftUI
 
 struct PlayersView: View {
     @State private var viewModel = PlayersViewModel()
-    @State private var isSearchPresented = false
+    @FocusState private var isSearchFocused: Bool
 
     private let roles: [(label: String, value: String)] = [
         ("TOP", "top"), ("JGL", "jungle"), ("MID", "mid"),
@@ -16,22 +16,35 @@ struct PlayersView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                // 고정 타이틀 헤더
+                HStack {
+                    Text("선수")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Color(.label))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 6)
+                .background(Color(.systemGroupedBackground))
 
-                if viewModel.isLoading {
-                    LoadingView("선수 목록 불러오는 중...")
-                } else if viewModel.loadFailed {
-                    ErrorRetryView { Task { await viewModel.load() } }
-                } else {
-                    playerContent
+                searchBar
+
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+
+                    if viewModel.isLoading {
+                        LoadingView("선수 목록 불러오는 중...")
+                    } else if viewModel.loadFailed {
+                        ErrorRetryView { Task { await viewModel.load() } }
+                    } else {
+                        playerContent
+                    }
                 }
             }
-            .navigationTitle("선수")
-            .searchable(
-                text: $viewModel.searchText, isPresented: $isSearchPresented,
-                placement: .navigationBarDrawer(displayMode: .always), prompt: "선수 검색"
-            )
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
             // Match.self/League.self는 탭 루트에서 한 번씩만 등록(LeagueDetailView.swift 주석 참고).
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(match: match)
@@ -45,6 +58,31 @@ struct PlayersView: View {
             }
         }
         .task { await viewModel.load() }
+    }
+
+    // MARK: - Search Bar
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("선수 검색", text: $viewModel.searchText)
+                .font(.subheadline)
+                .focused($isSearchFocused)
+            if !viewModel.searchText.isEmpty {
+                Button { viewModel.searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
     }
 
     // MARK: - Content
@@ -66,7 +104,7 @@ struct PlayersView: View {
 
     @ViewBuilder
     private var filterHeader: some View {
-        if isSearchPresented {
+        if isSearchFocused {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     roleMenu

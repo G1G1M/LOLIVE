@@ -21,14 +21,15 @@ struct Standing: Codable, Identifiable, Hashable {
 extension Standing {
     /// 그룹 정렬 우선순위. 그냥 가나다순으로 정렬하면 LCK의 "라이즈"가 "레전드"보다 앞에
     /// 오는 것처럼(ㄹㅏ < ㄹㅔ) 상위 그룹이 하위 그룹 뒤로 밀리는 경우가 있어서, 상위 그룹이
-    /// 항상 먼저 오도록 우선순위를 명시한다. 목록에 없는 그룹명은 항상 뒤로 밀리고, 서로는
-    /// 가나다순으로 정렬된다 — 다른 리그에서 비슷한 다단계 그룹(예: 상위/하위 디비전)이
-    /// 발견되면 여기에 추가할 것.
+    /// 항상 먼저 오도록 우선순위를 명시한다. 실제 API가 주는 그룹명은 "레전드 그룹"처럼 접미사가
+    /// 붙어있어서 정확히 일치(==)가 아니라 포함(contains) 여부로 판별한다. 목록에 없는 그룹명은
+    /// 항상 뒤로 밀리고, 서로는 가나다순으로 정렬된다 — 다른 리그에서 비슷한 다단계 그룹(예:
+    /// 상위/하위 디비전)이 발견되면 여기에 추가할 것.
     private static let groupPriorityOrder = ["레전드", "라이즈"]
 
     static func groupSortKey(_ group: String?) -> (Int, String) {
         let name = group ?? ""
-        if let idx = groupPriorityOrder.firstIndex(of: name) {
+        if let idx = groupPriorityOrder.firstIndex(where: { name.contains($0) }) {
             return (idx, name)
         }
         return (groupPriorityOrder.count, name)
