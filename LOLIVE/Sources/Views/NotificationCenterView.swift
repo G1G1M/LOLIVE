@@ -22,7 +22,7 @@ struct NotificationCenterView: View {
                 List {
                     ForEach(items) { item in
                         if let info = item.matchInfo {
-                            NavigationLink(destination: MatchDetailView(match: info.match)) {
+                            NavigationLink(value: info.match) {
                                 itemRow(item)
                             }
                         } else {
@@ -35,6 +35,9 @@ struct NotificationCenterView: View {
         }
         .navigationTitle("예정 알림")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: Match.self) { match in
+            MatchDetailView(match: match)
+        }
         .task { await loadPending() }
     }
 

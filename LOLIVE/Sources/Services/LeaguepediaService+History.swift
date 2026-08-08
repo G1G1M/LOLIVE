@@ -29,32 +29,32 @@ extension LeaguepediaService {
     func fetchLiveTournamentResults(for league: League) async -> [Match] {
         guard let leagueName = leaguepediaName(for: league) else {
             #if DEBUG
-            reconcileLPLogger.debug("🔎 [Reconcile] leaguepediaName(for: \(league.name)) = nil — 리그명 매핑 실패")
+            // reconcileLPLogger.debug("🔎 [Reconcile] leaguepediaName(for: \(league.name)) = nil — 리그명 매핑 실패")
             #endif
             return []
         }
         let pages = await cachedOrFetchPages(leagueName: leagueName)
         guard let currentPage = currentTournamentPage(from: pages) else {
             #if DEBUG
-            reconcileLPLogger.debug("🔎 [Reconcile] \(leagueName) 대회 페이지 목록이 비어있음 (pages.count=\(pages.count))")
+            // reconcileLPLogger.debug("🔎 [Reconcile] \(leagueName) 대회 페이지 목록이 비어있음 (pages.count=\(pages.count))")
             #endif
             return []
         }
         #if DEBUG
-        reconcileLPLogger.debug("🔎 [Reconcile] \(leagueName) 현재 페이지: \(currentPage.page)")
+        // reconcileLPLogger.debug("🔎 [Reconcile] \(leagueName) 현재 페이지: \(currentPage.page)")
         #endif
 
         let cacheKey = "lpresults_\(leagueName)_\(currentPage.page)"
         if let cached: [Match] = AppDiskCache.get(key: cacheKey, maxAge: 15 * 60) {
             #if DEBUG
-            reconcileLPLogger.debug("🔎 [Reconcile] \(currentPage.page) 캐시 히트 \(cached.count)건 (15분 이내)")
+            // reconcileLPLogger.debug("🔎 [Reconcile] \(currentPage.page) 캐시 히트 \(cached.count)건 (15분 이내)")
             #endif
             return cached
         }
 
         let matches = await matchesForOverviewPage(currentPage.page, league: league)
         #if DEBUG
-        reconcileLPLogger.debug("🔎 [Reconcile] \(currentPage.page) API 조회 \(matches.count)건")
+        // reconcileLPLogger.debug("🔎 [Reconcile] \(currentPage.page) API 조회 \(matches.count)건")
         #endif
         if !matches.isEmpty { AppDiskCache.set(key: cacheKey, value: matches) }
         return matches
@@ -90,10 +90,10 @@ extension LeaguepediaService {
                 abs(lp.startTime.timeIntervalSince(riot.startTime)) < 6 * 3600
             }) else {
                 #if DEBUG
-                reconcileLPLogger.debug("🔎 [Reconcile] \(riot.teamA.code) vs \(riot.teamB.code) — Leaguepedia \(leaguepediaMatches.count)건 중 매칭되는 completed 경기 없음")
-                for lp in leaguepediaMatches where sameTeams(riot, lp) {
-                    reconcileLPLogger.debug("🔎 [Reconcile]   팀은 일치하나 state=\(lp.state.rawValue) 또는 시간차 큼 (lp.startTime=\(lp.startTime.description))")
-                }
+                // reconcileLPLogger.debug("🔎 [Reconcile] \(riot.teamA.code) vs \(riot.teamB.code) — Leaguepedia \(leaguepediaMatches.count)건 중 매칭되는 completed 경기 없음")
+                // for lp in leaguepediaMatches where sameTeams(riot, lp) {
+                //     reconcileLPLogger.debug("🔎 [Reconcile]   팀은 일치하나 state=\(lp.state.rawValue) 또는 시간차 큼 (lp.startTime=\(lp.startTime.description))")
+                // }
                 #endif
                 return riot
             }
@@ -126,11 +126,11 @@ extension LeaguepediaService {
         let scoreA = sameOrder ? lp.scoreA : lp.scoreB
         let scoreB = sameOrder ? lp.scoreB : lp.scoreA
         #if DEBUG
-        reconcileLPLogger.debug("""
-            🔁 [Reconcile] stuckLiveMatch \(match.teamA.code) vs \(match.teamB.code) — \
-            lp.teamA=\(lp.teamA.name) lp.teamB=\(lp.teamB.name) sameOrder=\(sameOrder) \
-            리보정전(\(match.scoreA)-\(match.scoreB)) → 리보정후(\(scoreA)-\(scoreB))
-            """)
+        // reconcileLPLogger.debug("""
+        //     🔁 [Reconcile] stuckLiveMatch \(match.teamA.code) vs \(match.teamB.code) — \
+        //     lp.teamA=\(lp.teamA.name) lp.teamB=\(lp.teamB.name) sameOrder=\(sameOrder) \
+        //     리보정전(\(match.scoreA)-\(match.scoreB)) → 리보정후(\(scoreA)-\(scoreB))
+        //     """)
         #endif
         return Match(id: match.id, league: match.league, teamA: match.teamA, teamB: match.teamB,
                      scoreA: scoreA, scoreB: scoreB, startTime: match.startTime,

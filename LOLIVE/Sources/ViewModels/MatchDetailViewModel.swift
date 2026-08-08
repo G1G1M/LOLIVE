@@ -5,6 +5,9 @@
 
 import Foundation
 import Observation
+import os
+
+private let navDebugLogger = Logger(subsystem: "com.lolive", category: "NavDebug")
 
 @MainActor
 @Observable
@@ -78,6 +81,9 @@ final class MatchDetailViewModel {
     // MARK: - Public
 
     func load() async {
+        #if DEBUG
+        navDebugLogger.debug("🔍 [NavDebug] load() 시작 matchId=\(self.match.id) state=\(self.match.state.rawValue)")
+        #endif
         // 백필된 과거 시즌 경기(oe_/lp_ 접두사)는 Riot API의 실제 경기 ID가 아니라 상세 조회 자체가
         // 불가능 — Riot 호출 없이 백필 데이터(match.games, 있으면)로 직접 화면을 채운다.
         if Self.isBackfilledMatchId(match.id) {
@@ -95,8 +101,29 @@ final class MatchDetailViewModel {
 
         // 완료된 경기: 디스크 캐시 → 서버(Firestore) 캐시 순으로 확인, 있으면 Riot 재호출 없이 표시
         if match.state == .completed {
-            if await tryLoadFromCache() { return }
-            if await tryLoadFromServerCache() { return }
+            // SwiftUI가 NavigationStack 전환 과정에서 같은 화면의 .task를 실제로 두 번 이상
+            // 재실행하는 경우가 실측으로 확인됐다(정확한 이유는 못 밝혔지만, 리그로 갔다가
+            // 뒤로가기로 돌아올 때 반복 재현됨). 원인을 완전히 못 없애더라도, 이미 로드된
+            // 완료 경기라면 아무 것도 다시 안 건드리도록 멱등하게 만들어서 재실행이 상태를
+            // 리셋하며 화면(ScrollView 포함)이 다시 그려지는 걸 원천 차단한다.
+            guard eventDetail == nil else {
+                #if DEBUG
+                navDebugLogger.debug("🔍 [NavDebug] load() 이미 로드됨(재실행 스킵) matchId=\(self.match.id)")
+                #endif
+                return
+            }
+            if await tryLoadFromCache() {
+                #if DEBUG
+                navDebugLogger.debug("🔍 [NavDebug] load() 디스크 캐시 경로로 완료 matchId=\(self.match.id)")
+                #endif
+                return
+            }
+            if await tryLoadFromServerCache() {
+                #if DEBUG
+                navDebugLogger.debug("🔍 [NavDebug] load() 서버 캐시 경로로 완료 matchId=\(self.match.id)")
+                #endif
+                return
+            }
         }
 
         isLoading = true
@@ -321,7 +348,13 @@ final class MatchDetailViewModel {
             }
         }
 
+        #if DEBUG
+        navDebugLogger.debug("🔍 [NavDebug] fetchLeaguepediaBans 호출 직전 matchId=\(self.match.id)")
+        #endif
         await fetchLeaguepediaBans(for: detail.games.filter { $0.state == .completed })
+        #if DEBUG
+        navDebugLogger.debug("🔍 [NavDebug] fetchLeaguepediaBans 호출 완료 matchId=\(self.match.id) isCancelled=\(Task.isCancelled)")
+        #endif
         return true
     }
 
@@ -371,7 +404,17 @@ final class MatchDetailViewModel {
                 }
             }
             for await (gameId, bans) in group {
-                if let bans { self.leaguepediaBans[gameId] = bans }
+                // Leaguepedia 호출(레이트리밋으로 지연될 수 있음)이 끝나기 전에 사용자가 화면을
+                // 벗어나면(뒤로가기) 응답이 뒤늦게 와도 상태를 건드리면 안 된다 — 완료 경기 상세만
+                // 이 밴 조회를 거치는데, 하필 이게 늦게 끝나서 뒤로가기 전환 도중 상태 갱신이 겹치며
+                // ScrollView가 맨 위로 리셋되는 것처럼 보이는 문제가 있었다(실측 확인).
+                guard !Task.isCancelled else { continue }
+                if let bans {
+                    #if DEBUG
+                    navDebugLogger.debug("🔍 [NavDebug] leaguepediaBans 갱신 matchId=\(self.match.id) gameId=\(gameId)")
+                    #endif
+                    self.leaguepediaBans[gameId] = bans
+                }
             }
         }
     }
@@ -392,6 +435,12 @@ final class MatchDetailViewModel {
 
                 // eventDetail 폴링: 드래프트 밴픽 + 게임 상태 변화 감지
                 if let freshDetail = try? await esports.fetchEventDetails(matchId: matchId) {
+                    // 네트워크 응답을 기다리는 동안 stopPolling()으로 취소됐을 수 있다(예: 사용자가
+                    // 화면을 벗어남) — 이 경우 응답이 뒤늦게 와도 상태를 건드리면 안 된다. 특히
+                    // 뒤로가기 전환 애니메이션 도중에 이 상태 갱신이 겹치면 ScrollView가 다시
+                    // 그려지며 맨 위로 튀는 것처럼 보이는 문제가 있었다(실측 확인).
+                    guard !Task.isCancelled else { break }
+
                     let prevLiveGameId = eventDetail?.games.first(where: { $0.state == .inProgress })?.gameId
                     let newLiveGame = freshDetail.games.first(where: { $0.state == .inProgress })
 
@@ -412,9 +461,12 @@ final class MatchDetailViewModel {
                     eventDetail = freshDetail
                 }
 
+                guard !Task.isCancelled else { break }
+
                 // 인게임 스탯: inProgress 게임만 window 요청
                 guard let game = eventDetail?.games.first(where: { $0.state == .inProgress }) else { continue }
                 if let window = try? await liveStats.fetchGameWindow(gameId: game.gameId, startingTime: nil) {
+                    guard !Task.isCancelled else { break }
                     gameWindows[game.gameId] = window
                     if let t = window.gameTime {
                         currentGameTime = t

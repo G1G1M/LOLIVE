@@ -142,23 +142,23 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         }
         guard !staleOnes.isEmpty else { return matches }
         #if DEBUG
-        for m in staleOnes {
-            reconcileLogger.debug("🔎 [Reconcile] \(league.name) 보정 대상: \(m.teamA.code) vs \(m.teamB.code) state=\(m.state.rawValue) score=\(m.scoreA)-\(m.scoreB)")
-        }
+        // for m in staleOnes {
+        //     reconcileLogger.debug("🔎 [Reconcile] \(league.name) 보정 대상: \(m.teamA.code) vs \(m.teamB.code) state=\(m.state.rawValue) score=\(m.scoreA)-\(m.scoreB)")
+        // }
         #endif
 
         let lpMatches = await LeaguepediaService.shared.fetchLiveTournamentResults(for: league)
         #if DEBUG
-        reconcileLogger.debug("🔎 [Reconcile] \(league.name) Leaguepedia 응답 \(lpMatches.count)건")
+        // reconcileLogger.debug("🔎 [Reconcile] \(league.name) Leaguepedia 응답 \(lpMatches.count)건")
         #endif
         guard !lpMatches.isEmpty else { return matches }
         let result = LeaguepediaService.shared.reconcileResults(riotMatches: matches, leaguepediaMatches: lpMatches)
         #if DEBUG
-        for m in staleOnes {
-            if let fixed = result.first(where: { $0.id == m.id }) {
-                reconcileLogger.debug("🔎 [Reconcile] \(fixed.teamA.code) vs \(fixed.teamB.code) 결과: state=\(fixed.state.rawValue) score=\(fixed.scoreA)-\(fixed.scoreB)")
-            }
-        }
+        // for m in staleOnes {
+        //     if let fixed = result.first(where: { $0.id == m.id }) {
+        //         reconcileLogger.debug("🔎 [Reconcile] \(fixed.teamA.code) vs \(fixed.teamB.code) 결과: state=\(fixed.state.rawValue) score=\(fixed.scoreA)-\(fixed.scoreB)")
+        //     }
+        // }
         #endif
         return result
     }

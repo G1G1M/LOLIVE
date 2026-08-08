@@ -65,6 +65,17 @@ struct SearchView: View {
             }
             .navigationTitle("검색")
             .navigationBarTitleDisplayMode(.inline)
+            // Match.self/League.self는 탭 루트에서 한 번씩만 등록(LeagueDetailView.swift 주석 참고).
+            .navigationDestination(for: Match.self) { match in
+                MatchDetailView(match: match)
+            }
+            .navigationDestination(for: League.self) { league in
+                if league.isInternationalTournament {
+                    TournamentDetailView(league: league)
+                } else {
+                    LeagueDetailView(league: league)
+                }
+            }
         }
         .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "리그, 팀, 선수 검색")
         .onChange(of: isSearchPresented) { wasPresented, presented in

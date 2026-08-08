@@ -14,6 +14,9 @@
 //
 
 import SwiftUI
+import os
+
+private let navDebugLogger = Logger(subsystem: "com.lolive", category: "NavDebug")
 
 struct LeagueDetailView: View {
     let league: League
@@ -48,9 +51,13 @@ struct LeagueDetailView: View {
         }
         .navigationTitle(league.name)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: Match.self) { match in
-            MatchDetailView(match: match)
-        }
+        // Match.self는 여기서 등록하지 않는다 — Match는 team/league 같은 추가 컨텍스트 없이도
+        // 자기 완결적(match.league/teamA/teamB 다 들어있음)이라 각 탭 루트(TodayView/LeaguesView/
+        // StandingsView/PlayersView/SearchView)에서 한 번씩만 등록해도 충분한데, 여기서도 같이
+        // 등록해두면 이 화면이 그 루트들 스택에 중첩될 때 같은 타입이 두 번 등록돼("A
+        // navigationDestination for ... was declared earlier on the stack" 경고) 뒤로가기 시
+        // 화면이 통째로 다시 생성되는 버그가 실제로 있었음(실측 확인). Team/Player는 이 화면이
+        // 갖고 있는 league 컨텍스트가 필요해서 루트로 못 옮기니 그대로 유지.
         .navigationDestination(for: Team.self) { team in
             TeamDetailView(
                 team: team,
@@ -62,6 +69,16 @@ struct LeagueDetailView: View {
             LeaguePlayerDetailView(player: player, league: league)
         }
         .task { await viewModel.load() }
+        .onAppear {
+            #if DEBUG
+            navDebugLogger.debug("🔍 [NavDebug] LeagueDetailView onAppear league=\(league.name)")
+            #endif
+        }
+        .onDisappear {
+            #if DEBUG
+            navDebugLogger.debug("🔍 [NavDebug] LeagueDetailView onDisappear league=\(league.name)")
+            #endif
+        }
     }
 
     // MARK: - Tab Bar

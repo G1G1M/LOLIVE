@@ -24,7 +24,7 @@ struct RecentMatchesCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(items) { item in
-                NavigationLink(destination: MatchDetailView(match: item.match)) {
+                NavigationLink(value: item.match) {
                     RecentMatchRow(opponent: item.opponent, myScore: item.myScore,
                                    oppScore: item.oppScore, won: item.won, date: item.date)
                 }

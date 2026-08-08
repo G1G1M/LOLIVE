@@ -55,6 +55,9 @@ struct TeamDetailView: View {
         }
         .navigationTitle(team.name)
         .navigationBarTitleDisplayMode(.inline)
+        // Match.self는 여기서 등록 안 함 — 각 탭 루트(TodayView 등)에서 한 번만 등록.
+        // 이 화면이 LeagueDetailView 스택에 중첩될 때 같은 타입이 두 번 등록되는 걸 막기 위함
+        // (자세한 이유는 LeagueDetailView.swift 주석 참고).
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { toggleFavorite() } label: {

@@ -47,12 +47,37 @@ struct TodayView: View {
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showMenu) { AppMenuView() }
-            .sheet(isPresented: $showFavorites) { NavigationStack { FavoritesView() } }
+            .sheet(isPresented: $showFavorites) {
+                NavigationStack {
+                    FavoritesView()
+                        .navigationDestination(for: Match.self) { match in
+                            MatchDetailView(match: match)
+                        }
+                        .navigationDestination(for: League.self) { league in
+                            if league.isInternationalTournament {
+                                TournamentDetailView(league: league)
+                            } else {
+                                LeagueDetailView(league: league)
+                            }
+                        }
+                }
+            }
+            // Match.self/League.self는 탭 루트에서 한 번씩만 등록 — 이 화면 안에서 중첩된
+            // LeagueDetailView/TeamDetailView 등이 각자 또 등록하면 중복돼서 뒤로가기 시 화면이
+            // 통째로 다시 만들어지는 버그가 있었다(실측 확인, 자세한 내용은 LeagueDetailView.swift
+            // /MatchDetailView.swift 주석 참고).
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(
                     match: match,
                     liveMatch: viewModel.liveMatches.first { $0.match.id == match.id }
                 )
+            }
+            .navigationDestination(for: League.self) { league in
+                if league.isInternationalTournament {
+                    TournamentDetailView(league: league)
+                } else {
+                    LeagueDetailView(league: league)
+                }
             }
         }
         .task {

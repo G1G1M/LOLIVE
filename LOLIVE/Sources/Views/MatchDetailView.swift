@@ -7,6 +7,9 @@
 //
 
 import SwiftUI
+import os
+
+private let navDebugLogger = Logger(subsystem: "com.lolive", category: "NavDebug")
 
 struct MatchDetailView: View {
     let match: Match
@@ -69,17 +72,34 @@ struct MatchDetailView: View {
                             statsUnavailableCard
                         }
                     }
+
+                    matchInfoSection
                 }
                 .padding()
             }
         }
         .navigationTitle(match.league.name)
         .navigationBarTitleDisplayMode(.inline)
-        .task {
+        // matchInfoSection의 리그 링크는 값 기반(NavigationLink(value:))으로 통일했다 — 예전엔
+        // 클로저 방식(NavigationLink { View })을 썼는데, 이 화면 자체가
+        // .navigationDestination(for: Match.self)라는 값 기반 방식으로 진입해 있어서 두 방식이
+        // 섞이자 리그에서 뒤로가기로 돌아올 때 SwiftUI가 이 화면을 "새 화면"으로 통째로 다시
+        // 만들어버렸음(실측 확인). League.self 목적지 핸들러는 여기서 등록하지 않는다 — League도
+        // Match처럼 자기 완결적이라 각 탭 루트에서 한 번만 등록하면 되는데, 여기서도 등록하면 이
+        // 화면이 LeaguesView 스택에 중첩될 때(리그 목록 → 리그 상세 → 경기 상세) 중복 등록된다.
+        .task(id: match.id) {
             await viewModel.load()
             viewModel.startPolling()
         }
+        .onAppear {
+            #if DEBUG
+            navDebugLogger.debug("🔍 [NavDebug] MatchDetailView onAppear matchId=\(match.id)")
+            #endif
+        }
         .onDisappear {
+            #if DEBUG
+            navDebugLogger.debug("🔍 [NavDebug] MatchDetailView onDisappear matchId=\(match.id)")
+            #endif
             viewModel.stopPolling()
         }
     }
@@ -87,16 +107,13 @@ struct MatchDetailView: View {
     // MARK: - Score Card
 
     private var scoreCard: some View {
-        VStack(spacing: 20) {
-            statusBadge
-
-            HStack(spacing: 0) {
-                teamColumn(team: resolvedTeam(match.teamA), isWinner: match.scoreA > match.scoreB)
-                scoreColumn
-                teamColumn(team: resolvedTeam(match.teamB), isWinner: match.scoreB > match.scoreA)
-            }
+        HStack(spacing: 0) {
+            teamColumn(team: resolvedTeam(match.teamA), isWinner: match.scoreA > match.scoreB)
+            scoreColumn
+            teamColumn(team: resolvedTeam(match.teamB), isWinner: match.scoreB > match.scoreA)
         }
-        .padding(.vertical, 24)
+        .padding(.vertical, 32)
+        .padding(.horizontal, 8)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
@@ -105,19 +122,14 @@ struct MatchDetailView: View {
         NavigationLink {
             TeamDetailView(team: team, league: match.league)
         } label: {
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 CachedAsyncImage(url: URL(string: team.imageURL ?? ""))
-                    .frame(width: 64, height: 64)
-
-                Text(team.name)
-                    .font(.subheadline)
-                    .fontWeight(isWinner ? .bold : .regular)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
+                    .frame(width: 48, height: 48)
 
                 Text(team.code)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.footnote)
+                    .fontWeight(isWinner ? .bold : .regular)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
         }
@@ -125,75 +137,89 @@ struct MatchDetailView: View {
     }
 
     private var scoreColumn: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 12) {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
                 Text("\(match.scoreA)")
-                    .font(.system(size: 48, weight: .bold))
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(match.scoreA > match.scoreB ? .primary : .secondary)
                 Text("-")
-                    .font(.system(size: 32, weight: .light))
+                    .font(.system(size: 22, weight: .light))
                     .foregroundStyle(.secondary)
                 Text("\(match.scoreB)")
-                    .font(.system(size: 48, weight: .bold))
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(match.scoreB > match.scoreA ? .primary : .secondary)
             }
 
-            if let live = liveMatch {
-                Text("Game \(live.currentSet) 진행 중")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            statusText
         }
-        .frame(width: 140)
+        .frame(width: 120)
     }
 
-    // MARK: - Status Badge
-
+    /// 팀 로고/이름 행과 같은 줄에 오는 짧은 상태 텍스트 (LIVE / 경기 종료 / 예정 시각).
+    /// 리그명·날짜 같은 부가 정보는 matchInfoSection(페이지 맨 아래)으로 분리했다.
     @ViewBuilder
-    private var statusBadge: some View {
+    private var statusText: some View {
         switch match.state {
         case .inProgress:
-            VStack(spacing: 4) {
-                LiveBadge()
+            LiveBadge()
+        case .completed:
+            Text("경기 종료")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .unstarted:
+            Text(match.startTime.formatted(
+                .dateTime.month().day().hour().minute().locale(Locale(identifier: "ko_KR"))
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
 
-                if let t = viewModel.lastPolledAt {
-                    Text("\(match.league.name) · 업데이트 \(t, style: .relative) 전")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                } else {
+    // MARK: - Match Info Section (리그 · 날짜/업데이트 시각 — 페이지 맨 아래)
+
+    private var matchInfoSection: some View {
+        VStack(spacing: 4) {
+            NavigationLink(value: match.league) {
+                HStack(spacing: 3) {
                     Text(match.league.name)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .font(.subheadline).fontWeight(.semibold)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+
+            infoSubtext
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    @ViewBuilder
+    private var infoSubtext: some View {
+        switch match.state {
+        case .inProgress:
+            VStack(spacing: 2) {
+                if let live = liveMatch {
+                    Text("Game \(live.currentSet) 진행 중")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let t = viewModel.lastPolledAt {
+                    Text("업데이트 \(t, style: .relative) 전")
+                        .font(.system(size: 10)).foregroundStyle(.tertiary)
                 }
             }
-
         case .completed:
-            let dateText = match.startTime.formatted(
+            Text(match.startTime.formatted(
                 .dateTime.month().day().hour().minute().locale(Locale(identifier: "ko_KR"))
-            )
-            VStack(spacing: 4) {
-                Text("경기 종료")
-                    .font(.caption).fontWeight(.medium).foregroundStyle(.secondary)
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Color.secondary.opacity(0.15)).clipShape(Capsule())
-                Text("\(match.league.name) · \(dateText)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
-
+            ))
+            .font(.caption).foregroundStyle(.secondary)
         case .unstarted:
-            VStack(spacing: 4) {
-                Text(match.startTime.formatted(
-                    .dateTime.month().day().hour().minute().locale(Locale(identifier: "ko_KR"))
-                ))
-                .font(.caption).foregroundStyle(.secondary)
-                .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(Color.secondary.opacity(0.1)).clipShape(Capsule())
-
-                Text(match.league.name)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
+            EmptyView()
         }
     }
 

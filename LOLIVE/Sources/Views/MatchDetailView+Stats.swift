@@ -102,9 +102,9 @@ extension MatchDetailView {
                 if let isWinner {
                     Text(isWinner ? "WIN" : "LOSE")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(isWinner ? Color.blue : Color.secondary)
+                        .foregroundStyle(isWinner ? Color.blue : Color.red)
                         .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(isWinner ? Color.blue.opacity(0.15) : Color.secondary.opacity(0.1))
+                        .background(isWinner ? Color.blue.opacity(0.15) : Color.red.opacity(0.12))
                         .clipShape(Capsule())
                 }
             }

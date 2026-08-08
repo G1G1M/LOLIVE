@@ -49,9 +49,7 @@ struct TournamentDetailView: View {
         }
         .navigationTitle(league.name)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: Match.self) { match in
-            MatchDetailView(match: match)
-        }
+        // Match.self는 여기서 등록 안 함 — 각 탭 루트에서 한 번만 등록(LeagueDetailView.swift 주석 참고).
         .task { await viewModel.load() }
     }
 

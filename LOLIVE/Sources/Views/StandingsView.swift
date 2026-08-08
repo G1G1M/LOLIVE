@@ -36,6 +36,18 @@ struct StandingsView: View {
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            // Match.self/League.self는 탭 루트에서 한 번씩만 등록(중첩 화면에서 중복 등록하면
+            // 뒤로가기 시 화면이 다시 만들어지는 버그가 있었음 — LeagueDetailView.swift 주석 참고).
+            .navigationDestination(for: Match.self) { match in
+                MatchDetailView(match: match)
+            }
+            .navigationDestination(for: League.self) { league in
+                if league.isInternationalTournament {
+                    TournamentDetailView(league: league)
+                } else {
+                    LeagueDetailView(league: league)
+                }
+            }
         }
         .task { await viewModel.loadLeagues() }
     }

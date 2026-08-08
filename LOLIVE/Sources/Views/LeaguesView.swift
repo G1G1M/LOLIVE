@@ -34,11 +34,16 @@ struct LeaguesView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: League.self) { league in
                 // Worlds/MSI는 연도별 히스토리가 있는 TournamentDetailView로 분기
-                if viewModel.internationalSlugs.contains(league.slug) {
+                if league.isInternationalTournament {
                     TournamentDetailView(league: league)
                 } else {
                     LeagueDetailView(league: league)
                 }
+            }
+            // Match.self는 여기서 한 번만 등록 — LeagueDetailView/TeamDetailView 등 중첩 화면에서
+            // 또 등록하면 중복돼서 뒤로가기 시 화면이 다시 만들어지는 버그가 있었다(실측 확인).
+            .navigationDestination(for: Match.self) { match in
+                MatchDetailView(match: match)
             }
         }
         .task { await viewModel.load() }

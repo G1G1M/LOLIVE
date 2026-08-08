@@ -50,6 +50,7 @@ struct LeaguePlayerDetailView: View {
         }
         .navigationTitle(player.summonerName)
         .navigationBarTitleDisplayMode(.inline)
+        // Match.self는 여기서 등록 안 함 — TeamDetailView와 동일한 이유(그쪽 주석 참고).
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { toggleFavorite() } label: {
