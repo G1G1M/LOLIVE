@@ -14,24 +14,22 @@ struct LeaguesView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                titleHeader
-                searchBar
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
 
-                ZStack {
-                    Color(.systemGroupedBackground).ignoresSafeArea()
-
-                    if viewModel.isLoading && viewModel.leagues.isEmpty {
-                        LoadingView()
-                    } else if viewModel.loadFailed && viewModel.leagues.isEmpty {
-                        ErrorRetryView { Task { await viewModel.load() } }
-                    } else {
-                        leagueList
-                    }
+                if viewModel.isLoading && viewModel.leagues.isEmpty {
+                    LoadingView()
+                } else if viewModel.loadFailed && viewModel.leagues.isEmpty {
+                    ErrorRetryView { Task { await viewModel.load() } }
+                } else {
+                    leagueList
                 }
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
+            // 진짜 네이티브 .searchable(리퀴드 글래스 자동 적용)을 쓰려면 시스템 타이틀이
+            // 필요하다 — SwiftUI 구조상 검색창은 항상 네비게이션 바에만 붙기 때문에,
+            // 네비게이션 바를 숨기고 커스텀 타이틀을 쓰면 검색창 자체가 안 뜬다(실측 확인).
+            .navigationTitle("리그")
+            .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "리그 검색")
             .navigationDestination(for: League.self) { league in
                 // Worlds/MSI는 연도별 히스토리가 있는 TournamentDetailView로 분기
                 if league.isInternationalTournament {
@@ -47,41 +45,6 @@ struct LeaguesView: View {
             }
         }
         .task { await viewModel.load() }
-    }
-
-    // MARK: - 헤더
-
-    private var titleHeader: some View {
-        HStack {
-            Text("리그")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(Color(.label))
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 6)
-        .background(Color(.systemGroupedBackground))
-    }
-
-    private var searchBar: some View {
-        GlassFieldBackground {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("리그 검색", text: $viewModel.searchText)
-                    .font(.subheadline)
-                if !viewModel.searchText.isEmpty {
-                    Button { viewModel.searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
     }
 
     // MARK: - 리스트

@@ -7,7 +7,7 @@ import SwiftUI
 
 struct PlayersView: View {
     @State private var viewModel = PlayersViewModel()
-    @FocusState private var isSearchFocused: Bool
+    @State private var isSearchPresented = false
 
     private let roles: [(label: String, value: String)] = [
         ("TOP", "top"), ("JGL", "jungle"), ("MID", "mid"),
@@ -16,35 +16,25 @@ struct PlayersView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // 고정 타이틀 헤더
-                HStack {
-                    Text("선수")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color(.label))
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 6)
-                .background(Color(.systemGroupedBackground))
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
 
-                searchBar
-
-                ZStack {
-                    Color(.systemGroupedBackground).ignoresSafeArea()
-
-                    if viewModel.isLoading {
-                        LoadingView("선수 목록 불러오는 중...")
-                    } else if viewModel.loadFailed {
-                        ErrorRetryView { Task { await viewModel.load() } }
-                    } else {
-                        playerContent
-                    }
+                if viewModel.isLoading {
+                    LoadingView("선수 목록 불러오는 중...")
+                } else if viewModel.loadFailed {
+                    ErrorRetryView { Task { await viewModel.load() } }
+                } else {
+                    playerContent
                 }
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
+            // 진짜 네이티브 .searchable(리퀴드 글래스 자동 적용)을 쓰려면 시스템 타이틀이
+            // 필요하다 — SwiftUI 구조상 검색창은 항상 네비게이션 바에만 붙기 때문에,
+            // 네비게이션 바를 숨기고 커스텀 타이틀을 쓰면 검색창 자체가 안 뜬다(실측 확인).
+            .navigationTitle("선수")
+            .searchable(
+                text: $viewModel.searchText, isPresented: $isSearchPresented,
+                placement: .navigationBarDrawer(displayMode: .always), prompt: "선수 검색"
+            )
             // Match.self/League.self는 탭 루트에서 한 번씩만 등록(LeagueDetailView.swift 주석 참고).
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(match: match)
@@ -58,29 +48,6 @@ struct PlayersView: View {
             }
         }
         .task { await viewModel.load() }
-    }
-
-    // MARK: - Search Bar
-
-    private var searchBar: some View {
-        GlassFieldBackground {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("선수 검색", text: $viewModel.searchText)
-                    .font(.subheadline)
-                    .focused($isSearchFocused)
-                if !viewModel.searchText.isEmpty {
-                    Button { viewModel.searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
     }
 
     // MARK: - Content
@@ -102,7 +69,7 @@ struct PlayersView: View {
 
     @ViewBuilder
     private var filterHeader: some View {
-        if isSearchFocused {
+        if isSearchPresented {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     roleMenu
