@@ -66,6 +66,7 @@ struct LOLIVEApp: App {
 
     init() {
         UNUserNotificationCenter.current().delegate = LOLIVENotificationDelegate.shared
+        _ = SystemAppearance.isDark // 오버라이드가 걸리기 전, 앱 시작 시점에 미리 캐싱
     }
 
     var body: some Scene {
@@ -120,7 +121,7 @@ struct LOLIVEApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.35), value: phase)
-            .preferredColorScheme(appTheme.colorScheme)
+            .preferredColorScheme(appTheme.resolvedColorScheme)
             // 화면 모드 전환 시 전체 화면 크로스페이드가 세그먼트 버튼 애니메이션과 겹쳐
             // 버벅이는 느낌이 났음 — 모드 전환 자체는 애니메이션 없이 즉시 바뀌게 함
             .animation(nil, value: appTheme)
