@@ -14,26 +14,30 @@ struct LeaguesView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                titleHeader
+                searchBar
 
-                if viewModel.isLoading && viewModel.leagues.isEmpty {
-                    LoadingView()
-                } else if viewModel.loadFailed && viewModel.leagues.isEmpty {
-                    ErrorRetryView { Task { await viewModel.load() } }
-                } else {
-                    leagueList
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+
+                    if viewModel.isLoading && viewModel.leagues.isEmpty {
+                        LoadingView()
+                    } else if viewModel.loadFailed && viewModel.leagues.isEmpty {
+                        ErrorRetryView { Task { await viewModel.load() } }
+                    } else {
+                        leagueList
+                    }
                 }
             }
-            // 진짜 네이티브 .searchable(리퀴드 글래스 자동 적용)을 쓰려면 시스템 타이틀이
-            // 필요하다 — SwiftUI 구조상 검색창은 항상 네비게이션 바에만 붙기 때문에,
-            // 네비게이션 바를 숨기고 커스텀 타이틀을 쓰면 검색창 자체가 안 뜬다(실측 확인).
-            // 여백을 줄이려고 인라인+principal(가운데 정렬로 강제됨), 인라인+leading
-            // 툴바 아이템(검색 활성 시 "..." 축약 버튼으로 깨짐)도 시도했지만 둘 다
-            // 실패해서 큰 타이틀 방식을 유지한다. 폰트 크기를 줄여도 큰 타이틀의 위쪽
-            // 여백 자체는 줄지 않음(실측 확인) — iOS가 내부적으로 고정 높이를 예약함.
-            .navigationTitle("리그")
-            .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "리그 검색")
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            // 진짜 네이티브 .searchable(iOS 26 리퀴드 글래스 자동 적용)은 시스템 타이틀에만
+            // 붙어서, 커스텀 타이틀(오늘의 경기/순위와 동일 스타일)을 쓰면 위쪽 여백이 iOS 26
+            // 새 네비게이션 바 디자인 때문에 훨씬 커진다(실측 확인, 큰 타이틀+인라인+원형
+            // 방식 전부 시도해봤지만 여백을 줄이는 동시에 타이틀을 정상 표시할 방법이 없었음).
+            // 그래서 커스텀 검색창에 .glassEffect만 입혀서 겉모습은 동일하게, 여백은
+            // 타이트하게 유지한다(GlassFieldBackground).
             .navigationDestination(for: League.self) { league in
                 // Worlds/MSI는 연도별 히스토리가 있는 TournamentDetailView로 분기
                 if league.isInternationalTournament {
@@ -49,6 +53,41 @@ struct LeaguesView: View {
             }
         }
         .task { await viewModel.load() }
+    }
+
+    // MARK: - 헤더
+
+    private var titleHeader: some View {
+        HStack {
+            Text("리그")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Color(.label))
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private var searchBar: some View {
+        GlassFieldBackground {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("리그 검색", text: $viewModel.searchText)
+                    .font(.subheadline)
+                if !viewModel.searchText.isEmpty {
+                    Button { viewModel.searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
     }
 
     // MARK: - 리스트
