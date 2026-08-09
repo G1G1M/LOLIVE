@@ -108,7 +108,6 @@ struct StandingsView: View {
         Group {
             if viewModel.isLoadingStandings {
                 LoadingView("순위 불러오는 중...")
-                    .frame(minHeight: 120)
             } else if viewModel.standings.isEmpty {
                 EmptyStateView("순위 데이터가 없습니다")
             } else {

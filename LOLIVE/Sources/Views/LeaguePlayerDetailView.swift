@@ -138,7 +138,6 @@ struct LeaguePlayerDetailView: View {
         case .champions:
             if viewModel.isLoadingStats && viewModel.championStats.isEmpty {
                 LoadingView("챔피언 통계 불러오는 중...")
-                    .frame(minHeight: 120)
             } else if viewModel.championStats.isEmpty {
                 EmptyStateView("챔피언 통계가 없습니다", icon: "gamecontroller")
             } else {
@@ -148,7 +147,6 @@ struct LeaguePlayerDetailView: View {
         case .recent:
             if viewModel.recentResults.isEmpty && viewModel.isLoadingStats {
                 LoadingView("최근 경기 불러오는 중...")
-                    .frame(minHeight: 120)
             } else if viewModel.recentResults.isEmpty {
                 EmptyStateView("최근 경기 기록이 없습니다", icon: "calendar.badge.clock")
             } else {

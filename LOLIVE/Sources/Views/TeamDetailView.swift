@@ -141,7 +141,6 @@ struct TeamDetailView: View {
         case .roster:
             if viewModel.isLoading && viewModel.players.isEmpty {
                 LoadingView("선수단 불러오는 중...")
-                    .frame(minHeight: 120)
             } else if viewModel.players.isEmpty {
                 EmptyStateView("선수 정보가 없습니다", icon: "person.3")
             } else {
@@ -150,7 +149,6 @@ struct TeamDetailView: View {
         case .h2h:
             if viewModel.isLoading && viewModel.h2hRecords.isEmpty {
                 LoadingView("상대 전적 불러오는 중...")
-                    .frame(minHeight: 120)
             } else if viewModel.h2hRecords.isEmpty {
                 EmptyStateView("맞대결 기록이 없습니다", icon: "arrow.left.arrow.right")
             } else {
@@ -159,7 +157,6 @@ struct TeamDetailView: View {
         case .recent:
             if viewModel.isLoading && viewModel.recentMatches.isEmpty {
                 LoadingView("최근 경기 불러오는 중...")
-                    .frame(minHeight: 120)
             } else if viewModel.recentMatches.isEmpty {
                 EmptyStateView("최근 경기 기록이 없습니다", icon: "calendar.badge.clock")
             } else {

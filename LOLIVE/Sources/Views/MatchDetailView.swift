@@ -34,7 +34,6 @@ struct MatchDetailView: View {
 
                     if viewModel.isLoading {
                         LoadingView("데이터 불러오는 중...")
-                            .frame(minHeight: 120)
                     } else if let error = viewModel.errorMessage {
                         ErrorRetryView(error) { Task { await viewModel.load() } }
                             .frame(minHeight: 160)
