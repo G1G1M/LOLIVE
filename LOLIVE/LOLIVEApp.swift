@@ -121,6 +121,9 @@ struct LOLIVEApp: App {
             }
             .animation(.easeInOut(duration: 0.35), value: phase)
             .preferredColorScheme(appTheme.colorScheme)
+            // 화면 모드 전환 시 전체 화면 크로스페이드가 세그먼트 버튼 애니메이션과 겹쳐
+            // 버벅이는 느낌이 났음 — 모드 전환 자체는 애니메이션 없이 즉시 바뀌게 함
+            .animation(nil, value: appTheme)
         }
         .onChange(of: scenePhase) { _, newPhase in
             // 포그라운드 복귀 시 즉시 폴링 재시작 → 백그라운드 중 시작된 경기도 즉각 감지
