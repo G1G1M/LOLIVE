@@ -143,6 +143,7 @@ struct PlayersView: View {
                     .lineLimit(1)
             }
         }
+        .tint(Color(.label))
     }
 
     private var leagueMenu: some View {
@@ -168,6 +169,7 @@ struct PlayersView: View {
                     .lineLimit(1)
             }
         }
+        .tint(Color(.label))
     }
 
     // MARK: - Player List

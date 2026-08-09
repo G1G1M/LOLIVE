@@ -23,6 +23,12 @@ struct StandingsView: View {
                 .padding(.bottom, 6)
                 .background(Color(.systemGroupedBackground))
 
+                // 리그 선택 칩은 스크롤과 무관하게 항상 고정 — 스크롤/새로고침(리그 재선택 시
+                // 순위표 재로딩 포함)은 아래 순위 리스트 영역에서만 일어나게 분리.
+                if !viewModel.isLoadingLeagues && !viewModel.loadFailed {
+                    leagueSelector
+                }
+
                 ZStack {
                     Color(.systemGroupedBackground).ignoresSafeArea()
                     if viewModel.isLoadingLeagues {
@@ -56,14 +62,8 @@ struct StandingsView: View {
 
     private var standingsContent: some View {
         ScrollView {
-            LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
-                Section {
-                    standingsBody
-                } header: {
-                    leagueSelector
-                }
-            }
-            .padding(.bottom, 20)
+            standingsBody
+                .padding(.bottom, 20)
         }
         .refreshable {
             await viewModel.refreshStandings()
