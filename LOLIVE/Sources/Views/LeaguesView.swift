@@ -14,10 +14,11 @@ struct LeaguesView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                titleHeader
-                searchBar
-
+            // SwiftUI .searchable은 iOS 26 큰 타이틀과 결합하면 위쪽 여백이 커지는 문제가
+            // 있어서(실측 확인, 못 줄임), 앱스토어 등이 쓰는 진짜 UIKit UISearchController를
+            // 직접 붙인다(UIKitSearchBar). 문제 생기면 커스텀 titleHeader+searchBar(git
+            // history에 남아있음, GlassFieldBackground 기반)로 되돌릴 것.
+            UIKitSearchBar(text: $viewModel.searchText, placeholder: "리그 검색") {
                 ZStack {
                     Color(.systemGroupedBackground).ignoresSafeArea()
 
@@ -30,14 +31,7 @@ struct LeaguesView: View {
                     }
                 }
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
-            // 진짜 네이티브 .searchable(iOS 26 리퀴드 글래스 자동 적용)은 시스템 타이틀에만
-            // 붙어서, 커스텀 타이틀(오늘의 경기/순위와 동일 스타일)을 쓰면 위쪽 여백이 iOS 26
-            // 새 네비게이션 바 디자인 때문에 훨씬 커진다(실측 확인, 큰 타이틀+인라인+원형
-            // 방식 전부 시도해봤지만 여백을 줄이는 동시에 타이틀을 정상 표시할 방법이 없었음).
-            // 그래서 커스텀 검색창에 .glassEffect만 입혀서 겉모습은 동일하게, 여백은
-            // 타이트하게 유지한다(GlassFieldBackground).
+            .navigationTitle("리그")
             .navigationDestination(for: League.self) { league in
                 // Worlds/MSI는 연도별 히스토리가 있는 TournamentDetailView로 분기
                 if league.isInternationalTournament {
@@ -53,41 +47,6 @@ struct LeaguesView: View {
             }
         }
         .task { await viewModel.load() }
-    }
-
-    // MARK: - 헤더
-
-    private var titleHeader: some View {
-        HStack {
-            Text("리그")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(Color(.label))
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 6)
-        .background(Color(.systemGroupedBackground))
-    }
-
-    private var searchBar: some View {
-        GlassFieldBackground {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("리그 검색", text: $viewModel.searchText)
-                    .font(.subheadline)
-                if !viewModel.searchText.isEmpty {
-                    Button { viewModel.searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
     }
 
     // MARK: - 리스트
