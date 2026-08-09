@@ -67,21 +67,32 @@ struct PlayersView: View {
     // MARK: - Search Bar
 
     private var searchBar: some View {
-        GlassFieldBackground {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("선수 검색", text: $viewModel.searchText)
-                    .font(.subheadline)
-                    .focused($isSearchFocused)
-                if !viewModel.searchText.isEmpty {
-                    Button { viewModel.searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            GlassFieldBackground {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("선수 검색", text: $viewModel.searchText)
+                        .font(.subheadline)
+                        .focused($isSearchFocused)
+                    if !viewModel.searchText.isEmpty {
+                        Button { viewModel.searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
+
+            if isSearchFocused {
+                SearchCancelButton {
+                    viewModel.searchText = ""
+                    isSearchFocused = false
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: isSearchFocused)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(Color(.systemGroupedBackground))

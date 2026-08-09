@@ -11,6 +11,7 @@ import SwiftUI
 struct LeaguesView: View {
 
     @State private var viewModel = LeaguesViewModel()
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -80,20 +81,32 @@ struct LeaguesView: View {
     }
 
     private var searchBar: some View {
-        GlassFieldBackground {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("리그 검색", text: $viewModel.searchText)
-                    .font(.subheadline)
-                if !viewModel.searchText.isEmpty {
-                    Button { viewModel.searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            GlassFieldBackground {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("리그 검색", text: $viewModel.searchText)
+                        .font(.subheadline)
+                        .focused($isSearchFocused)
+                    if !viewModel.searchText.isEmpty {
+                        Button { viewModel.searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
+
+            if isSearchFocused {
+                SearchCancelButton {
+                    viewModel.searchText = ""
+                    isSearchFocused = false
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: isSearchFocused)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(Color(.systemGroupedBackground))
