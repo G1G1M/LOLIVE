@@ -34,10 +34,19 @@ struct LeaguesView: View {
             .toolbar(.hidden, for: .navigationBar)
             // 진짜 네이티브 .searchable(iOS 26 리퀴드 글래스 자동 적용)은 시스템 타이틀에만
             // 붙어서, 커스텀 타이틀(오늘의 경기/순위와 동일 스타일)을 쓰면 위쪽 여백이 iOS 26
-            // 새 네비게이션 바 디자인 때문에 훨씬 커진다(실측 확인, 큰 타이틀+인라인+원형
-            // 방식 전부 시도해봤지만 여백을 줄이는 동시에 타이틀을 정상 표시할 방법이 없었음).
-            // 그래서 커스텀 검색창에 .glassEffect만 입혀서 겉모습은 동일하게, 여백은
-            // 타이트하게 유지한다(GlassFieldBackground).
+            // 새 네비게이션 바 디자인 때문에 훨씬 커진다(실측 확인). 여백을 줄이는 조합도
+            // 여럿 시도함:
+            //  - 큰 타이틀(.large) + searchable: 여백 큼, 폰트를 줄여도 안 줄어듦
+            //  - 인라인 + 시스템 기본 타이틀(가운데 정렬, 작은 글씨) + searchable: 여백 줄고
+            //    정상 작동하지만 가운데 정렬/작은 폰트라 스타일이 안 맞음
+            //  - 인라인 + leading 커스텀 뷰(왼쪽 정렬 시도, .navigationBarLeading/.topBarLeading
+            //    둘 다) + searchable: iOS 26이 타이틀을 "..." 축약 버튼으로 바꿔버림(재현됨)
+            //  - 인라인 + principal 커스텀 뷰 + searchable: 가운데 정렬로 강제됨
+            //  - UIKit UISearchController 브릿지(UIViewControllerRepresentable): 여백/검색
+            //    다 되지만 NavigationLink가 중첩 UIHostingController를 못 넘을 위험 있어 보류
+            // "여백 줄이기 + 왼쪽정렬 유지 + 진짜 searchable" 셋 다 동시에 만족하는 조합을
+            // 못 찾아서, 커스텀 검색창에 .glassEffect만 입혀 겉모습은 동일하게, 스타일은
+            // 오늘의 경기/순위와 통일된 상태를 유지한다(GlassFieldBackground).
             .navigationDestination(for: League.self) { league in
                 // Worlds/MSI는 연도별 히스토리가 있는 TournamentDetailView로 분기
                 if league.isInternationalTournament {
