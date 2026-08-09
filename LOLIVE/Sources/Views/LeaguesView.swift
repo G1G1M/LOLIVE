@@ -89,12 +89,6 @@ struct LeaguesView: View {
                     TextField("리그 검색", text: $viewModel.searchText)
                         .font(.subheadline)
                         .focused($isSearchFocused)
-                    if !viewModel.searchText.isEmpty {
-                        Button { viewModel.searchText = "" } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
                 }
             }
 
