@@ -23,12 +23,8 @@ extension LeagueDetailView {
                 )
                 .padding(.top, 60)
             } else {
-                yearSelector
+                historySelectorRow
                 Divider()
-                if !viewModel.availableHistoricalRounds.isEmpty {
-                    roundSelector
-                    Divider()
-                }
                 historyMatchList
             }
         }
@@ -43,69 +39,90 @@ extension LeagueDetailView {
         }
     }
 
-    // MARK: - 연도 선택
+    // MARK: - 연도 + 라운드 선택 (한 줄에 드롭다운 두 개)
 
-    private var yearSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(viewModel.historicalYears, id: \.self) { year in
-                    let isSelected = year == viewModel.selectedHistoricalYear
-                    SelectableChip(isSelected: isSelected) {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            viewModel.selectHistoricalYear(year)
-                        }
-                    } label: {
-                        Text(String(year))
-                            .font(.subheadline).fontWeight(isSelected ? .bold : .regular)
-                            .foregroundStyle(isSelected ? .white : .secondary)
-                    }
-                }
+    // 라벨 글자 수가 바뀔 때(예: "전체" → "Rounds 1-2 · Week 9 (10)") 캡슐(Liquid Glass) 크기가
+    // 자연스럽게 커졌다 작아지게 하려면, iOS 26의 glassEffect는 반드시 GlassEffectContainer로
+    // 감싸야 한다 — 컨테이너 없이 개별 .glassEffect()만 쓰면 모양 변화가 부드럽게 보간되지 않고
+    // 뚝뚝 끊겨 보인다(애플 문서화된 동작, 실측으로도 확인: .animation()을 껐다 켜도 변화 없었음).
+    @ViewBuilder
+    private var historySelectorRow: some View {
+        let row = HStack(spacing: 8) {
+            yearMenu
+            if !viewModel.availableHistoricalRounds.isEmpty {
+                roundMenu
             }
-            .padding(.horizontal, 16).padding(.vertical, 10)
+            Spacer()
         }
+        .padding(.horizontal, 16).padding(.vertical, 10)
         .background(Color(.systemGroupedBackground))
+
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 8) { row }
+        } else {
+            row
+        }
     }
 
-    // MARK: - 라운드 선택 (플레이오프/그룹 스테이지 등 — 연도 안에서 좁혀보기)
-
-    private var roundSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                let isAllSelected = viewModel.selectedHistoricalRound == nil
-                SelectableChip(isSelected: isAllSelected) {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        viewModel.selectedHistoricalRound = nil
+    private var yearMenu: some View {
+        Menu {
+            ForEach(viewModel.historicalYears, id: \.self) { year in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        viewModel.selectHistoricalYear(year)
                     }
                 } label: {
-                    Text("전체")
-                        .font(.subheadline).fontWeight(isAllSelected ? .semibold : .regular)
-                        .foregroundStyle(isAllSelected ? .white : .primary)
-                }
-
-                ForEach(viewModel.availableHistoricalRounds) { round in
-                    let isSelected = round.label == viewModel.selectedHistoricalRound
-                    SelectableChip(isSelected: isSelected) {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            viewModel.selectedHistoricalRound = round.label
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(round.label)
-                                .font(.subheadline).fontWeight(isSelected ? .semibold : .regular)
-                            Text("\(round.matches.count)")
-                                .font(.caption2).fontWeight(.medium)
-                                .padding(.horizontal, 5).padding(.vertical, 2)
-                                .background(isSelected ? Color.white.opacity(0.25)
-                                            : Color(.tertiarySystemGroupedBackground))
-                                .clipShape(Capsule())
-                        }
-                        .foregroundStyle(isSelected ? .white : .secondary)
+                    if year == viewModel.selectedHistoricalYear {
+                        Label(String(year), systemImage: "checkmark")
+                    } else {
+                        Text(String(year))
                     }
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 10)
+        } label: {
+            MenuFilterLabel {
+                Text(viewModel.selectedHistoricalYear.map(String.init) ?? "연도")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .contentTransition(.opacity)
+            }
         }
-        .background(Color(.systemGroupedBackground))
+        .tint(Color(.label))
+    }
+
+    private var roundMenu: some View {
+        Menu {
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    viewModel.selectedHistoricalRound = nil
+                }
+            } label: {
+                if viewModel.selectedHistoricalRound == nil { Label("전체", systemImage: "checkmark") }
+                else { Text("전체") }
+            }
+            ForEach(viewModel.availableHistoricalRounds) { round in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        viewModel.selectedHistoricalRound = round.label
+                    }
+                } label: {
+                    let text = "\(round.label) (\(round.matches.count))"
+                    if round.label == viewModel.selectedHistoricalRound {
+                        Label(text, systemImage: "checkmark")
+                    } else {
+                        Text(text)
+                    }
+                }
+            }
+        } label: {
+            MenuFilterLabel {
+                Text(viewModel.selectedHistoricalRound ?? "전체")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .contentTransition(.opacity)
+            }
+        }
+        .tint(Color(.label))
     }
 
     // MARK: - 경기 목록 (날짜별 그룹핑)

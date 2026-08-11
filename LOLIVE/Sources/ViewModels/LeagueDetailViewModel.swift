@@ -201,8 +201,8 @@ final class LeagueDetailViewModel {
         let teamIds = fetchedStandings.map { $0.team.id }
         let svc = service
 
-        // Leaguepedia에서 이 리그의 공식 선수 목록 조회 (Riot API 로스터와 병렬)
-        async let leaguepediaTask = LeaguepediaService.shared.playerNames(league: league)
+        // Oracle's Elixir에서 이 리그의 공식 선수 목록 조회 (Riot API 로스터와 병렬)
+        async let officialNamesTask = OracleElixirService.shared.fetchOfficialPlayerNames(league: league)
 
         let rawPlayers = await withTaskGroup(of: [Player].self) { group in
             for teamId in teamIds {
@@ -213,11 +213,11 @@ final class LeagueDetailViewModel {
             return result
         }
 
-        let validNames = await leaguepediaTask
+        let validNames = await officialNamesTask
 
         let filteredPlayers: [Player]
         if let validNames {
-            // Leaguepedia 공식 명단 기준 필터
+            // Oracle's Elixir 공식 명단 기준 필터
             filteredPlayers = rawPlayers.filter { validNames.contains($0.summonerName.lowercased()) }
         } else {
             // Fallback: 팀·포지션별 1명 (Riot API 조직 전체 반환 대응)
@@ -283,7 +283,8 @@ final class LeagueDetailViewModel {
         guard let leagueName = LeaguepediaService.shared.leaguepediaName(for: league) else { return }
         isLoadingHistoricalMatches = true
         defer { isLoadingHistoricalMatches = false }
-        historicalMatches = await FirebaseHistoricalService.fetchMatches(leagueName: leagueName, year: year)
+        let fetched = await FirebaseHistoricalService.fetchMatches(leagueName: leagueName, year: year)
+        historicalMatches = Match.deduplicatedAcrossSources(fetched)
             .sorted { $0.startTime < $1.startTime }
     }
 

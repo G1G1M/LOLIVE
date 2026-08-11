@@ -172,7 +172,8 @@ final class TournamentDetailViewModel {
             return results
         }
         for serverMatches in fetchedByYear {
-            let unique = deduplicateAgainstRiot(serverMatches, riotMatches: riotMatches)
+            let deduped = Match.deduplicatedAcrossSources(serverMatches)
+            let unique = deduplicateAgainstRiot(deduped, riotMatches: riotMatches)
             if !unique.isEmpty { allMatches.append(contentsOf: unique) }
         }
 
