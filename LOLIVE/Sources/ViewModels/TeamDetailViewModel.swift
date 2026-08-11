@@ -172,10 +172,10 @@ final class TeamDetailViewModel {
                    role: $0.role, imageURL: nil, teamId: team.id, teamCode: team.code)
         }
 
-        let leaguepedia = LeaguepediaService.shared
+        let oracleElixir = OracleElixirService.shared
         let imageURLs: [Int: URL] = await withTaskGroup(of: (Int, URL?).self) { group in
             for (idx, player) in basePlayers.enumerated() {
-                group.addTask { (idx, await leaguepedia.fetchPlayerImageURL(summonerName: player.summonerName)) }
+                group.addTask { (idx, await oracleElixir.fetchPlayerImageURL(summonerName: player.summonerName)) }
             }
             var results: [Int: URL] = [:]
             for await (idx, url) in group where url != nil {

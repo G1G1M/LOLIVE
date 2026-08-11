@@ -31,7 +31,7 @@
 |-----|------|
 | Riot Esports API (비공식) | 경기 일정, 라이브 스코어, 팀·선수 정보 |
 | Leaguepedia MediaWiki Cargo API | 선수 시즌 스탯, 과거 대회 경기 기록 |
-| oe.datalisk.io (Oracle's Elixir 비공식 API) | 과거 시즌 백필(2013년~) 원본 데이터 |
+| oe.datalisk.io (Oracle's Elixir 비공식 API) | 과거 시즌 백필(2013년~) 원본 데이터, 선수 프로필 사진 |
 
 ## 주요 기능
 

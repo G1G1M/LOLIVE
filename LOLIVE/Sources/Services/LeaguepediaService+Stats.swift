@@ -173,39 +173,6 @@ extension LeaguepediaService {
         return (team1Bans: t1, team2Bans: t2)
     }
 
-    // MARK: - 선수 프로필 이미지
-
-    /// Leaguepedia Players 테이블에서 선수 프로필 이미지 URL 반환.
-    /// Riot API는 선수 이미지를 제공하지 않으므로 Leaguepedia 보완 데이터 사용.
-    func fetchPlayerImageURL(summonerName: String) async -> URL? {
-        let cacheKey = CacheKey.leaguepediaPlayerImage(summonerName: summonerName)
-        if let cached: String = AppDiskCache.get(cacheKey) {
-            return cached.isEmpty ? nil : URL(string: cached)
-        }
-        var c = URLComponents(string: baseURL)!
-        c.queryItems = [
-            .init(name: "action", value: "cargoquery"),
-            .init(name: "tables", value: "Players"),
-            .init(name: "fields", value: "Players.Photo"),
-            .init(name: "where",  value: "Players.ID='\(escapeSql(summonerName))'"),
-            .init(name: "limit",  value: "1"),
-            .init(name: "format", value: "json"),
-        ]
-        guard let url = c.url,
-              let data = await cargoData(url: url),
-              let resp = try? JSONDecoder().decode(CargoResp.self, from: data),
-              let photo = resp.cargoquery.first?.title["Photo"], !photo.isEmpty else {
-            // 결과 없음도 캐싱해 불필요한 재요청 방지
-            AppDiskCache.set(cacheKey, value: "")
-            return nil
-        }
-        let encoded = photo.replacingOccurrences(of: " ", with: "_")
-            .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? photo
-        let urlString = "https://lol.fandom.com/wiki/Special:FilePath/\(encoded)"
-        AppDiskCache.set(cacheKey, value: urlString)
-        return URL(string: urlString)
-    }
-
     // MARK: - 배치 로드 (내부)
 
     /// 리그 전체 선수의 챔피언 픽을 한 번에 로드.

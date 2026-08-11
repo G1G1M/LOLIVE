@@ -97,8 +97,8 @@ extension OnboardingView {
                     .task {
                         let name = player.summonerName
                         guard loader.playerImageURLs[name] == nil else { return }
-                        AppDiskCache.clear(.leaguepediaPlayerImage(summonerName: name))
-                        if let url = await LeaguepediaService.shared.fetchPlayerImageURL(summonerName: name) {
+                        AppDiskCache.clear(.oracleElixirPlayerImage(summonerName: name))
+                        if let url = await OracleElixirService.shared.fetchPlayerImageURL(summonerName: name) {
                             loader.playerImageURLs[name] = url
                         }
                     }

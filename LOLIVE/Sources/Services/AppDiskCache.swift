@@ -90,7 +90,7 @@ enum CacheKey {
     case standings(tournamentId: String)
     case roster(teamId: String)
     case live
-    case leaguepediaPlayerImage(summonerName: String)
+    case oracleElixirPlayerImage(summonerName: String)
 
     var stringValue: String {
         switch self {
@@ -101,7 +101,7 @@ enum CacheKey {
         case .standings(let id): return "standings_\(id)"
         case .roster(let id): return "roster_\(id)"
         case .live: return "live"
-        case .leaguepediaPlayerImage(let name): return "lp_playerimg_\(name)"
+        case .oracleElixirPlayerImage(let name): return "oe_playerimg_\(name)"
         }
     }
 
@@ -114,7 +114,7 @@ enum CacheKey {
         case .standings: return 3600
         case .roster: return 12 * 3600
         case .live: return 5 * 60
-        case .leaguepediaPlayerImage: return 7 * 24 * 3600
+        case .oracleElixirPlayerImage: return 7 * 24 * 3600
         }
     }
 }

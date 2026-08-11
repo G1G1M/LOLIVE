@@ -69,11 +69,11 @@ final class OnboardingLoader {
                 guard playerImageURLs.isEmpty,
                       let window = gameWindow,
                       let currentMatch = match else { return }
-                let leaguepedia = LeaguepediaService.shared
+                let oracleElixir = OracleElixirService.shared
                 let targets = [window.bluePlayers.first, window.redPlayers.first].compactMap { $0 }
                 var urls: [String: URL] = [:]
                 for player in targets {
-                    if let url = await leaguepedia.fetchPlayerImageURL(summonerName: player.summonerName) {
+                    if let url = await oracleElixir.fetchPlayerImageURL(summonerName: player.summonerName) {
                         urls[player.summonerName] = url
                     }
                 }
@@ -141,11 +141,11 @@ final class OnboardingLoader {
             return
         }
         let targets = [window.bluePlayers.first, window.redPlayers.first].compactMap { $0 }
-        let leaguepedia = LeaguepediaService.shared
+        let oracleElixir = OracleElixirService.shared
         var urls: [String: URL] = [:]
         for player in targets {
             guard !Task.isCancelled else { break }
-            if let url = await leaguepedia.fetchPlayerImageURL(summonerName: player.summonerName) {
+            if let url = await oracleElixir.fetchPlayerImageURL(summonerName: player.summonerName) {
                 urls[player.summonerName] = url
             }
         }
