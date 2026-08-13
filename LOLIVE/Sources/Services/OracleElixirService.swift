@@ -105,32 +105,76 @@ struct OracleElixirService: Sendable {
     // MARK: - 팀 시즌 스탯
 
     /// `/stats/teams/byTournament` 원본 행 — 필드명은 OE 표기 그대로(AGT=평균 게임 시간(분),
-    /// FB%=퍼스트블러드율, DRG%=드래곤 획득률, BN%=바론 획득률, GD15=15분 골드 격차).
+    /// FB%=퍼스트블러드율, DRG%=드래곤 획득률, BN%=바론 획득률, GD15=15분 골드 격차, 그 외 확장
+    /// 필드는 `TeamSeasonStats` 정의부 주석 참고). `%` 필드는 팀에 따라 `null`이 오기도 해서
+    /// (예: 장로 드래곤이 안 나온 시즌의 ELD%) 전부 옵셔널 raw 문자열로 받고 변환한다.
     private struct TeamStatsRow: Codable {
         let Team: String
         let GP: Int
         let W: Int
         let L: Int
         let AGT: Double
+        let K: Int
+        let D: Int
+        let KD: Double
+        let CKPM: Double
+        let GPR: Double
+        let EGR: Double
+        let MLR: Double
         let GD15: Double?
+        let PPG: Double
+        let WPM: Double
+        let CWPM: Double
+        let WCPM: Double
+        private let gspdRaw: String?
         private let firstBloodRateRaw: String?
+        private let firstTowerRateRaw: String?
+        private let firstToThreeTowersRateRaw: String?
+        private let heraldRateRaw: String?
+        private let voidGrubsRateRaw: String?
+        private let firstDragonRateRaw: String?
         private let dragonRateRaw: String?
+        private let elderDragonRateRaw: String?
+        private let firstBaronRateRaw: String?
         private let baronRateRaw: String?
+        private let laneCsShareRaw: String?
+        private let jungleCsShareRaw: String?
 
         enum CodingKeys: String, CodingKey {
-            case Team, GP, W, L, AGT, GD15
+            case Team, GP, W, L, AGT, K, D, KD, CKPM, GPR, EGR, MLR, GD15, PPG, WPM, CWPM, WCPM
+            case gspdRaw = "GSPD"
             case firstBloodRateRaw = "FB%"
+            case firstTowerRateRaw = "FT%"
+            case firstToThreeTowersRateRaw = "F3T%"
+            case heraldRateRaw = "HLD%"
+            case voidGrubsRateRaw = "GRB%"
+            case firstDragonRateRaw = "FD%"
             case dragonRateRaw = "DRG%"
+            case elderDragonRateRaw = "ELD%"
+            case firstBaronRateRaw = "FBN%"
             case baronRateRaw = "BN%"
+            case laneCsShareRaw = "LNE%"
+            case jungleCsShareRaw = "JNG%"
         }
 
-        var firstBloodRate: Double { Self.percent(firstBloodRateRaw) }
-        var dragonRate: Double { Self.percent(dragonRateRaw) }
-        var baronRate: Double { Self.percent(baronRateRaw) }
+        var killDeathRatio: Double { KD }
+        var goldSpentPercentDiff: Double { Self.percent(gspdRaw) ?? 0 }
+        var firstBloodRate: Double { Self.percent(firstBloodRateRaw) ?? 0 }
+        var firstTowerRate: Double { Self.percent(firstTowerRateRaw) ?? 0 }
+        var firstToThreeTowersRate: Double { Self.percent(firstToThreeTowersRateRaw) ?? 0 }
+        var heraldRate: Double { Self.percent(heraldRateRaw) ?? 0 }
+        var voidGrubsRate: Double { Self.percent(voidGrubsRateRaw) ?? 0 }
+        var firstDragonRate: Double { Self.percent(firstDragonRateRaw) ?? 0 }
+        var dragonRate: Double { Self.percent(dragonRateRaw) ?? 0 }
+        var elderDragonRate: Double? { Self.percent(elderDragonRateRaw) }
+        var firstBaronRate: Double { Self.percent(firstBaronRateRaw) ?? 0 }
+        var baronRate: Double { Self.percent(baronRateRaw) ?? 0 }
+        var laneCsShare: Double { Self.percent(laneCsShareRaw) ?? 0 }
+        var jungleCsShare: Double { Self.percent(jungleCsShareRaw) ?? 0 }
 
-        private static func percent(_ raw: String?) -> Double {
+        private static func percent(_ raw: String?) -> Double? {
             guard let raw, let value = Double(raw.replacingOccurrences(of: "%", with: ""))
-            else { return 0 }
+            else { return nil }
             return value / 100
         }
     }
@@ -168,7 +212,27 @@ struct OracleElixirService: Sendable {
             firstBloodRate: row.firstBloodRate,
             dragonRate: row.dragonRate,
             baronRate: row.baronRate,
-            goldDiffAt15: row.GD15 ?? 0
+            goldDiffAt15: row.GD15 ?? 0,
+            kills: row.K, deaths: row.D,
+            killDeathRatio: row.killDeathRatio,
+            combinedKillsPerMinute: row.CKPM,
+            goldPercentRating: row.GPR,
+            goldSpentPercentDiff: row.goldSpentPercentDiff,
+            earlyGameRating: row.EGR,
+            midLateRating: row.MLR,
+            firstTowerRate: row.firstTowerRate,
+            firstToThreeTowersRate: row.firstToThreeTowersRate,
+            platesPerGame: row.PPG,
+            heraldRate: row.heraldRate,
+            voidGrubsRate: row.voidGrubsRate,
+            firstDragonRate: row.firstDragonRate,
+            elderDragonRate: row.elderDragonRate,
+            firstBaronRate: row.firstBaronRate,
+            laneCsShare: row.laneCsShare,
+            jungleCsShare: row.jungleCsShare,
+            wardsPerMinute: row.WPM,
+            controlWardsPerMinute: row.CWPM,
+            wardsClearedPerMinute: row.WCPM
         )
     }
 

@@ -14,6 +14,7 @@ struct TeamDetailView: View {
     @State private var viewModel: TeamDetailViewModel
     @State private var isFavorited = false
     @State private var selectedTab: TeamTab = .roster
+    @State private var showStatsDetail = false
     @Environment(\.modelContext) private var modelContext
     @Environment(TodayViewModel.self) private var todayViewModel
 
@@ -74,6 +75,11 @@ struct TeamDetailView: View {
             )
             await viewModel.load()
             checkFavoriteStatus()
+        }
+        .sheet(isPresented: $showStatsDetail) {
+            if let stats = viewModel.teamStats {
+                TeamStatsDetailSheet(teamName: team.name, stats: stats)
+            }
         }
     }
 
@@ -317,6 +323,8 @@ struct TeamDetailView: View {
                 Spacer()
                 Text("\(stats.games)경기")
                     .font(.caption).foregroundStyle(.secondary)
+                Image(systemName: "chevron.right")
+                    .font(.caption).fontWeight(.semibold).foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
 
@@ -364,6 +372,10 @@ struct TeamDetailView: View {
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .onTapGesture { showStatsDetail = true }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("시즌 스탯 상세 보기")
     }
 
     private func teamStatColumn(value: String, label: String, color: Color = .primary) -> some View {
