@@ -76,12 +76,14 @@ extension FavoriteTeamWidgetView {
             // 작은 기기에서 양옆 팀 패널이 좁아지고 큰 기기에서는 가운데만 휑하게 남을 수 있음.
             let midWidth = max(90, min(130, geo.size.width * 0.32))
 
-            // 컴포넌트 크기(로고/폰트/캐러셀 버튼)는 그대로 두고, 요소 사이 간격을 패딩(20)과
-            // 어울리는 스케일로 확실하게 벌림 — 조금씩 늘리는 게 아니라 패딩과 비슷한 크기로.
+            // 실제 계산해서 맞춘 값 — Medium 캔버스 최소 높이(가장 작은 기기 기준 약 155pt)에서
+            // 패딩 20(위아래 40) + 캐러셀 줄(36, 여러 팀일 때만) + 여백을 다 빼고 남는 공간에
+            // 로고(44)+텍스트가 겨우 들어가는 수준이라, 간격을 6pt 선에서 확정함(그 이상은
+            // 작은 기기에서 실제로 잘림 — 실측 확인).
             VStack(spacing: 0) {
                 if let match = entry.nextMatch {
                     HStack(spacing: 0) {
-                        VStack(spacing: 14) {
+                        VStack(spacing: 6) {
                             teamLogo(data: entry.teamImageData, size: 44)
                             Text(entry.teamCode)
                                 .font(.subheadline).fontWeight(.bold).foregroundStyle(.primary)
@@ -89,7 +91,7 @@ extension FavoriteTeamWidgetView {
                         }
                         .frame(maxWidth: .infinity)
 
-                        VStack(spacing: 14) {
+                        VStack(spacing: 6) {
                             if match.isLive {
                                 liveBadge
                                 matchTimeView(match: match, compact: true)
@@ -99,11 +101,11 @@ extension FavoriteTeamWidgetView {
                             Text(entry.leagueName)
                                 .font(.caption2).foregroundStyle(.secondary)
                                 .lineLimit(1)
-                                .padding(.top, 4)
+                                .padding(.top, 3)
                         }
                         .frame(width: midWidth)
 
-                        VStack(spacing: 14) {
+                        VStack(spacing: 6) {
                             teamLogo(data: entry.opponentImageData, size: 44)
                             Text(match.opponentCode)
                                 .font(.subheadline).fontWeight(.bold).foregroundStyle(.primary)
@@ -115,9 +117,9 @@ extension FavoriteTeamWidgetView {
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(nextMatchAccessibilityLabel(match, myTeam: entry.teamName))
                 } else {
-                    HStack(spacing: 20) {
+                    HStack(spacing: 14) {
                         teamLogo(data: entry.teamImageData, size: 44)
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(entry.teamCode)
                                 .font(.title3).fontWeight(.bold).foregroundStyle(.primary)
                                 .lineLimit(1)
@@ -126,7 +128,7 @@ extension FavoriteTeamWidgetView {
                                 .lineLimit(1)
                             Text("예정된 경기 없음")
                                 .font(.caption2).foregroundStyle(.secondary)
-                                .padding(.top, 4)
+                                .padding(.top, 3)
                         }
                         Spacer()
                     }
@@ -136,7 +138,7 @@ extension FavoriteTeamWidgetView {
                 }
 
                 if entry.totalTeams > 1 {
-                    Spacer(minLength: 16)
+                    Spacer(minLength: 4)
                     carouselControls
                 }
             }

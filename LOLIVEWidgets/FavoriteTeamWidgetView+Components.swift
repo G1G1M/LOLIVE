@@ -102,14 +102,16 @@ extension FavoriteTeamWidgetView {
         let prev = (entry.currentIndex - 1 + entry.totalTeams) % entry.totalTeams
         let next = (entry.currentIndex + 1) % entry.totalTeams
 
-        // 아이콘 자체는 지금 크기(시각적으로 작게) 그대로 두고, 탭 가능한 영역만 44×44pt로
-        // 넓힌다 — .contentShape로 히트 영역을 아이콘보다 크게 잡아서 오터치 없이 누르기 쉽게.
+        // 아이콘 자체는 지금 크기(시각적으로 작게) 그대로 두고, 탭 가능한 영역을 넓힌다 —
+        // 너비는 44pt(가로로 넉넉하게), 높이는 36pt. Medium 캔버스가 기기별로 최소 155pt인데
+        // 패딩 20 + 이 줄까지 44pt를 그대로 쓰면 나머지 요소가 들어갈 자리가 5pt도 안 남아서
+        // 무조건 잘렸다 — 높이만 36으로 줄여서 규격 안에 확실히 들어가게 함.
         return HStack(spacing: 0) {
             Button(intent: NavigateTeamIntent(newIndex: prev)) {
                 Image(systemName: "chevron.left")
                     .font(.caption).fontWeight(.semibold)
                     .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 44, height: 36)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -123,13 +125,13 @@ extension FavoriteTeamWidgetView {
                 Image(systemName: "chevron.right")
                     .font(.caption).fontWeight(.semibold)
                     .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 44, height: 36)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("다음 팀")
         }
-        .frame(height: 44)
+        .frame(height: 36)
     }
 
     // MARK: - Common
