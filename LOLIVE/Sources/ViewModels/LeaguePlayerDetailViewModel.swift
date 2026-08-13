@@ -42,7 +42,26 @@ final class LeaguePlayerDetailViewModel {
     var recentResults: [MatchResult] = []
     var championStats: [ChampionStat] = []
     var seasonStats: PlayerSeasonStats? = nil
+    var playerOEStats: PlayerOEStats? = nil
     var isLoadingStats = true
+
+    /// 화면에 실제로 보여줄 시즌 스탯. Oracle's Elixir 데이터가 있으면 그걸 우선 쓴다 —
+    /// 팀 스탯(TeamSeasonStats.games)도 같은 OE 시즌 집계 테이블 기준이라, 선수도 OE로
+    /// 맞추면 "같은 경기를 뛴 선수들끼리 경기 수가 다르게 보이는" 문제(Leaguepedia는
+    /// 선수마다 개별 위키 기록 완성도가 달라 게임 수가 어긋날 수 있음)가 없어진다.
+    /// OE가 지원 안 하는 리그면 기존 Leaguepedia 값으로 자연스럽게 폴백.
+    var effectiveSeasonStats: PlayerSeasonStats? {
+        guard let oe = playerOEStats else { return seasonStats }
+        return PlayerSeasonStats(
+            games: oe.games,
+            winRate: oe.winRate,
+            avgKills: oe.games > 0 ? Double(oe.kills) / Double(oe.games) : 0,
+            avgDeaths: oe.games > 0 ? Double(oe.deaths) / Double(oe.games) : 0,
+            avgAssists: oe.games > 0 ? Double(oe.assists) / Double(oe.games) : 0,
+            kdaRatio: oe.kda,
+            avgCSPerMin: oe.csPerMin
+        )
+    }
 
     // MARK: - Private
 
@@ -135,5 +154,13 @@ final class LeaguePlayerDetailViewModel {
                     )
                 }
         }
+
+        // Oracle's Elixir는 별도 소스라 실패해도 나머지 화면엔 영향 없게 fire-and-forget으로
+        // 분리(await하면 Task 취소 시 위 대입들까지 같이 날아가는 문제가 있었던 전례가 있음).
+        Task { await loadOEStats() }
+    }
+
+    private func loadOEStats() async {
+        playerOEStats = await OracleElixirService.shared.fetchPlayerStats(player: player, league: league)
     }
 }

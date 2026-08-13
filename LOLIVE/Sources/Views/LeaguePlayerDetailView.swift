@@ -130,7 +130,7 @@ struct LeaguePlayerDetailView: View {
     private var tabContent: some View {
         switch selectedTab {
         case .stats:
-            SeasonStatsView(stats: viewModel.seasonStats, isLoading: viewModel.isLoadingStats)
+            SeasonStatsView(stats: viewModel.effectiveSeasonStats, isLoading: viewModel.isLoadingStats)
             if !viewModel.recentResults.isEmpty {
                 recentFormCard
             }

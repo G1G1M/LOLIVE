@@ -203,7 +203,7 @@ struct OracleElixirService: Sendable {
             AppDiskCache.set(key: cacheKey, value: rows)
         }
 
-        guard let row = Self.matchTeamStatsRow(rows, teamName: team.name)
+        guard let row = Self.matchByName(rows, target: team.name, key: { $0.Team })
         else { return nil }
 
         return TeamSeasonStats(
@@ -236,30 +236,146 @@ struct OracleElixirService: Sendable {
         )
     }
 
-    /// Riot API 팀명과 OE 팀명은 서로 다른 소스라 표기가 어긋나는 경우가 있다(실측 확인:
-    /// Riot "Gen.G Esports" ↔ OE "Gen.G", Riot "NONGSHIM RED FORCE" ↔ OE "Nongshim RedForce"
-    /// 처럼 접미사·띄어쓰기 차이). 단순 대소문자 무시 비교로는 이런 팀의 스탯이 통째로
-    /// 안 뜨는 문제가 있어, 영숫자만 남기고 정규화한 뒤 완전일치 → (그래도 안 맞으면)
-    /// 부분일치 순으로 매칭한다.
-    private static func matchTeamStatsRow(_ rows: [TeamStatsRow], teamName: String) -> TeamStatsRow? {
-        let target = normalizedTeamName(teamName)
+    /// Riot API와 OE는 서로 다른 소스라 이름 표기가 어긋나는 경우가 있다(실측 확인:
+    /// 팀 "Gen.G Esports" ↔ "Gen.G", "NONGSHIM RED FORCE" ↔ "Nongshim RedForce"처럼
+    /// 접미사·띄어쓰기 차이 — 선수 이름도 같은 종류의 표기 드리프트가 있을 수 있어 공용으로 씀).
+    /// 단순 대소문자 무시 비교로는 통째로 매칭 실패할 수 있어, 영숫자만 남기고 정규화한 뒤
+    /// 완전일치 → (그래도 안 맞으면) 부분일치 순으로 매칭한다.
+    private static func matchByName<Row>(_ rows: [Row], target name: String, key: (Row) -> String) -> Row? {
+        let target = normalizedName(name)
         guard !target.isEmpty else { return nil }
 
-        if let exact = rows.first(where: { normalizedTeamName($0.Team) == target }) {
+        if let exact = rows.first(where: { normalizedName(key($0)) == target }) {
             return exact
         }
-        // 부분일치는 "Gen.G Esports" vs "Gen.G"처럼 접미사가 붙은 경우 대응 — 너무 짧은
-        // 이름끼리 우연히 겹치는 걸 막기 위해 최소 길이를 둔다.
+        // 부분일치는 접미사가 붙은 경우 대응 — 너무 짧은 이름끼리 우연히 겹치는 걸 막기 위해
+        // 최소 길이를 둔다.
         guard target.count >= 4 else { return nil }
         return rows.first { row in
-            let candidate = normalizedTeamName(row.Team)
+            let candidate = normalizedName(key(row))
             guard candidate.count >= 4 else { return false }
             return candidate.contains(target) || target.contains(candidate)
         }
     }
 
-    private static func normalizedTeamName(_ name: String) -> String {
+    private static func normalizedName(_ name: String) -> String {
         name.lowercased().filter { $0.isLetter || $0.isNumber }
+    }
+
+    // MARK: - 선수 시즌 스탯
+
+    /// `/stats/players/byTournament` 원본 행 — 필드명은 OE 표기 그대로. `CTR%`는 정확한 정의를
+    /// 못 찾아서(oracleselixir.com 자체 정의 페이지가 접근 차단됨) 의도적으로 안 씀 — 뜻이
+    /// 불확실한 필드를 추측해서 라벨 붙이지 말 것.
+    private struct PlayerStatsRow: Codable {
+        let Player: String
+        let Team: String
+        let GP: Int
+        let K: Int
+        let D: Int
+        let A: Int
+        let KDA: Double
+        let GD10: Double?
+        let XPD10: Double?
+        let CSD10: Double?
+        let CSPM: Double
+        let DPM: Double
+        let TDPG: Double
+        let EGPM: Double
+        let STL: Int
+        let WPM: Double
+        let CWPM: Double
+        let WCPM: Double
+        private let winRateRaw: String?
+        private let killParticipationRaw: String?
+        private let killShareRaw: String?
+        private let deathShareRaw: String?
+        private let firstBloodRateRaw: String?
+        private let csShareAt15Raw: String?
+        private let damageShareRaw: String?
+        private let damageShareAt15Raw: String?
+        private let goldShareRaw: String?
+
+        enum CodingKeys: String, CodingKey {
+            case Player, Team, GP, K, D, A, KDA, GD10, XPD10, CSD10, CSPM, DPM, TDPG, EGPM, STL, WPM, CWPM, WCPM
+            case winRateRaw = "W%"
+            case killParticipationRaw = "KP"
+            case killShareRaw = "KS%"
+            case deathShareRaw = "DTH%"
+            case firstBloodRateRaw = "FB%"
+            case csShareAt15Raw = "CS%P15"
+            case damageShareRaw = "DMG%"
+            case damageShareAt15Raw = "D%P15"
+            case goldShareRaw = "GOLD%"
+        }
+
+        var winRate: Double { Self.percent(winRateRaw) ?? 0 }
+        var killParticipation: Double { Self.percent(killParticipationRaw) ?? 0 }
+        var killShare: Double { Self.percent(killShareRaw) ?? 0 }
+        var deathShare: Double { Self.percent(deathShareRaw) ?? 0 }
+        var firstBloodRate: Double { Self.percent(firstBloodRateRaw) ?? 0 }
+        var csShareAt15: Double { Self.percent(csShareAt15Raw) ?? 0 }
+        var damageShare: Double { Self.percent(damageShareRaw) ?? 0 }
+        var damageShareAt15: Double { Self.percent(damageShareAt15Raw) ?? 0 }
+        var goldShare: Double { Self.percent(goldShareRaw) ?? 0 }
+
+        private static func percent(_ raw: String?) -> Double? {
+            guard let raw, let value = Double(raw.replacingOccurrences(of: "%", with: ""))
+            else { return nil }
+            return value / 100
+        }
+    }
+
+    /// 선수 단위 시즌 집계 스탯. 리그당 요청 1번(선수 전체 목록)으로 끝나고 결과는 24시간
+    /// 캐싱 — `fetchTeamStats`와 같은 tournamentId 해석 경로를 재사용한다. 이름 매칭은
+    /// `player.summonerName`이 OE `Player` 필드와 표기가 다를 수 있어(대소문자·공백 등)
+    /// `matchByName`으로 처리한다.
+    func fetchPlayerStats(player: Player, league: League) async -> PlayerOEStats? {
+        guard let oeLeagueName = Self.oracleElixirLeagueName(for: league) else { return nil }
+        guard let tournamentId = await currentTournamentId(oeLeagueName: oeLeagueName) else { return nil }
+
+        let cacheKey = "oe_player_stats_\(tournamentId)"
+        let rows: [PlayerStatsRow]
+        if let cached: [PlayerStatsRow] = AppDiskCache.get(key: cacheKey, maxAge: 24 * 3600) {
+            rows = cached
+        } else {
+            guard let encoded = tournamentId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                  let url = URL(string: "\(apiBase)/stats/players/byTournament?tournament=\(encoded)")
+            else { return nil }
+            var request = URLRequest(url: url)
+            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+            guard let (data, response) = try? await Self.session.data(for: request),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let decoded = try? JSONDecoder().decode([PlayerStatsRow].self, from: data)
+            else { return nil }
+            rows = decoded
+            AppDiskCache.set(key: cacheKey, value: rows)
+        }
+
+        guard let row = Self.matchByName(rows, target: player.summonerName, key: { $0.Player })
+        else { return nil }
+
+        return PlayerOEStats(
+            games: row.GP, winRate: row.winRate,
+            kills: row.K, deaths: row.D, assists: row.A, kda: row.KDA,
+            killParticipation: row.killParticipation,
+            killShare: row.killShare,
+            deathShare: row.deathShare,
+            firstBloodRate: row.firstBloodRate,
+            goldDiffAt10: row.GD10, xpDiffAt10: row.XPD10, csDiffAt10: row.CSD10,
+            csPerMin: row.CSPM,
+            csShareAt15: row.csShareAt15,
+            damagePerMin: row.DPM,
+            damageShare: row.damageShare,
+            damageShareAt15: row.damageShareAt15,
+            totalDamagePerGame: row.TDPG,
+            earnedGoldPerMin: row.EGPM,
+            goldShare: row.goldShare,
+            steals: row.STL,
+            wardsPerMinute: row.WPM,
+            controlWardsPerMinute: row.CWPM,
+            wardsClearedPerMinute: row.WCPM
+        )
     }
 
     /// 리그의 가장 최근(현재) 시즌 토너먼트 ID. `/tournaments/byLeague`가 리그당 시즌 목록을
