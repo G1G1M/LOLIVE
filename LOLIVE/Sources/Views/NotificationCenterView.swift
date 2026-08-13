@@ -38,6 +38,13 @@ struct NotificationCenterView: View {
         .navigationDestination(for: Match.self) { match in
             MatchDetailView(match: match)
         }
+        .navigationDestination(for: League.self) { league in
+            if league.isInternationalTournament {
+                TournamentDetailView(league: league)
+            } else {
+                LeagueDetailView(league: league)
+            }
+        }
         .task { await loadPending() }
     }
 

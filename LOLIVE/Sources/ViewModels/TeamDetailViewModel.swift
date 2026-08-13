@@ -198,29 +198,53 @@ final class TeamDetailViewModel {
     /// 주전 판별이 종종 실패한다. 성공할 때까지 최근 5경기까지 순서대로 시도한다.
     private func loadCurrentStarters() async {
         for match in recentMatches.prefix(5) {
+            #if DEBUG
+            teamDetailLogger.debug("[Starters] \(self.team.code) 시도: \(match.startTime) vs \(match.teamA.code == self.team.code ? match.teamB.code : match.teamA.code) matchId=\(match.id)")
+            #endif
             guard let detail = try? await service.fetchEventDetails(matchId: match.id),
                   let lastGame = detail.games.last(where: { $0.state == .completed })
-            else { continue }
+            else {
+                #if DEBUG
+                teamDetailLogger.debug("[Starters] \(self.team.code) eventDetails/lastGame 실패")
+                #endif
+                continue
+            }
 
             let isTeamA = match.teamA.id == team.id || match.teamA.code == team.code
             let myEsportsId = isTeamA ? detail.teamAEsportsId : detail.teamBEsportsId
             guard let window = try? await liveStatsService.fetchGameWindow(gameId: lastGame.gameId, startingTime: nil)
-            else { continue }
+            else {
+                #if DEBUG
+                teamDetailLogger.debug("[Starters] \(self.team.code) gameId=\(lastGame.gameId) window 실패")
+                #endif
+                continue
+            }
 
             // blue/red 배정은 반드시 window 자기 자신의 blueTeamId/redTeamId로 판단해야 한다 —
             // getEventDetails(lastGame)와 LiveStats(window)가 같은 게임인데도 서로 다른 blue/red
             // 배정을 준 사례를 실측으로 확인함(LPL JDG: lastGame은 LGD=blue/JDG=red라는데 window는
             // JDG=blue/LGD=red). lastGame 기준으로 판단하면 window에서 상대팀 선수를 골라오게 된다.
             let myPlayers = window.blueTeamId == myEsportsId ? window.bluePlayers : window.redPlayers
-            guard !myPlayers.isEmpty else { continue }
+            guard !myPlayers.isEmpty else {
+                #if DEBUG
+                teamDetailLogger.debug("[Starters] \(self.team.code) myEsportsId=\(myEsportsId) blueId=\(window.blueTeamId) redId=\(window.redTeamId) — 양쪽 다 매칭 안 됨")
+                #endif
+                continue
+            }
 
             let matched = matchAgainstRoster(myPlayers)
+            #if DEBUG
+            teamDetailLogger.debug("[Starters] \(self.team.code) window선수=\(myPlayers.map(\.summonerName)) 로스터매칭=\(matched.count)명 \(Array(matched))")
+            #endif
             // 매칭이 0명이면 blue/red 판정이 실제로 틀렸거나(다른 팀 명단을 받아온 경우) 게임
             // 상세가 아직 안 채워진 것 — 다음 최근 경기로 재시도(이 for 루프가 이미 그 역할).
             guard !matched.isEmpty else { continue }
             currentStarterNames = matched
             return
         }
+        #if DEBUG
+        teamDetailLogger.debug("[Starters] \(self.team.code) 5경기 전부 실패 — currentStarterNames 비어있음")
+        #endif
     }
 
     /// LiveStats API의 소환사명 표기가 리그마다 다르다(실측 확인) — LCK는 "T1 Oner"처럼 팀 코드
@@ -259,12 +283,24 @@ final class TeamDetailViewModel {
     /// 현재 리그 전체 스케줄 + 교차 리그(국제 대회 등) 경기를 합쳐
     /// "최근 경기"는 대회 상관없이 전부, "상대 전적"은 현재 리그/대회 내 경기만으로 구성한다.
     func applyMatches(_ leagueMatches: [Match]) {
+        // leagueMatches는 이미 이 팀의 홈 리그(league.id) 하나로 조회 범위가 좁혀져 있어서, 그
+        // 리그 안에서 팀 코드가 겹칠 일이 없다 — 코드 폴백이 안전하다(Riot 스케줄 API가 팀 id를
+        // null로 주는 경우가 흔해서, id만 보면 같은 팀인데도 매칭에 실패하는 걸 막아준다).
         func isThisTeam(_ m: Match) -> Bool {
             m.teamA.id == team.id || m.teamA.code == team.code ||
             m.teamB.id == team.id || m.teamB.code == team.code
         }
 
-        let crossMatches = crossLeagueMatches.filter(isThisTeam)
+        // crossLeagueMatches는 여러 대회가 섞여 들어오는데(Today 화면의 전체 리그 매치 등),
+        // 같은 조직의 1군/2군 팀이 같은 코드를 공유하는 경우가 있다(실측 확인: LCK 챌린저스에도
+        // "DK"/"KT" 코드 팀이 따로 있음 — 팀 id는 서로 다름). 코드로 매칭하면 2군 경기가 1군
+        // "최근 경기"에 섞여 들어와서 주전 판별까지 2군 선수로 잘못 나오는 버그가 있었다 —
+        // 크로스리그 경기는 반드시 실제 팀 id가 일치할 때만 인정한다.
+        func isThisTeamCrossLeague(_ m: Match) -> Bool {
+            m.teamA.id == team.id || m.teamB.id == team.id
+        }
+
+        let crossMatches = crossLeagueMatches.filter(isThisTeamCrossLeague)
         var seen = Set<String>()
         let merged = (leagueMatches + crossMatches).filter { seen.insert($0.id).inserted }
 

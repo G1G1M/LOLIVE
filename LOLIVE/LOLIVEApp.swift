@@ -109,6 +109,16 @@ struct LOLIVEApp: App {
                         .sheet(item: $deepLinkMatch) { info in
                             NavigationStack {
                                 MatchDetailView(match: info.match)
+                                    .navigationDestination(for: Match.self) { match in
+                                        MatchDetailView(match: match)
+                                    }
+                                    .navigationDestination(for: League.self) { league in
+                                        if league.isInternationalTournament {
+                                            TournamentDetailView(league: league)
+                                        } else {
+                                            LeagueDetailView(league: league)
+                                        }
+                                    }
                             }
                         }
                         .onReceive(
@@ -216,6 +226,16 @@ struct WidgetMatchDeepLinkSheet: View {
                     liveMatch: todayViewModel.liveMatches.first { $0.match.id == match.id }
                 )
                 .navigationBarTitleDisplayMode(.inline)
+                .navigationDestination(for: Match.self) { match in
+                    MatchDetailView(match: match)
+                }
+                .navigationDestination(for: League.self) { league in
+                    if league.isInternationalTournament {
+                        TournamentDetailView(league: league)
+                    } else {
+                        LeagueDetailView(league: league)
+                    }
+                }
             }
         } else {
             ContentUnavailableView(
