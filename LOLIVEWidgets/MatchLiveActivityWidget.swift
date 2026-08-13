@@ -194,7 +194,7 @@ struct LockScreenLiveActivityView: View {
         HStack(spacing: 0) {
 
             // ── 팀 A ─────────────────────
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 teamLogo(imageData: attributes.teamAImageData,
                          teamCode: attributes.teamACode,
                          imageURL: attributes.teamAImageURL,
@@ -208,8 +208,11 @@ struct LockScreenLiveActivityView: View {
             .accessibilityHidden(true)
 
             // ── 스코어 (중앙) ─────────────
-            VStack(spacing: 2) {
-                HStack(spacing: 6) {
+            // 컴포넌트 크기는 그대로 두고, 요소 사이 간격만 넉넉하게 — 세로 길이를 140pt로
+            // 고정한 뒤에도 안쪽 요소들끼리 다닥다닥 붙어 있어서 위아래에 빈 여백만 크게 남고
+            // 정작 콘텐츠는 뭉쳐 보였다.
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
                     Text("\(state.scoreA)")
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
@@ -225,7 +228,7 @@ struct LockScreenLiveActivityView: View {
                 .widgetAccentable()
                 .accessibilityHidden(true)
                 if state.isLive {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 5) {
                         Circle().fill(Color.red).frame(width: 5, height: 5)
                         Text("LIVE")
                             .font(.system(size: 9, weight: .bold))
@@ -236,7 +239,7 @@ struct LockScreenLiveActivityView: View {
                     }
                     .accessibilityHidden(true)
                 } else {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 5) {
                         Image(systemName: "clock.fill")
                             .font(.system(size: 8))
                             .foregroundStyle(.secondary)
@@ -252,10 +255,10 @@ struct LockScreenLiveActivityView: View {
                     .lineLimit(1)
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 16)
 
             // ── 팀 B ─────────────────────
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Text(attributes.teamBCode)
                     .font(.subheadline).fontWeight(.bold)
                     .foregroundStyle(.primary)
