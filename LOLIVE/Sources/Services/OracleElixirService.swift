@@ -203,7 +203,7 @@ struct OracleElixirService: Sendable {
             AppDiskCache.set(key: cacheKey, value: rows)
         }
 
-        guard let row = rows.first(where: { $0.Team.caseInsensitiveCompare(team.name) == .orderedSame })
+        guard let row = Self.matchTeamStatsRow(rows, teamName: team.name)
         else { return nil }
 
         return TeamSeasonStats(
@@ -234,6 +234,32 @@ struct OracleElixirService: Sendable {
             controlWardsPerMinute: row.CWPM,
             wardsClearedPerMinute: row.WCPM
         )
+    }
+
+    /// Riot API 팀명과 OE 팀명은 서로 다른 소스라 표기가 어긋나는 경우가 있다(실측 확인:
+    /// Riot "Gen.G Esports" ↔ OE "Gen.G", Riot "NONGSHIM RED FORCE" ↔ OE "Nongshim RedForce"
+    /// 처럼 접미사·띄어쓰기 차이). 단순 대소문자 무시 비교로는 이런 팀의 스탯이 통째로
+    /// 안 뜨는 문제가 있어, 영숫자만 남기고 정규화한 뒤 완전일치 → (그래도 안 맞으면)
+    /// 부분일치 순으로 매칭한다.
+    private static func matchTeamStatsRow(_ rows: [TeamStatsRow], teamName: String) -> TeamStatsRow? {
+        let target = normalizedTeamName(teamName)
+        guard !target.isEmpty else { return nil }
+
+        if let exact = rows.first(where: { normalizedTeamName($0.Team) == target }) {
+            return exact
+        }
+        // 부분일치는 "Gen.G Esports" vs "Gen.G"처럼 접미사가 붙은 경우 대응 — 너무 짧은
+        // 이름끼리 우연히 겹치는 걸 막기 위해 최소 길이를 둔다.
+        guard target.count >= 4 else { return nil }
+        return rows.first { row in
+            let candidate = normalizedTeamName(row.Team)
+            guard candidate.count >= 4 else { return false }
+            return candidate.contains(target) || target.contains(candidate)
+        }
+    }
+
+    private static func normalizedTeamName(_ name: String) -> String {
+        name.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 
     /// 리그의 가장 최근(현재) 시즌 토너먼트 ID. `/tournaments/byLeague`가 리그당 시즌 목록을
