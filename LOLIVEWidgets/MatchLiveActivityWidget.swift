@@ -194,13 +194,13 @@ struct LockScreenLiveActivityView: View {
         HStack(spacing: 0) {
 
             // ── 팀 A ─────────────────────
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 teamLogo(imageData: attributes.teamAImageData,
                          teamCode: attributes.teamACode,
                          imageURL: attributes.teamAImageURL,
-                         size: 64)
+                         size: 38)
                 Text(attributes.teamACode)
-                    .font(.title3).fontWeight(.bold)
+                    .font(.subheadline).fontWeight(.bold)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
             }
@@ -208,70 +208,70 @@ struct LockScreenLiveActivityView: View {
             .accessibilityHidden(true)
 
             // ── 스코어 (중앙) ─────────────
-            // Live Activity 잠금화면 최대 높이(약 160pt)에 맞춰 구조는 그대로 두고 로고·스코어
-            // 크기와 여백을 키워서 실제 캔버스를 훨씬 넉넉하게 채운다(기존엔 절반도 안 썼음).
-            VStack(spacing: 4) {
-                HStack(spacing: 8) {
+            VStack(spacing: 2) {
+                HStack(spacing: 6) {
                     Text("\(state.scoreA)")
-                        .font(.system(size: 44, weight: .bold, design: .rounded))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
                         .monospacedDigit()
                     Text("–")
-                        .font(.system(size: 28, weight: .light))
+                        .font(.system(size: 20, weight: .light))
                         .foregroundStyle(.secondary)
                     Text("\(state.scoreB)")
-                        .font(.system(size: 44, weight: .bold, design: .rounded))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
                         .monospacedDigit()
                 }
                 .widgetAccentable()
                 .accessibilityHidden(true)
                 if state.isLive {
-                    HStack(spacing: 4) {
-                        Circle().fill(Color.red).frame(width: 6, height: 6)
+                    HStack(spacing: 3) {
+                        Circle().fill(Color.red).frame(width: 5, height: 5)
                         Text("LIVE")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.red)
                         Text("· G\(state.currentGame)")
-                            .font(.system(size: 12))
+                            .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityHidden(true)
                 } else {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Image(systemName: "clock.fill")
-                            .font(.system(size: 10))
+                            .font(.system(size: 8))
                             .foregroundStyle(.secondary)
                         Text("시작 중...")
-                            .font(.system(size: 12))
+                            .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityHidden(true)
                 }
                 Text(attributes.leagueName)
-                    .font(.system(size: 11))
+                    .font(.system(size: 8))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
 
             // ── 팀 B ─────────────────────
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Text(attributes.teamBCode)
-                    .font(.title3).fontWeight(.bold)
+                    .font(.subheadline).fontWeight(.bold)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                 teamLogo(imageData: attributes.teamBImageData,
                          teamCode: attributes.teamBCode,
                          imageURL: attributes.teamBImageURL,
-                         size: 64)
+                         size: 38)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityHidden(true)
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 26)
+        .padding(.horizontal, 16)
+        // 컴포넌트 크기는 원래대로 두고, 세로 길이만 140pt로 고정 — 내용은 가운데 정렬돼
+        // 남는 위아래 공간에 여백이 생긴다.
+        .frame(height: 140)
         // 팀 로고·코드·스코어·상태가 VoiceOver로 따로따로 읽히던 걸 한 문장으로 통합
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
