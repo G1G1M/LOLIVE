@@ -82,4 +82,14 @@ enum SharedDataService {
         guard Date().timeIntervalSince(match.savedAt) < 3600 else { return nil }
         return match
     }
+
+    /// "대표 팀"(즐겨찾기 화면에서 지정, 앱 틴트 컬러에도 씀) 코드 — Small 위젯이 캐러셀과
+    /// 무관하게 항상 이 팀을 고정으로 보여줄 때 쓴다. `primaryTeamCode`가 App Group
+    /// UserDefaults(`@AppStorage(store:)`)에 저장되므로 여기선 읽기만 한다.
+    static func loadPrimaryTeamCode() -> String? {
+        guard let defaults = UserDefaults(suiteName: appGroupId),
+              let code = defaults.string(forKey: "primaryTeamCode"), !code.isEmpty
+        else { return nil }
+        return code
+    }
 }

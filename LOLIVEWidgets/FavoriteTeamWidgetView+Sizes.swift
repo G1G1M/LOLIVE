@@ -13,52 +13,54 @@ extension FavoriteTeamWidgetView {
 
     var smallView: some View {
         // systemSmall 실제 캔버스는 기기마다 대략 150~170pt — 기존엔 로고 48pt + 여백들을
-        // 합치면 최소 185pt가 필요해서 항상 넘쳤고(특히 캐러셀 점까지 있으면 더 심함), 아래쪽
-        // 콘텐츠가 잘리거나 다른 요소와 겹쳐 보였다. 로고를 줄이고 여백을 최소 여백(minLength)
-        // 위주로 다시 짜서, 가장 작은 기기에서도 안 넘치게 계산해서 맞췄다.
-        VStack(spacing: 0) {
-            VStack(spacing: 3) {
-                teamLogo(data: entry.teamImageData, size: 38)
-                Text(entry.teamCode)
-                    .font(.subheadline).fontWeight(.bold).foregroundStyle(.primary)
-                    .lineLimit(1)
-                Text(entry.leagueName)
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(entry.teamName), \(entry.leagueName)")
-
-            Spacer(minLength: 6)
-
-            if let match = entry.nextMatch {
-                VStack(spacing: 3) {
-                    if match.isLive {
-                        liveBadge
-                    } else {
-                        Text("다음 경기").font(.caption2).foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 4) {
-                        teamLogo(data: entry.opponentImageData, size: 16)
-                        Text("vs \(match.opponentCode)")
-                            .font(.subheadline).fontWeight(.semibold).foregroundStyle(.primary)
+        // 합치면 최소 185pt가 필요해서 항상 넘쳤고, 아래쪽 콘텐츠가 잘리거나 겹쳐 보였다.
+        // 로고를 줄이고 여백을 최소 여백(minLength) 위주로 다시 짜서 맞췄다.
+        //
+        // Medium과 달리 캐러셀에 참여하지 않는다 — 항상 대표 팀 하나만 고정으로 보여주므로
+        // 점(dots)/버튼도 없다(대표 팀 개념은 representativeTeam 참고).
+        Group {
+            if let team = representativeTeam {
+                VStack(spacing: 0) {
+                    VStack(spacing: 3) {
+                        teamLogo(data: team.teamImageData, size: 38)
+                        Text(team.teamCode)
+                            .font(.subheadline).fontWeight(.bold).foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text(team.leagueName)
+                            .font(.caption2).foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    matchTimeView(match: match, compact: true)
-                }
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(nextMatchAccessibilityLabel(match))
-            } else {
-                Text("예정된 경기 없음")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(team.teamName), \(team.leagueName)")
 
-            if entry.totalTeams > 1 {
-                Spacer(minLength: 6)
-                carouselDots
-                    .accessibilityHidden(true)
+                    Spacer(minLength: 8)
+
+                    if let match = team.nextMatch {
+                        VStack(spacing: 3) {
+                            if match.isLive {
+                                liveBadge
+                            } else {
+                                Text("다음 경기").font(.caption2).foregroundStyle(.secondary)
+                            }
+                            HStack(spacing: 4) {
+                                teamLogo(data: team.opponentImageData, size: 16)
+                                Text("vs \(match.opponentCode)")
+                                    .font(.subheadline).fontWeight(.semibold).foregroundStyle(.primary)
+                                    .lineLimit(1)
+                            }
+                            matchTimeView(match: match, compact: true)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(nextMatchAccessibilityLabel(match, myTeam: team.teamName))
+                    } else {
+                        Text("예정된 경기 없음")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                unconfiguredView
             }
         }
         .padding(12)

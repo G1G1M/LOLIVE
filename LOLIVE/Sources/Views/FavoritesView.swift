@@ -12,7 +12,9 @@ struct FavoritesView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(TodayViewModel.self) private var todayViewModel
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
+    // App Group 저장소 — ContentView.swift와 동일한 이유(위젯 Small이 읽을 수 있게)
+    @AppStorage("primaryTeamCode", store: UserDefaults(suiteName: SharedDataService.appGroupId))
+    private var primaryTeamCode: String = ""
     @State private var showingTeamSearch = false
     @State private var showLiveOnly = false
 

@@ -71,6 +71,21 @@ extension FavoriteTeamWidgetView {
         }
     }
 
+    // MARK: - Small 전용: 대표 팀
+
+    /// Small은 Medium 캐러셀과 상태를 공유하지 않고 항상 "대표 팀"(즐겨찾기 화면에서 지정,
+    /// 없으면 즐겨찾기 목록 첫 팀)을 고정으로 보여준다 — Medium에서 다음 팀으로 넘겨도
+    /// Small이 같이 넘어가던 문제(같은 위젯 kind가 공용 캐러셀 인덱스를 공유해서 발생)를
+    /// Small을 그 인덱스에서 아예 분리해서 해결.
+    var representativeTeam: TeamRowInfo? {
+        let primaryCode = SharedDataService.loadPrimaryTeamCode()?.uppercased()
+        if let primaryCode,
+           let match = entry.allTeams.first(where: { $0.teamCode.uppercased() == primaryCode }) {
+            return match
+        }
+        return entry.allTeams.first
+    }
+
     // MARK: - Carousel
 
     var carouselDots: some View {

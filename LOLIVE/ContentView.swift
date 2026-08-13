@@ -12,7 +12,10 @@ import WidgetKit
 struct ContentView: View {
     @Query private var favoriteTeams: [FavoriteTeam]
     @Environment(TodayViewModel.self) private var todayViewModel
-    @AppStorage("primaryTeamCode") private var primaryTeamCode: String = ""
+    // App Group 저장소를 써서 위젯(Small)도 "대표 팀"을 읽을 수 있게 함 — 앱 자체 동작(틴트
+    // 컬러)은 그대로, 저장 위치만 위젯과 공유되는 곳으로 옮긴 것.
+    @AppStorage("primaryTeamCode", store: UserDefaults(suiteName: SharedDataService.appGroupId))
+    private var primaryTeamCode: String = ""
     @State private var selectedTab = 0
 
     private var themeColor: Color {

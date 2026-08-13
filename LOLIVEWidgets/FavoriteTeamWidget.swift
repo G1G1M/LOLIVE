@@ -193,7 +193,7 @@ struct FavoriteTeamWidgetView: View {
 
     // MARK: - Unconfigured
 
-    private var unconfiguredView: some View {
+    var unconfiguredView: some View {
         VStack(spacing: 8) {
             Image(systemName: "star.slash")
                 .font(.title2).foregroundStyle(.secondary)
