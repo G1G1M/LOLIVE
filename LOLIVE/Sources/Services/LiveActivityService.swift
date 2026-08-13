@@ -248,7 +248,7 @@ final class LiveActivityService {
     /// 폴링 결과로 liveMatches가 갱신될 때마다 호출
     /// — 즐겨찾기 팀의 경기 Live Activity를 시작/업데이트/종료
     /// - overdueMatches: startTime 지났으나 API 미확인 경기 (예약 시각부터 pre-live Activity 표시)
-    func syncActivities(_ liveMatches: [LiveMatch], overdueMatches: [Match] = [], favoritedTeamIds: Set<String>) async {
+    func syncActivities(_ liveMatches: [LiveMatch], overdueMatches: [Match] = [], favoritedTeams: Set<FavoritedTeamRef>) async {
         let authInfo = ActivityAuthorizationInfo()
         guard authInfo.areActivitiesEnabled else {
             #if DEBUG
@@ -258,10 +258,8 @@ final class LiveActivityService {
         }
 
         let relevant = liveMatches.filter {
-            favoritedTeamIds.contains($0.match.teamA.id) ||
-            favoritedTeamIds.contains($0.match.teamB.id) ||
-            favoritedTeamIds.contains($0.match.teamA.code) ||
-            favoritedTeamIds.contains($0.match.teamB.code)
+            FavoritedTeamRef.matches(favoritedTeams, team: $0.match.teamA, league: $0.match.league) ||
+            FavoritedTeamRef.matches(favoritedTeams, team: $0.match.teamB, league: $0.match.league)
         }
 
         // 라이브 경기 + 예약 시각 지난 경기 모두 유지 (둘 다 아닌 경우에만 종료)

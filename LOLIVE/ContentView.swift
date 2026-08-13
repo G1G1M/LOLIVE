@@ -27,7 +27,7 @@ struct ContentView: View {
         .transaction(value: selectedTab) { $0.disablesAnimations = true }
         .task {
             syncFavoritedTeamIds()
-            todayViewModel.startLivePolling()   // favoritedTeamIds 설정 직후 시작
+            todayViewModel.startLivePolling()   // favoritedTeams 설정 직후 시작
             SharedDataService.saveFavoriteTeams(favoriteTeams)
             WidgetCenter.shared.reloadAllTimelines()
             await MatchNotificationService.shared.requestPermission()
@@ -102,7 +102,9 @@ struct ContentView: View {
     }
 
     private func syncFavoritedTeamIds() {
-        todayViewModel.favoritedTeamIds = Set(favoriteTeams.flatMap { [$0.teamId, $0.teamCode] })
+        todayViewModel.favoritedTeams = Set(favoriteTeams.map {
+            FavoritedTeamRef(teamId: $0.teamId, teamCode: $0.teamCode, leagueId: $0.leagueId)
+        })
     }
 
     private func sharedMatchEntry(match: Match, teamCode: String, liveMatch: LiveMatch?) -> SharedNextMatch {
@@ -132,9 +134,15 @@ struct ContentView: View {
 
         var nextMatchMap: [String: SharedNextMatch] = [:]
         for fav in favoriteTeams {
-            let code = fav.teamCode.lowercased()
+            // 팀 코드만 보고 고르면 같은 조직의 1군/2군 팀(코드가 같음, 예: LCK 본 리그와 LCK
+            // 챌린저스 둘 다 "KT")이 섞인 오늘의 전체 리그 경기 목록에서 엉뚱한 쪽(2군)이 먼저
+            // 걸릴 수 있다(실측 확인) — 팀 ID가 정확히 일치하거나, 폴백으로 코드+리그가 둘 다
+            // 일치할 때만 이 즐겨찾기 팀의 경기로 인정한다.
             guard let match = allMatches.first(where: {
-                $0.teamA.code.lowercased() == code || $0.teamB.code.lowercased() == code
+                $0.teamA.id == fav.teamId || $0.teamB.id == fav.teamId ||
+                (($0.teamA.code.lowercased() == fav.teamCode.lowercased() ||
+                  $0.teamB.code.lowercased() == fav.teamCode.lowercased()) &&
+                 $0.league.id == fav.leagueId)
             }) else { continue }
             let liveMatch = todayViewModel.liveMatches.first { $0.match.id == match.id }
             nextMatchMap[fav.teamCode.uppercased()] = sharedMatchEntry(match: match, teamCode: fav.teamCode, liveMatch: liveMatch)

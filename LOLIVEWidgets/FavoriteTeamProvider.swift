@@ -138,7 +138,9 @@ struct FavoriteTeamProvider: TimelineProvider {
         let shouldCheckLive = currentSharedMatch == nil || (currentSharedMatch.map {
             !$0.isLive && $0.startTime.timeIntervalSinceNow < Self.earlyLiveCheckWindow
         } ?? false)
-        let liveCheck = shouldCheckLive ? liveInfo[fav.teamCode.uppercased()] : nil
+        let liveCheck = shouldCheckLive
+            ? liveInfo[WidgetNetworkService.liveInfoKey(code: fav.teamCode, leagueId: fav.leagueId)]
+            : nil
         let match = liveCheck ?? currentSharedMatch.map {
             WidgetNetworkService.NextMatchInfo(
                 opponentName: $0.opponentName,
@@ -184,7 +186,9 @@ struct FavoriteTeamProvider: TimelineProvider {
                 let shouldCheckLive = sharedMatch == nil || (sharedMatch.map {
                     !$0.isLive && $0.startTime.timeIntervalSinceNow < Self.earlyLiveCheckWindow
                 } ?? false)
-                let liveCheck = shouldCheckLive ? liveInfo[fav.teamCode.uppercased()] : nil
+                let liveCheck = shouldCheckLive
+                    ? liveInfo[WidgetNetworkService.liveInfoKey(code: fav.teamCode, leagueId: fav.leagueId)]
+                    : nil
 
                 group.addTask {
                     async let apiMatchTask: WidgetNetworkService.NextMatchInfo? = (sharedMatch == nil)

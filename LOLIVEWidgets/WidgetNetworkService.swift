@@ -99,11 +99,15 @@ enum WidgetNetworkService {
             let games = matchDict["games"] as? [[String: Any]] ?? []
             let currentGame = games.filter { ($0["state"] as? String) == "completed" }.count + 1
             let scores = teams.map { ($0["result"] as? [String: Any])?["gameWins"] as? Int ?? 0 }
+            // 같은 조직의 1군/2군 팀이 팀 코드를 공유하는 경우가 있어서(예: "KT"가 LCK 본 리그와
+            // LCK 챌린저스에 둘 다 있음), 코드만 키로 쓰면 두 리그가 동시에 라이브일 때 서로 덮어써
+            // 즐겨찾기 위젯/Live Activity가 엉뚱한 쪽을 보여줄 수 있다 — 리그 id까지 합쳐서 키로 쓴다.
+            let leagueId = (event["league"] as? [String: Any])?["id"] as? String ?? ""
 
             for i in 0..<2 {
                 guard let code = teams[i]["code"] as? String else { continue }
                 let opp = teams[1 - i]
-                result[code.uppercased()] = NextMatchInfo(
+                result[Self.liveInfoKey(code: code, leagueId: leagueId)] = NextMatchInfo(
                     opponentName:     (opp["name"]  as? String) ?? "TBD",
                     opponentCode:     (opp["code"]  as? String) ?? "TBD",
                     opponentImageURL: (opp["image"] as? String)?.replacingOccurrences(of: "http://", with: "https://"),
@@ -116,6 +120,11 @@ enum WidgetNetworkService {
             }
         }
         return result
+    }
+
+    /// `parseAllLive` 결과 딕셔너리의 조회 키 — 팀 코드 + 소속 리그 id를 합쳐서 1군/2군 코드 충돌을 막는다.
+    static func liveInfoKey(code: String, leagueId: String) -> String {
+        "\(code.uppercased())_\(leagueId)"
     }
 
     // MARK: - Schedule Parse

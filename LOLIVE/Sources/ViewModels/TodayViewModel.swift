@@ -25,10 +25,10 @@ final class TodayViewModel {
     let completedMatchesLimit = 5
     var showFavoritesOnly: Bool = false
 
-    /// 즐겨찾기 팀 ID + Code 집합 — ContentView에서 SwiftData 쿼리 결과로 설정
-    var favoritedTeamIds: Set<String> = []
+    /// 즐겨찾기 팀 목록(ID+코드+리그) — ContentView에서 SwiftData 쿼리 결과로 설정
+    var favoritedTeams: Set<FavoritedTeamRef> = []
 
-    var hasFavoriteTeams: Bool { !favoritedTeamIds.isEmpty }
+    var hasFavoriteTeams: Bool { !favoritedTeams.isEmpty }
 
     var filteredLiveMatches: [LiveMatch] {
         guard showFavoritesOnly else { return liveMatches }
@@ -69,14 +69,15 @@ final class TodayViewModel {
 
 
     private func isFavorited(_ match: Match) -> Bool {
-        favoritedTeamIds.contains(match.teamA.id) || favoritedTeamIds.contains(match.teamB.id)
+        FavoritedTeamRef.matches(favoritedTeams, team: match.teamA, league: match.league) ||
+        FavoritedTeamRef.matches(favoritedTeams, team: match.teamB, league: match.league)
     }
 
     private func favoriteTeamCode(for match: Match) -> String? {
-        if favoritedTeamIds.contains(match.teamA.id) || favoritedTeamIds.contains(match.teamA.code) {
+        if FavoritedTeamRef.matches(favoritedTeams, team: match.teamA, league: match.league) {
             return match.teamA.code
         }
-        if favoritedTeamIds.contains(match.teamB.id) || favoritedTeamIds.contains(match.teamB.code) {
+        if FavoritedTeamRef.matches(favoritedTeams, team: match.teamB, league: match.league) {
             return match.teamB.code
         }
         return nil
@@ -199,7 +200,7 @@ final class TodayViewModel {
 
                     #if DEBUG
                     // livePollLogger.debug("🔴 [LivePoll] fetchLive 성공 — 전체 \(live.count)건, 즐겨찾기 팀 경기 \(newFavoriteLive.count)건")
-                    // if newFavoriteLive.isEmpty && !favoritedTeamIds.isEmpty {
+                    // if newFavoriteLive.isEmpty && !favoritedTeams.isEmpty {
                     //     livePollLogger.debug("🔴 [LivePoll] 즐겨찾기 팀이 지금 getLive 응답엔 없음 (아직 시작 전이거나 API 미반영)")
                     // }
                     // for lm in newFavoriteLive {
@@ -286,7 +287,7 @@ final class TodayViewModel {
                         favoriteTeamCode(for: $0) != nil &&
                         !newLiveIds.contains($0.id)
                     }
-                    await LiveActivityService.shared.syncActivities(liveMatches, overdueMatches: overdueMatches, favoritedTeamIds: favoritedTeamIds)
+                    await LiveActivityService.shared.syncActivities(liveMatches, overdueMatches: overdueMatches, favoritedTeams: favoritedTeams)
                 } catch {
                     // 폴링 중 에러는 무시 (기존 데이터 유지)
                     #if DEBUG
@@ -319,9 +320,9 @@ final class TodayViewModel {
                     favoriteTeamCode(for: $0) != nil &&
                     !liveIds.contains($0.id)
                 }
-                await LiveActivityService.shared.syncActivities(enriched, overdueMatches: overdueMatches, favoritedTeamIds: favoritedTeamIds)
+                await LiveActivityService.shared.syncActivities(enriched, overdueMatches: overdueMatches, favoritedTeams: favoritedTeams)
             } else {
-                await LiveActivityService.shared.syncActivities(liveMatches, favoritedTeamIds: favoritedTeamIds)
+                await LiveActivityService.shared.syncActivities(liveMatches, favoritedTeams: favoritedTeams)
             }
         }
     }
