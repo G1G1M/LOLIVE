@@ -101,6 +101,7 @@
 - Small / Medium / Large 사이즈 + 잠금화면 accessory 3종
 - 즐겨찾기 팀의 다음 경기, 진행 중이면 실시간 스코어까지 표시
 - 위젯 탭 → 해당 팀 경기 상세로 딥링크 (`lolive://match/<teamCode>`)
+- 홈 화면 테마(틴트) 모드·Dynamic Type·VoiceOver 대응, Live Activity 잠금화면 배너는 라이트/다크 모드에 맞춰 자동 전환
 
 ## 앱 구조
 

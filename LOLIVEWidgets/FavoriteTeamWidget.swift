@@ -58,6 +58,7 @@ struct FavoriteTeamWidget: Widget {
 struct FavoriteTeamWidgetView: View {
     let entry: FavoriteTeamEntry
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) var renderingMode
 
     var body: some View {
         Group {
@@ -90,6 +91,7 @@ struct FavoriteTeamWidgetView: View {
                 Image(uiImage: img)
                     .resizable().scaledToFit()
                     .padding(6)
+                    .accessibilityHidden(true)
             } else {
                 Text(entry.teamCode)
                     .font(.caption2).fontWeight(.bold)
@@ -97,6 +99,8 @@ struct FavoriteTeamWidgetView: View {
                     .lineLimit(1)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(entry.teamName)
     }
 
     /// 직사각형: 팀 vs 상대 + 경기 시간
@@ -137,6 +141,16 @@ struct FavoriteTeamWidgetView: View {
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessoryAccessibilityLabel)
+    }
+
+    private var accessoryAccessibilityLabel: String {
+        guard let match = entry.nextMatch else { return "\(entry.teamName), 경기 없음" }
+        if match.isLive {
+            return "\(entry.teamName) vs \(match.opponentName), \(scoreText(match) ?? "라이브")"
+        }
+        return "\(entry.teamName), \(entry.leagueName), 다음 경기 vs \(match.opponentName)"
     }
 
     /// 인라인 (잠금화면 시계 위/아래 한 줄)

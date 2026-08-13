@@ -30,8 +30,10 @@ struct MatchLiveActivityWidget: Widget {
                 attributes: context.attributes,
                 state: context.state
             )
-            .activityBackgroundTint(Color.black.opacity(0.92))
-            .activitySystemActionForegroundColor(.white)
+            // 시스템 라이트/다크 모드에 맞춰 자동으로 흰색/검정으로 전환되는 시맨틱 컬러 —
+            // 예전엔 항상 검정 고정이라 라이트 모드에서도 어두운 카드로 떠 있었음.
+            .activityBackgroundTint(Color(uiColor: .systemBackground))
+            .activitySystemActionForegroundColor(Color.primary)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -79,39 +81,79 @@ struct MatchLiveActivityWidget: Widget {
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                     .padding(.bottom, 4)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(
+                        "\(context.attributes.leagueName), " +
+                        (context.state.isLive ? "라이브, \(context.state.currentGame)세트" : "시작 중")
+                    )
                 }
             } compactLeading: {
                 HStack(spacing: 3) {
-                    teamLogoView(imageData: context.attributes.teamAImageData,
-                                 teamCode: context.attributes.teamACode,
-                                 imageURL: context.attributes.teamAImageURL,
-                                 size: 14)
+                    DynamicIslandTeamLogo(imageData: context.attributes.teamAImageData,
+                                          teamCode: context.attributes.teamACode,
+                                          imageURL: context.attributes.teamAImageURL,
+                                          size: 14)
                     Text("\(context.state.scoreA)")
                         .font(.caption2).fontWeight(.bold)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(context.attributes.teamAName) \(context.state.scoreA)점")
             } compactTrailing: {
                 HStack(spacing: 3) {
                     Text("\(context.state.scoreB)")
                         .font(.caption2).fontWeight(.bold)
-                    teamLogoView(imageData: context.attributes.teamBImageData,
-                                 teamCode: context.attributes.teamBCode,
-                                 imageURL: context.attributes.teamBImageURL,
-                                 size: 14)
+                    DynamicIslandTeamLogo(imageData: context.attributes.teamBImageData,
+                                          teamCode: context.attributes.teamBCode,
+                                          imageURL: context.attributes.teamBImageURL,
+                                          size: 14)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(context.attributes.teamBName) \(context.state.scoreB)점")
             } minimal: {
                 Text("\(context.state.scoreA)-\(context.state.scoreB)")
                     .font(.system(size: 10)).fontWeight(.bold)
+                    .accessibilityLabel(
+                        "\(context.attributes.teamAName) \(context.state.scoreA) 대 \(context.attributes.teamBName) \(context.state.scoreB)"
+                    )
             }
         }
     }
 
-    // MARK: - Logo helper
+    // MARK: - Dynamic Island expanded helper
 
-    @ViewBuilder
-    func teamLogoView(imageData: Data?, teamCode: String, imageURL: String?, size: CGFloat) -> some View {
-        // 1순위: App Group 고화질 파일 → 2순위: attributes 내장 썸네일 → 3순위: URL/텍스트 폴백
-        if let img = sharedHiResLogo(teamCode: teamCode)
-            ?? imageData.flatMap({ UIImage(data: $0) }) {
+    private func expandedTeamView(imageData: Data?, code: String, imageURL: String?, score: Int, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 3) {
+            DynamicIslandTeamLogo(imageData: imageData, teamCode: code, imageURL: imageURL, size: 24)
+            Text(code)
+                .font(.caption2).fontWeight(.bold)
+                .lineLimit(1)
+            Text("\(score)")
+                .font(.subheadline).fontWeight(.bold)
+                .foregroundStyle(score > 0 ? Color.orange : Color.secondary)
+                .widgetAccentable()
+        }
+        .padding(.horizontal, 4).padding(.vertical, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(code) \(score)점")
+    }
+}
+
+// MARK: - Dynamic Island 로고 (widgetRenderingMode 대응 위해 별도 View로 분리)
+
+/// Dynamic Island는 하드웨어 카메라 하우징 자리라 배경이 항상 검정으로 고정이지만, 저조도·집중모드
+/// 등에서 vibrant(단색) 렌더링으로 전환될 수 있다 — 그럴 땐 색깔 로고 대신 팀 코드 텍스트로 대체.
+private struct DynamicIslandTeamLogo: View {
+    let imageData: Data?
+    let teamCode: String
+    let imageURL: String?
+    let size: CGFloat
+
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    var body: some View {
+        if renderingMode != .fullColor {
+            fallback
+        } else if let img = sharedHiResLogo(teamCode: teamCode) ?? imageData.flatMap({ UIImage(data: $0) }) {
             Image(uiImage: img)
                 .resizable().scaledToFit()
                 .frame(width: size, height: size)
@@ -119,35 +161,20 @@ struct MatchLiveActivityWidget: Widget {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image): image.resizable().scaledToFit()
-                default: logoFallback(code: teamCode, size: size)
+                default: fallback
                 }
             }
             .frame(width: size, height: size)
         } else {
-            logoFallback(code: teamCode, size: size)
-                .frame(width: size, height: size)
+            fallback
         }
     }
 
-    private func logoFallback(code: String, size: CGFloat) -> some View {
-        Text(String(code.prefix(1)))
+    private var fallback: some View {
+        Text(String(teamCode.prefix(1)))
             .font(.system(size: size * 0.7, weight: .bold))
             .foregroundStyle(.white)
-    }
-
-    // MARK: - Dynamic Island expanded helper
-
-    private func expandedTeamView(imageData: Data?, code: String, imageURL: String?, score: Int, alignment: HorizontalAlignment) -> some View {
-        VStack(alignment: alignment, spacing: 3) {
-            teamLogoView(imageData: imageData, teamCode: code, imageURL: imageURL, size: 24)
-            Text(code)
-                .font(.caption2).fontWeight(.bold)
-                .lineLimit(1)
-            Text("\(score)")
-                .font(.subheadline).fontWeight(.bold)
-                .foregroundStyle(score > 0 ? Color.orange : Color.secondary)
-        }
-        .padding(.horizontal, 4).padding(.vertical, 4)
+            .frame(width: size, height: size)
     }
 }
 
@@ -156,6 +183,12 @@ struct MatchLiveActivityWidget: Widget {
 struct LockScreenLiveActivityView: View {
     let attributes: MatchActivityAttributes
     let state: MatchActivityAttributes.ContentState
+
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    private var statusText: String {
+        state.isLive ? "LIVE · Game \(state.currentGame)" : "시작 중"
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -168,26 +201,29 @@ struct LockScreenLiveActivityView: View {
                          size: 38)
                 Text(attributes.teamACode)
                     .font(.subheadline).fontWeight(.bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
+            .accessibilityHidden(true)
 
             // ── 스코어 (중앙) ─────────────
             VStack(spacing: 2) {
                 HStack(spacing: 6) {
                     Text("\(state.scoreA)")
                         .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .monospacedDigit()
                     Text("–")
                         .font(.system(size: 20, weight: .light))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.secondary)
                     Text("\(state.scoreB)")
                         .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .monospacedDigit()
                 }
+                .widgetAccentable()
+                .accessibilityHidden(true)
                 if state.isLive {
                     HStack(spacing: 3) {
                         Circle().fill(Color.red).frame(width: 5, height: 5)
@@ -196,22 +232,25 @@ struct LockScreenLiveActivityView: View {
                             .foregroundStyle(.red)
                         Text("· G\(state.currentGame)")
                             .font(.system(size: 9))
-                            .foregroundStyle(.white.opacity(0.55))
+                            .foregroundStyle(.secondary)
                     }
+                    .accessibilityHidden(true)
                 } else {
                     HStack(spacing: 3) {
                         Image(systemName: "clock.fill")
                             .font(.system(size: 8))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(.secondary)
                         Text("시작 중...")
                             .font(.system(size: 9))
-                            .foregroundStyle(.white.opacity(0.55))
+                            .foregroundStyle(.secondary)
                     }
+                    .accessibilityHidden(true)
                 }
                 Text(attributes.leagueName)
                     .font(.system(size: 8))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.tertiary)
                     .lineLimit(1)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 12)
 
@@ -219,7 +258,7 @@ struct LockScreenLiveActivityView: View {
             HStack(spacing: 8) {
                 Text(attributes.teamBCode)
                     .font(.subheadline).fontWeight(.bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                 teamLogo(imageData: attributes.teamBImageData,
                          teamCode: attributes.teamBCode,
@@ -227,15 +266,25 @@ struct LockScreenLiveActivityView: View {
                          size: 38)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityHidden(true)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        // 팀 로고·코드·스코어·상태가 VoiceOver로 따로따로 읽히던 걸 한 문장으로 통합
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(attributes.leagueName), \(attributes.teamAName) \(state.scoreA) 대 \(attributes.teamBName) \(state.scoreB), \(statusText)"
+        )
     }
 
     @ViewBuilder
     private func teamLogo(imageData: Data?, teamCode: String, imageURL: String?, size: CGFloat) -> some View {
-        // 1순위: App Group 고화질 파일 → 2순위: attributes 내장 썸네일 → 3순위: URL/텍스트 폴백
-        if let img = sharedHiResLogo(teamCode: teamCode)
+        // 잠금화면이 모노크롬/vibrant 모드로 렌더링될 땐(접근성 설정, 저조도 등) 색깔 있는 로고
+        // 이미지가 뭉개져 잘 안 보일 수 있어서, 그럴 땐 로고 대신 팀 코드 텍스트로 대체한다.
+        if renderingMode != .fullColor {
+            logoPlaceholder(code: teamCode, size: size)
+                .frame(width: size, height: size)
+        } else if let img = sharedHiResLogo(teamCode: teamCode)
             ?? imageData.flatMap({ UIImage(data: $0) }) {
             Image(uiImage: img)
                 .resizable().scaledToFit()
@@ -256,11 +305,11 @@ struct LockScreenLiveActivityView: View {
 
     private func logoPlaceholder(code: String, size: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(Color.white.opacity(0.1))
+            .fill(Color.primary.opacity(0.08))
             .overlay(
                 Text(String(code.prefix(3)))
                     .font(.system(size: size * 0.28, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.secondary)
             )
     }
 }

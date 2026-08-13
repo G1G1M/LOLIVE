@@ -7,6 +7,7 @@
 
 import AppIntents
 import SwiftUI
+import WidgetKit
 
 extension FavoriteTeamWidgetView {
 
@@ -24,6 +25,7 @@ extension FavoriteTeamWidgetView {
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .widgetAccentable()
             } else {
                 Text("경기 진행 중")
                     .font(compact ? .caption2 : .subheadline)
@@ -39,6 +41,7 @@ extension FavoriteTeamWidgetView {
                 .lineLimit(1)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .widgetAccentable()
         } else if compact {
             Text(timeText(match.startTime, isLive: match.isLive))
                 .font(.caption2).foregroundStyle(.secondary)
@@ -61,6 +64,7 @@ extension FavoriteTeamWidgetView {
                 .monospacedDigit()
                 .lineLimit(1)
                 .frame(minWidth: 44, alignment: .trailing)
+                .widgetAccentable()
         } else {
             Text(timeText(match.startTime, isLive: match.isLive))
                 .font(.caption2).foregroundStyle(.secondary)
@@ -83,14 +87,18 @@ extension FavoriteTeamWidgetView {
         let prev = (entry.currentIndex - 1 + entry.totalTeams) % entry.totalTeams
         let next = (entry.currentIndex + 1) % entry.totalTeams
 
+        // 아이콘 자체는 지금 크기(시각적으로 작게) 그대로 두고, 탭 가능한 영역만 44×44pt로
+        // 넓힌다 — .contentShape로 히트 영역을 아이콘보다 크게 잡아서 오터치 없이 누르기 쉽게.
         return HStack(spacing: 0) {
             Button(intent: NavigateTeamIntent(newIndex: prev)) {
                 Image(systemName: "chevron.left")
                     .font(.caption).fontWeight(.semibold)
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 16)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("이전 팀")
 
             Spacer()
             carouselDots
@@ -100,10 +108,13 @@ extension FavoriteTeamWidgetView {
                 Image(systemName: "chevron.right")
                     .font(.caption).fontWeight(.semibold)
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 16)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("다음 팀")
         }
+        .frame(height: 44)
     }
 
     // MARK: - Common
@@ -117,11 +128,14 @@ extension FavoriteTeamWidgetView {
         .padding(.horizontal, 7).padding(.vertical, 3)
         .background(Color.red.opacity(0.15))
         .clipShape(Capsule())
+        .widgetAccentable()
     }
 
     func teamLogo(data: Data?, size: CGFloat) -> some View {
         Group {
-            if let data, let uiImage = UIImage(data: data) {
+            // 홈 화면 "테마" 틴트 모드에서는 색깔 있는 로고가 강제로 단색 처리돼 뭉개져 보일 수
+            // 있어서, fullColor가 아닐 땐 로고 이미지 대신 방패 아이콘 폴백으로 대체한다.
+            if renderingMode == .fullColor, let data, let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage).resizable().scaledToFit()
             } else {
                 Circle()
