@@ -196,7 +196,8 @@ final class LiveActivityService {
             teamBCode: "GEN",
             teamBImageURL: nil,
             teamBImageData: teamBData,
-            leagueName: "LCK (테스트)"
+            leagueName: "LCK (테스트)",
+            blockName: "3주 차"
         )
         let state = MatchActivityAttributes.ContentState(
             scoreA: 0, scoreB: 0, currentGame: 1, isLive: true
@@ -310,7 +311,8 @@ final class LiveActivityService {
                     teamBCode: liveMatch.match.teamB.code,
                     teamBImageURL: nil,
                     teamBImageData: teamBImageData,
-                    leagueName: liveMatch.match.league.name
+                    leagueName: liveMatch.match.league.name,
+                    blockName: liveMatch.match.blockName
                 )
                 do {
                     let activity = try Activity.request(
@@ -352,7 +354,8 @@ final class LiveActivityService {
                 teamBCode: match.teamB.code,
                 teamBImageURL: nil,
                 teamBImageData: teamBData,
-                leagueName: match.league.name
+                leagueName: match.league.name,
+                blockName: match.blockName
             )
             do {
                 let activity = try Activity.request(

@@ -30,4 +30,5 @@ struct MatchActivityAttributes: ActivityAttributes {
     let teamBImageURL: String?
     let teamBImageData: Data?   // 30×30 PNG 썸네일 — ActivityKit이 위젯 Extension에 직접 전달
     let leagueName: String
+    let blockName: String?      // "Week 5", "Playoffs" 등 — Match.blockName 그대로
 }
