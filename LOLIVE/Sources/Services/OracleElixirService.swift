@@ -102,6 +102,76 @@ struct OracleElixirService: Sendable {
         return names
     }
 
+    // MARK: - 팀 시즌 스탯
+
+    /// `/stats/teams/byTournament` 원본 행 — 필드명은 OE 표기 그대로(AGT=평균 게임 시간(분),
+    /// FB%=퍼스트블러드율, DRG%=드래곤 획득률, BN%=바론 획득률, GD15=15분 골드 격차).
+    private struct TeamStatsRow: Codable {
+        let Team: String
+        let GP: Int
+        let W: Int
+        let L: Int
+        let AGT: Double
+        let GD15: Double?
+        private let firstBloodRateRaw: String?
+        private let dragonRateRaw: String?
+        private let baronRateRaw: String?
+
+        enum CodingKeys: String, CodingKey {
+            case Team, GP, W, L, AGT, GD15
+            case firstBloodRateRaw = "FB%"
+            case dragonRateRaw = "DRG%"
+            case baronRateRaw = "BN%"
+        }
+
+        var firstBloodRate: Double { Self.percent(firstBloodRateRaw) }
+        var dragonRate: Double { Self.percent(dragonRateRaw) }
+        var baronRate: Double { Self.percent(baronRateRaw) }
+
+        private static func percent(_ raw: String?) -> Double {
+            guard let raw, let value = Double(raw.replacingOccurrences(of: "%", with: ""))
+            else { return 0 }
+            return value / 100
+        }
+    }
+
+    /// 팀 단위 시즌 집계 스탯. 리그당 요청 1번(팀 전체 목록)으로 끝나고 결과는 24시간 캐싱 —
+    /// `fetchOfficialPlayerNames`와 같은 tournamentId 해석 경로를 재사용한다.
+    func fetchTeamStats(team: Team, league: League) async -> TeamSeasonStats? {
+        guard let oeLeagueName = Self.oracleElixirLeagueName(for: league) else { return nil }
+        guard let tournamentId = await currentTournamentId(oeLeagueName: oeLeagueName) else { return nil }
+
+        let cacheKey = "oe_team_stats_\(tournamentId)"
+        let rows: [TeamStatsRow]
+        if let cached: [TeamStatsRow] = AppDiskCache.get(key: cacheKey, maxAge: 24 * 3600) {
+            rows = cached
+        } else {
+            guard let encoded = tournamentId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                  let url = URL(string: "\(apiBase)/stats/teams/byTournament?tournament=\(encoded)")
+            else { return nil }
+            var request = URLRequest(url: url)
+            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+            guard let (data, response) = try? await Self.session.data(for: request),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let decoded = try? JSONDecoder().decode([TeamStatsRow].self, from: data)
+            else { return nil }
+            rows = decoded
+            AppDiskCache.set(key: cacheKey, value: rows)
+        }
+
+        guard let row = rows.first(where: { $0.Team.caseInsensitiveCompare(team.name) == .orderedSame })
+        else { return nil }
+
+        return TeamSeasonStats(
+            games: row.GP, wins: row.W, losses: row.L,
+            avgGameMinutes: row.AGT,
+            firstBloodRate: row.firstBloodRate,
+            dragonRate: row.dragonRate,
+            baronRate: row.baronRate,
+            goldDiffAt15: row.GD15 ?? 0
+        )
+    }
+
     /// 리그의 가장 최근(현재) 시즌 토너먼트 ID. `/tournaments/byLeague`가 리그당 시즌 목록을
     /// 최신순으로 주므로 첫 번째 항목을 쓴다. 응답 전체(~500KB)를 하루 캐싱해 리그별로 매번
     /// 다시 받지 않게 한다.

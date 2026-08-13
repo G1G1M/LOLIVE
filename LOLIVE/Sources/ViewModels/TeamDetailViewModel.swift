@@ -27,6 +27,9 @@ final class TeamDetailViewModel {
     var isLoading = true
     var loadFailed = false
 
+    var teamStats: TeamSeasonStats? = nil
+    var isLoadingTeamStats = false
+
     /// 최근 완료 경기에 실제로 출전한 선수(정규화된 소환사명) — 포지션당 여러 명이 등록돼
     /// 있는 로스터에서 "지금 실제로 뛰는 선수"를 구분하는 용도. Riot의 getTeams 응답 자체엔
     /// 주전/후보 구분 필드가 없어서(실측 확인함), 가장 최근 완료 경기의 실제 출전 명단으로
@@ -114,6 +117,19 @@ final class TeamDetailViewModel {
         #if DEBUG
         teamDetailLogger.debug("[TeamDetail] 최종 players=\(self.players.count) recentMatches=\(self.recentMatches.count) h2h=\(self.h2hRecords.count) starters=\(self.currentStarterNames.count)")
         #endif
+
+        // 로스터/최근경기와 무관한 별도 소스(Oracle's Elixir)라 fire-and-forget으로 뒤에서
+        // 채운다 — 여기서 기다리면 이 소스가 느리거나 실패할 때 위 핵심 데이터 표시까지
+        // 같이 늦어질 위험이 있다(선수 탭에서 겪었던 것과 같은 종류의 문제).
+        Task { await loadTeamStats() }
+    }
+
+    /// 팀 단위 시즌 스탯(Oracle's Elixir) — 선수단/최근경기와 별도 소스라 실패해도 그쪽엔
+    /// 영향 없음. "스탯" 탭에서만 쓰이므로 실패하면 그 탭만 빈 상태로 보임.
+    private func loadTeamStats() async {
+        isLoadingTeamStats = true
+        defer { isLoadingTeamStats = false }
+        teamStats = await OracleElixirService.shared.fetchTeamStats(team: team, league: league)
     }
 
     /// 백필된 팀/리그 컨텍스트 전용 로딩 경로. `historicalMatches`(서버, getHistoricalYears/
@@ -151,6 +167,7 @@ final class TeamDetailViewModel {
 
         applyMatches(teamMatches)
         await loadRosterFromHistoricalMatch()
+        Task { await loadTeamStats() }
     }
 
     /// 가장 최근(연도 내 마지막 게임 번호) 백필 경기의 실제 출전 명단으로 선수단을 채운다.
