@@ -76,13 +76,13 @@ extension FavoriteTeamWidgetView {
             // 작은 기기에서 양옆 팀 패널이 좁아지고 큰 기기에서는 가운데만 휑하게 남을 수 있음.
             let midWidth = max(90, min(130, geo.size.width * 0.32))
 
-            // 캐러셀 버튼 탭 영역을 44pt로 넓히면서(터치 타겟 기준) 그만큼 세로 여백이 부족해져
-            // 콘텐츠와 겹치기 쉬워졌다 — 바깥 여백/줄 간격을 줄여서 44pt 탭 영역이 있어도
-            // 안전하게 들어가도록 다시 맞췄다.
+            // 컴포넌트 크기(로고/폰트/캐러셀 버튼)는 그대로 두고, 바깥 여백과 요소 사이 간격만
+            // 널널하게 — 패딩 20 기준으로 다시 맞췄다. 캐러셀 버튼(44pt 고정)까지 감안하면
+            // 여유가 크진 않아서, 작은 기기에서 넘치면 캐러셀 쪽 여백부터 줄여야 할 수 있다.
             VStack(spacing: 0) {
                 if let match = entry.nextMatch {
                     HStack(spacing: 0) {
-                        VStack(spacing: 4) {
+                        VStack(spacing: 6) {
                             teamLogo(data: entry.teamImageData, size: 44)
                             Text(entry.teamCode)
                                 .font(.subheadline).fontWeight(.bold).foregroundStyle(.primary)
@@ -90,7 +90,7 @@ extension FavoriteTeamWidgetView {
                         }
                         .frame(maxWidth: .infinity)
 
-                        VStack(spacing: 3) {
+                        VStack(spacing: 5) {
                             if match.isLive {
                                 liveBadge
                                 matchTimeView(match: match, compact: true)
@@ -100,11 +100,11 @@ extension FavoriteTeamWidgetView {
                             Text(entry.leagueName)
                                 .font(.caption2).foregroundStyle(.secondary)
                                 .lineLimit(1)
-                                .padding(.top, 1)
+                                .padding(.top, 2)
                         }
                         .frame(width: midWidth)
 
-                        VStack(spacing: 4) {
+                        VStack(spacing: 6) {
                             teamLogo(data: entry.opponentImageData, size: 44)
                             Text(match.opponentCode)
                                 .font(.subheadline).fontWeight(.bold).foregroundStyle(.primary)
@@ -116,9 +116,9 @@ extension FavoriteTeamWidgetView {
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(nextMatchAccessibilityLabel(match, myTeam: entry.teamName))
                 } else {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 14) {
                         teamLogo(data: entry.teamImageData, size: 44)
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: 5) {
                             Text(entry.teamCode)
                                 .font(.title3).fontWeight(.bold).foregroundStyle(.primary)
                                 .lineLimit(1)
@@ -127,7 +127,7 @@ extension FavoriteTeamWidgetView {
                                 .lineLimit(1)
                             Text("예정된 경기 없음")
                                 .font(.caption2).foregroundStyle(.secondary)
-                                .padding(.top, 1)
+                                .padding(.top, 2)
                         }
                         Spacer()
                     }
@@ -137,13 +137,13 @@ extension FavoriteTeamWidgetView {
                 }
 
                 if entry.totalTeams > 1 {
-                    Spacer(minLength: 6)
+                    Spacer(minLength: 8)
                     carouselControls
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(14)
+        .padding(20)
     }
 
     /// Small/Medium의 "다음 경기" 블록을 VoiceOver 한 문장으로 합칠 때 쓰는 문구.
