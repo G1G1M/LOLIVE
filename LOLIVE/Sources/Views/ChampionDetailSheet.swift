@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import Charts
 
 struct ChampionDetailSheet: View {
     let stat: LeaguePlayerDetailViewModel.ChampionStat
@@ -107,56 +108,56 @@ struct ChampionDetailSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    @ViewBuilder
+    /// Swift Charts로 그리는 누적 승률 추이 — 부드러운 곡선 + 아래쪽 그라디언트 채움으로
+    /// 주식 앱 차트처럼 보이게 하고, 게임별 승패는 점 색(승=파랑/패=빨강)으로 얹는다.
     private var winRateChart: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .topLeading) {
-                // 50% 기준선
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.25))
-                    .frame(height: 1)
-                    .offset(y: geo.size.height * 0.5)
+        Chart {
+            ForEach(cumulativePoints) { pt in
+                AreaMark(
+                    x: .value("게임", pt.gameNumber),
+                    y: .value("승률", pt.winRate)
+                )
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(
+                    LinearGradient(colors: [Color.blue.opacity(0.22), Color.blue.opacity(0)],
+                                   startPoint: .top, endPoint: .bottom)
+                )
 
-                // 누적 승률 꺾은선
-                if cumulativePoints.count >= 2 {
-                    Path { path in
-                        for (i, pt) in cumulativePoints.enumerated() {
-                            let x = xPos(i, total: cumulativePoints.count, width: geo.size.width)
-                            let y = geo.size.height * (1.0 - pt.winRate)
-                            if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
-                            else       { path.addLine(to: CGPoint(x: x, y: y)) }
-                        }
+                LineMark(
+                    x: .value("게임", pt.gameNumber),
+                    y: .value("승률", pt.winRate)
+                )
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(Color.blue)
+                .lineStyle(StrokeStyle(lineWidth: 2.5, lineJoin: .round))
+
+                PointMark(
+                    x: .value("게임", pt.gameNumber),
+                    y: .value("승률", pt.winRate)
+                )
+                .foregroundStyle(pt.won ? Color.blue : Color.red)
+                .symbolSize(30)
+            }
+
+            // 50% 기준선
+            RuleMark(y: .value("기준", 0.5))
+                .foregroundStyle(Color.secondary.opacity(0.35))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+        }
+        .chartYScale(domain: 0...1)
+        .chartYAxis {
+            AxisMarks(position: .leading, values: [0, 0.5, 1.0]) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                    .foregroundStyle(Color.secondary.opacity(0.15))
+                AxisValueLabel {
+                    if let v = value.as(Double.self) {
+                        Text("\(Int(v * 100))%")
+                            .font(.system(size: 9)).foregroundStyle(.secondary)
                     }
-                    .stroke(Color.blue.opacity(0.7), style: StrokeStyle(lineWidth: 2, lineJoin: .round))
                 }
-
-                // 게임별 승패 점 (승=파랑, 패=빨강)
-                ForEach(Array(cumulativePoints.enumerated()), id: \.offset) { i, pt in
-                    let x = xPos(i, total: cumulativePoints.count, width: geo.size.width)
-                    let y = geo.size.height * (1.0 - pt.winRate)
-                    Circle()
-                        .fill(pt.won ? Color.blue : Color.red)
-                        .frame(width: 8, height: 8)
-                        .offset(x: x - 4, y: y - 4)
-                }
-
-                // Y축 레이블
-                VStack {
-                    Text("100%").font(.system(size: 9)).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("50%").font(.system(size: 9)).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("0%").font(.system(size: 9)).foregroundStyle(.secondary)
-                }
-                .frame(height: geo.size.height)
             }
         }
-    }
-
-    /// index번째 점의 X 좌표. 전체 너비를 (total-1) 등분해 균등 배치.
-    private func xPos(_ index: Int, total: Int, width: CGFloat) -> CGFloat {
-        guard total > 1 else { return width / 2 }
-        return CGFloat(index) / CGFloat(total - 1) * width
+        .chartXAxis(.hidden)
     }
 
     /// 차트 아래 W/L 결과 뱃지 가로 스크롤 행.

@@ -8,6 +8,8 @@ import SwiftUI
 struct SeasonStatsView: View {
     let stats: PlayerSeasonStats?
     let isLoading: Bool
+    /// nil이 아니면 카드에 "더보기" chevron이 붙고 탭하면 이 클로저 호출 (상세 시트 오픈용).
+    var onTapDetail: (() -> Void)? = nil
 
     var body: some View {
         Group {
@@ -49,6 +51,10 @@ struct SeasonStatsView: View {
                 Spacer()
                 Text("\(stats.games)경기")
                     .font(.caption).foregroundStyle(.secondary)
+                if onTapDetail != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.caption).fontWeight(.semibold).foregroundStyle(.tertiary)
+                }
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
 
@@ -107,6 +113,9 @@ struct SeasonStatsView: View {
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .onTapGesture { onTapDetail?() }
+        .accessibilityAddTraits(onTapDetail != nil ? .isButton : [])
     }
 
     private func kdaProportionBar(_ stats: PlayerSeasonStats) -> some View {

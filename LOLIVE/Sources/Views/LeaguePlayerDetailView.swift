@@ -14,6 +14,7 @@ struct LeaguePlayerDetailView: View {
     @State private var isFavorited = false
     @State private var selectedTab: PlayerTab = .stats
     @State private var selectedChampion: LeaguePlayerDetailViewModel.ChampionStat? = nil
+    @State private var showStatsDetail = false
     @Environment(\.modelContext) private var modelContext
 
     private enum PlayerTab: String, CaseIterable {
@@ -65,6 +66,11 @@ struct LeaguePlayerDetailView: View {
         }
         .sheet(item: $selectedChampion) { stat in
             ChampionDetailSheet(stat: stat)
+        }
+        .sheet(isPresented: $showStatsDetail) {
+            if let oeStats = viewModel.playerOEStats {
+                PlayerStatsDetailSheet(playerName: player.summonerName, stats: oeStats)
+            }
         }
     }
 
@@ -130,7 +136,10 @@ struct LeaguePlayerDetailView: View {
     private var tabContent: some View {
         switch selectedTab {
         case .stats:
-            SeasonStatsView(stats: viewModel.effectiveSeasonStats, isLoading: viewModel.isLoadingStats)
+            SeasonStatsView(
+                stats: viewModel.effectiveSeasonStats, isLoading: viewModel.isLoadingStats,
+                onTapDetail: viewModel.playerOEStats != nil ? { showStatsDetail = true } : nil
+            )
             if !viewModel.recentResults.isEmpty {
                 recentFormCard
             }
