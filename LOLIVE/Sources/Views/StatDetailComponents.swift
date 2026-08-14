@@ -4,10 +4,35 @@
 //
 //  팀/선수 스탯 상세 시트(TeamStatsDetailSheet, PlayerStatsDetailSheet)가 공유하는
 //  카드·행·도넛 링 컴포넌트. 원래 TeamStatsDetailSheet 안에 있던 걸 선수 쪽에도
-//  똑같이 필요해져서 공용으로 뽑았다.
+//  똑같이 필요해져서 공용으로 뽑았다. 시즌 선택 칩(SeasonChipRow)도 팀/선수 스탯
+//  탭이 똑같이 필요해서 여기 같이 둔다.
 //
 
 import SwiftUI
+
+/// 시즌/구간 선택 칩 행 — TeamDetailView "스탯" 탭, LeaguePlayerDetailView "통계" 탭이 공유.
+struct SeasonChipRow: View {
+    let seasons: [OESeasonOption]
+    let selectedId: String?
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(seasons) { season in
+                    let isSelected = season.id == selectedId
+                    SelectableChip(isSelected: isSelected) {
+                        onSelect(season.id)
+                    } label: {
+                        Text(season.name)
+                            .font(.subheadline).fontWeight(isSelected ? .semibold : .regular)
+                            .foregroundStyle(isSelected ? .white : .secondary)
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// 카테고리 카드 — 아이콘 배지 + 제목 + 행 목록.
 struct StatDetailCard<Content: View>: View {

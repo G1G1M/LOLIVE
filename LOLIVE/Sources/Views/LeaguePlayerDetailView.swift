@@ -136,6 +136,11 @@ struct LeaguePlayerDetailView: View {
     private var tabContent: some View {
         switch selectedTab {
         case .stats:
+            if viewModel.availableSeasons.count > 1 {
+                SeasonChipRow(seasons: viewModel.availableSeasons, selectedId: viewModel.selectedSeasonId) {
+                    viewModel.selectSeason($0)
+                }
+            }
             SeasonStatsView(
                 stats: viewModel.effectiveSeasonStats, isLoading: viewModel.isLoadingStats,
                 onTapDetail: viewModel.playerOEStats != nil ? { showStatsDetail = true } : nil

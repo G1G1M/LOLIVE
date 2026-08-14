@@ -29,6 +29,8 @@ final class TeamDetailViewModel {
 
     var teamStats: TeamSeasonStats? = nil
     var isLoadingTeamStats = false
+    var availableSeasons: [OESeasonOption] = []
+    var selectedSeasonId: String? = nil
 
     /// 최근 완료 경기에 실제로 출전한 선수(정규화된 소환사명) — 포지션당 여러 명이 등록돼
     /// 있는 로스터에서 "지금 실제로 뛰는 선수"를 구분하는 용도. Riot의 getTeams 응답 자체엔
@@ -126,10 +128,21 @@ final class TeamDetailViewModel {
 
     /// 팀 단위 시즌 스탯(Oracle's Elixir) — 선수단/최근경기와 별도 소스라 실패해도 그쪽엔
     /// 영향 없음. "스탯" 탭에서만 쓰이므로 실패하면 그 탭만 빈 상태로 보임.
-    private func loadTeamStats() async {
+    /// tournamentId를 안 주면(최초 로드) 현재 시즌 목록도 같이 채우고 최신 시즌을 쓴다.
+    private func loadTeamStats(tournamentId: String? = nil) async {
         isLoadingTeamStats = true
         defer { isLoadingTeamStats = false }
-        teamStats = await OracleElixirService.shared.fetchTeamStats(team: team, league: league)
+        if availableSeasons.isEmpty {
+            availableSeasons = await OracleElixirService.shared.availableSeasons(league: league)
+        }
+        teamStats = await OracleElixirService.shared.fetchTeamStats(team: team, league: league, tournamentId: tournamentId)
+        selectedSeasonId = tournamentId ?? availableSeasons.first?.id
+    }
+
+    /// 스탯 탭의 시즌 칩을 탭했을 때 호출 — 해당 시즌 데이터로 다시 불러온다.
+    func selectSeason(_ tournamentId: String) {
+        guard tournamentId != selectedSeasonId else { return }
+        Task { await loadTeamStats(tournamentId: tournamentId) }
     }
 
     /// 백필된 팀/리그 컨텍스트 전용 로딩 경로. `historicalMatches`(서버, getHistoricalYears/

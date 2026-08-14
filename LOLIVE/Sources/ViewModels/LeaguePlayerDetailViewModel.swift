@@ -44,6 +44,8 @@ final class LeaguePlayerDetailViewModel {
     var seasonStats: PlayerSeasonStats? = nil
     var playerOEStats: PlayerOEStats? = nil
     var isLoadingStats = true
+    var availableSeasons: [OESeasonOption] = []
+    var selectedSeasonId: String? = nil
 
     /// 화면에 실제로 보여줄 시즌 스탯. Oracle's Elixir 데이터가 있으면 그걸 우선 쓴다 —
     /// 팀 스탯(TeamSeasonStats.games)도 같은 OE 시즌 집계 테이블 기준이라, 선수도 OE로
@@ -160,7 +162,18 @@ final class LeaguePlayerDetailViewModel {
         Task { await loadOEStats() }
     }
 
-    private func loadOEStats() async {
-        playerOEStats = await OracleElixirService.shared.fetchPlayerStats(player: player, league: league)
+    /// tournamentId를 안 주면(최초 로드) 현재 시즌 목록도 같이 채우고 최신 시즌을 쓴다.
+    private func loadOEStats(tournamentId: String? = nil) async {
+        if availableSeasons.isEmpty {
+            availableSeasons = await OracleElixirService.shared.availableSeasons(league: league)
+        }
+        playerOEStats = await OracleElixirService.shared.fetchPlayerStats(player: player, league: league, tournamentId: tournamentId)
+        selectedSeasonId = tournamentId ?? availableSeasons.first?.id
+    }
+
+    /// 통계 탭의 시즌 칩을 탭했을 때 호출 — 해당 시즌 데이터로 다시 불러온다.
+    func selectSeason(_ tournamentId: String) {
+        guard tournamentId != selectedSeasonId else { return }
+        Task { await loadOEStats(tournamentId: tournamentId) }
     }
 }

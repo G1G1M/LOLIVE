@@ -154,12 +154,19 @@ struct TeamDetailView: View {
                 rosterCard
             }
         case .stats:
-            if viewModel.isLoadingTeamStats && viewModel.teamStats == nil {
-                LoadingView("팀 스탯 불러오는 중...")
-            } else if let stats = viewModel.teamStats {
-                teamStatsCard(stats)
-            } else {
-                EmptyStateView("팀 스탯이 없습니다", icon: "chart.bar.xaxis")
+            VStack(alignment: .leading, spacing: 12) {
+                if viewModel.availableSeasons.count > 1 {
+                    SeasonChipRow(seasons: viewModel.availableSeasons, selectedId: viewModel.selectedSeasonId) {
+                        viewModel.selectSeason($0)
+                    }
+                }
+                if viewModel.isLoadingTeamStats && viewModel.teamStats == nil {
+                    LoadingView("팀 스탯 불러오는 중...")
+                } else if let stats = viewModel.teamStats {
+                    teamStatsCard(stats)
+                } else {
+                    EmptyStateView("팀 스탯이 없습니다", icon: "chart.bar.xaxis")
+                }
             }
         case .h2h:
             if viewModel.isLoading && viewModel.h2hRecords.isEmpty {

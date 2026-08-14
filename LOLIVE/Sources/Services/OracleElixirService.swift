@@ -12,6 +12,12 @@
 
 import Foundation
 
+/// 시즌/구간 선택 칩에 쓰는 값 — `OracleElixirService.availableSeasons(league:)` 참고.
+struct OESeasonOption: Identifiable, Hashable {
+    let id: String
+    let name: String
+}
+
 struct OracleElixirService: Sendable {
 
     static let shared = OracleElixirService()
@@ -64,6 +70,7 @@ struct OracleElixirService: Sendable {
 
     private struct TournamentsByLeagueEntry: Codable {
         let id: String
+        let name: String
         let startDate: String
     }
 
@@ -181,9 +188,11 @@ struct OracleElixirService: Sendable {
 
     /// 팀 단위 시즌 집계 스탯. 리그당 요청 1번(팀 전체 목록)으로 끝나고 결과는 24시간 캐싱 —
     /// `fetchOfficialPlayerNames`와 같은 tournamentId 해석 경로를 재사용한다.
-    func fetchTeamStats(team: Team, league: League) async -> TeamSeasonStats? {
+    /// `tournamentId`를 명시하면(시즌 선택 칩) 그 시즌으로, 안 주면 현재 시즌으로 조회한다.
+    func fetchTeamStats(team: Team, league: League, tournamentId explicitTournamentId: String? = nil) async -> TeamSeasonStats? {
         guard let oeLeagueName = Self.oracleElixirLeagueName(for: league) else { return nil }
-        guard let tournamentId = await currentTournamentId(oeLeagueName: oeLeagueName) else { return nil }
+        guard let tournamentId = await resolveTournamentId(explicit: explicitTournamentId, oeLeagueName: oeLeagueName)
+        else { return nil }
 
         let cacheKey = "oe_team_stats_\(tournamentId)"
         let rows: [TeamStatsRow]
@@ -330,9 +339,11 @@ struct OracleElixirService: Sendable {
     /// 캐싱 — `fetchTeamStats`와 같은 tournamentId 해석 경로를 재사용한다. 이름 매칭은
     /// `player.summonerName`이 OE `Player` 필드와 표기가 다를 수 있어(대소문자·공백 등)
     /// `matchByName`으로 처리한다.
-    func fetchPlayerStats(player: Player, league: League) async -> PlayerOEStats? {
+    /// `tournamentId`를 명시하면(시즌 선택 칩) 그 시즌으로, 안 주면 현재 시즌으로 조회한다.
+    func fetchPlayerStats(player: Player, league: League, tournamentId explicitTournamentId: String? = nil) async -> PlayerOEStats? {
         guard let oeLeagueName = Self.oracleElixirLeagueName(for: league) else { return nil }
-        guard let tournamentId = await currentTournamentId(oeLeagueName: oeLeagueName) else { return nil }
+        guard let tournamentId = await resolveTournamentId(explicit: explicitTournamentId, oeLeagueName: oeLeagueName)
+        else { return nil }
 
         let cacheKey = "oe_player_stats_\(tournamentId)"
         let rows: [PlayerStatsRow]
@@ -378,26 +389,35 @@ struct OracleElixirService: Sendable {
         )
     }
 
-    /// 리그의 가장 최근(현재) 시즌 토너먼트 ID. `/tournaments/byLeague`가 리그당 시즌 목록을
-    /// 최신순으로 주므로 첫 번째 항목을 쓴다. 응답 전체(~500KB)를 하루 캐싱해 리그별로 매번
-    /// 다시 받지 않게 한다.
-    private func currentTournamentId(oeLeagueName: String) async -> String? {
+    /// `/tournaments/byLeague` 전체 응답(리그당 시즌 목록, 최신순). 응답 전체(~500KB)를
+    /// 하루 캐싱해 리그별로 매번 다시 받지 않게 한다. `currentTournamentId`/`availableSeasons`가
+    /// 공유하는 내부 헬퍼.
+    private func tournamentsByLeague() async -> [String: [TournamentsByLeagueEntry]] {
         let cacheKey = "oe_tournaments_by_league"
-        let byLeague: [String: [TournamentsByLeagueEntry]]
         if let cached: [String: [TournamentsByLeagueEntry]] = AppDiskCache.get(key: cacheKey, maxAge: 24 * 3600) {
-            byLeague = cached
-        } else {
-            guard let url = URL(string: "\(apiBase)/tournaments/byLeague") else { return nil }
-            var request = URLRequest(url: url)
-            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-            guard let (data, response) = try? await Self.session.data(for: request),
-                  (response as? HTTPURLResponse)?.statusCode == 200,
-                  let decoded = try? JSONDecoder().decode([String: [TournamentsByLeagueEntry]].self, from: data)
-            else { return nil }
-            byLeague = decoded
-            AppDiskCache.set(key: cacheKey, value: byLeague)
+            return cached
         }
-        guard let latest = byLeague[oeLeagueName]?.first else { return nil }
+        guard let url = URL(string: "\(apiBase)/tournaments/byLeague") else { return [:] }
+        var request = URLRequest(url: url)
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        guard let (data, response) = try? await Self.session.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let decoded = try? JSONDecoder().decode([String: [TournamentsByLeagueEntry]].self, from: data)
+        else { return [:] }
+        AppDiskCache.set(key: cacheKey, value: decoded)
+        return decoded
+    }
+
+    /// `fetchTeamStats`/`fetchPlayerStats`가 공유하는 tournamentId 결정 로직 — 명시적으로
+    /// 넘어온 시즌(칩 선택)이 있으면 그걸, 없으면 현재 시즌을 쓴다.
+    private func resolveTournamentId(explicit: String?, oeLeagueName: String) async -> String? {
+        if let explicit { return explicit }
+        return await currentTournamentId(oeLeagueName: oeLeagueName)
+    }
+
+    /// 리그의 가장 최근(현재) 시즌 토너먼트 ID — 시즌 목록의 첫 번째 항목.
+    private func currentTournamentId(oeLeagueName: String) async -> String? {
+        guard let latest = await tournamentsByLeague()[oeLeagueName]?.first else { return nil }
         // LCO/LLA처럼 최근 시즌 데이터가 아예 안 들어온 리그도 있다(리그 개편·중단 등).
         // 너무 오래된 시즌 명단으로 필터링하면 지금 선수단을 전부 걸러내버리는(=선수 0명)
         // 역효과가 나서, 1년 넘게 지난 데이터는 없는 것으로 취급하고 로스터 fallback에 맡긴다.
@@ -405,6 +425,27 @@ struct OracleElixirService: Sendable {
               Date().timeIntervalSince(startDate) < 365 * 24 * 3600
         else { return nil }
         return latest.id
+    }
+
+    /// "현재 시즌" 안의 라운드/구간 목록(예: LCK "2026 Rounds 3-4"/"2026 Road to MSI"/
+    /// "2026 Rounds 1-2"/"2026 Cup"). 토너먼트 id가 "리그/연도 Season/구간" 형식이라
+    /// (실측 확인: "LCK/2026 Season/Rounds 3-4"), 최신 항목과 접두사("LCK/2026 Season/")가
+    /// 같은 것만 추려서 "지난 시즌"은 자동으로 빠진다. 목록은 이미 최신순이라 정렬 그대로 유지.
+    func availableSeasons(league: League) async -> [OESeasonOption] {
+        guard let oeLeagueName = Self.oracleElixirLeagueName(for: league) else { return [] }
+        guard let entries = await tournamentsByLeague()[oeLeagueName], let latest = entries.first else { return [] }
+        guard let prefix = Self.seasonPrefix(of: latest.id) else {
+            return [OESeasonOption(id: latest.id, name: latest.name)]
+        }
+        return entries
+            .filter { $0.id.hasPrefix(prefix) }
+            .map { OESeasonOption(id: $0.id, name: $0.name) }
+    }
+
+    /// "LCK/2026 Season/Rounds 3-4" → "LCK/2026 Season/" (마지막 "/" 앞까지).
+    private static func seasonPrefix(of tournamentId: String) -> String? {
+        guard let lastSlash = tournamentId.range(of: "/", options: .backwards) else { return nil }
+        return String(tournamentId[..<lastSlash.upperBound])
     }
 
     private static let oeDateFmt: ISO8601DateFormatter = {
