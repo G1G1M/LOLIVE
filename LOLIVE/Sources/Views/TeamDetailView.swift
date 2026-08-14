@@ -156,7 +156,7 @@ struct TeamDetailView: View {
         case .stats:
             VStack(alignment: .leading, spacing: 12) {
                 if viewModel.availableSeasons.count > 1 {
-                    SeasonChipRow(seasons: viewModel.availableSeasons, selectedId: viewModel.selectedSeasonId) {
+                    SeasonPicker(seasons: viewModel.availableSeasons, selectedId: viewModel.selectedSeasonId) {
                         viewModel.selectSeason($0)
                     }
                 }

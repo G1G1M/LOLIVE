@@ -137,7 +137,7 @@ struct LeaguePlayerDetailView: View {
         switch selectedTab {
         case .stats:
             if viewModel.availableSeasons.count > 1 {
-                SeasonChipRow(seasons: viewModel.availableSeasons, selectedId: viewModel.selectedSeasonId) {
+                SeasonPicker(seasons: viewModel.availableSeasons, selectedId: viewModel.selectedSeasonId) {
                     viewModel.selectSeason($0)
                 }
             }

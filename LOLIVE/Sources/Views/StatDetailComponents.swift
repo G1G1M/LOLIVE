@@ -4,33 +4,45 @@
 //
 //  팀/선수 스탯 상세 시트(TeamStatsDetailSheet, PlayerStatsDetailSheet)가 공유하는
 //  카드·행·도넛 링 컴포넌트. 원래 TeamStatsDetailSheet 안에 있던 걸 선수 쪽에도
-//  똑같이 필요해져서 공용으로 뽑았다. 시즌 선택 칩(SeasonChipRow)도 팀/선수 스탯
+//  똑같이 필요해져서 공용으로 뽑았다. 시즌 선택 드롭다운(SeasonPicker)도 팀/선수 스탯
 //  탭이 똑같이 필요해서 여기 같이 둔다.
 //
 
 import SwiftUI
 
-/// 시즌/구간 선택 칩 행 — TeamDetailView "스탯" 탭, LeaguePlayerDetailView "통계" 탭이 공유.
-struct SeasonChipRow: View {
+/// 시즌/구간 선택 드롭다운 — TeamDetailView "스탯" 탭, LeaguePlayerDetailView "통계" 탭이 공유.
+/// LeagueDetailView+History의 연도/라운드 드롭다운(Menu + MenuFilterLabel)과 동일한 패턴.
+struct SeasonPicker: View {
     let seasons: [OESeasonOption]
     let selectedId: String?
     let onSelect: (String) -> Void
 
+    private var selectedName: String {
+        seasons.first(where: { $0.id == selectedId })?.name ?? seasons.first?.name ?? "시즌"
+    }
+
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(seasons) { season in
-                    let isSelected = season.id == selectedId
-                    SelectableChip(isSelected: isSelected) {
-                        onSelect(season.id)
-                    } label: {
+        Menu {
+            ForEach(seasons) { season in
+                Button {
+                    onSelect(season.id)
+                } label: {
+                    if season.id == selectedId {
+                        Label(season.name, systemImage: "checkmark")
+                    } else {
                         Text(season.name)
-                            .font(.subheadline).fontWeight(isSelected ? .semibold : .regular)
-                            .foregroundStyle(isSelected ? .white : .secondary)
                     }
                 }
             }
+        } label: {
+            MenuFilterLabel {
+                Text(selectedName)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .contentTransition(.opacity)
+            }
         }
+        .tint(Color(.label))
     }
 }
 
