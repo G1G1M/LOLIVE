@@ -261,10 +261,21 @@ struct LeaguePlayerDetailView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 38, alignment: .center)
 
-                        Text(String(format: "%.0f%%", stat.winRate * 100))
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(winRateColor(stat.winRate))
-                            .frame(width: 50, alignment: .center)
+                        VStack(spacing: 3) {
+                            Text(String(format: "%.0f%%", stat.winRate * 100))
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(winRateColor(stat.winRate))
+                            Capsule()
+                                .fill(Color(.tertiarySystemFill))
+                                .frame(height: 3)
+                                .overlay(alignment: .leading) {
+                                    Capsule()
+                                        .fill(winRateColor(stat.winRate).opacity(0.8))
+                                        .frame(width: 34 * stat.winRate)
+                                }
+                                .frame(width: 34)
+                        }
+                        .frame(width: 50, alignment: .center)
 
                         Text(String(format: "%.2f", stat.kda))
                             .font(.system(size: 13, weight: .semibold))
