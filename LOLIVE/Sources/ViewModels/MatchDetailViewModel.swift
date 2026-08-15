@@ -18,6 +18,7 @@ final class MatchDetailViewModel {
     var eventDetail: EventDetailInfo? = nil
     var gameWindows: [String: GameWindow] = [:]
     var leaguepediaBans: [String: (team1Bans: [String], team2Bans: [String])] = [:]
+    var oeBans: [String: (blue: [String], red: [String])] = [:]
     var isLoading: Bool = false
     var errorMessage: String? = nil
     var selectedGameId: String? = nil
@@ -43,11 +44,16 @@ final class MatchDetailViewModel {
         return gameWindows[game.gameId]
     }
 
-    /// Riot API 밴 데이터가 없을 경우 Leaguepedia 데이터로 fallback.
-    /// blueTeamId/redTeamId + teamAEsportsId를 이용해 team1/team2 → blue/red 매핑.
+    /// Riot API 밴 데이터가 없을 경우 Oracle's Elixir → Leaguepedia 순으로 fallback.
+    /// OE는 `team100=블루/team200=레드`가 Riot 엔진 표준이라 이미 블루/레드로 나와서 바로 씀.
+    /// Leaguepedia는 team1/team2(매치 기준)만 줘서 blueTeamId/redTeamId + teamAEsportsId로
+    /// blue/red 매핑이 추가로 필요.
     func correctedBans(for game: GameInfo) -> (blue: [String], red: [String]) {
         if !game.blueBans.isEmpty || !game.redBans.isEmpty {
             return (game.blueBans, game.redBans)
+        }
+        if let oe = oeBans[game.gameId] {
+            return oe
         }
         guard let lp = leaguepediaBans[game.gameId],
               let detail = eventDetail else { return ([], []) }
@@ -197,7 +203,7 @@ final class MatchDetailViewModel {
                 AppDiskCache.set(key: "event_detail_v2_\(match.id)", value: detail)
             }
 
-            await fetchLeaguepediaBans(for: playableGames.filter { $0.state == .completed })
+            await fetchGameBans(for: playableGames.filter { $0.state == .completed })
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -335,11 +341,11 @@ final class MatchDetailViewModel {
         }
 
         #if DEBUG
-        navDebugLogger.debug("🔍 [NavDebug] fetchLeaguepediaBans 호출 직전 matchId=\(self.match.id)")
+        navDebugLogger.debug("🔍 [NavDebug] fetchGameBans 호출 직전 matchId=\(self.match.id)")
         #endif
-        await fetchLeaguepediaBans(for: detail.games.filter { $0.state == .completed })
+        await fetchGameBans(for: detail.games.filter { $0.state == .completed })
         #if DEBUG
-        navDebugLogger.debug("🔍 [NavDebug] fetchLeaguepediaBans 호출 완료 matchId=\(self.match.id) isCancelled=\(Task.isCancelled)")
+        navDebugLogger.debug("🔍 [NavDebug] fetchGameBans 호출 완료 matchId=\(self.match.id) isCancelled=\(Task.isCancelled)")
         #endif
         return true
     }
@@ -378,11 +384,39 @@ final class MatchDetailViewModel {
         }
     }
 
-    private func fetchLeaguepediaBans(for games: [GameInfo]) async {
-        let lpService = leaguepediaService
-        await withTaskGroup(of: (String, (team1Bans: [String], team2Bans: [String])?).self) { group in
+    /// Riot이 밴을 안 주는 완료 경기의 밴 조회 — Oracle's Elixir(`/drafts`)를 먼저 시도하고,
+    /// 실패한 게임만 Leaguepedia로 폴백한다.
+    private func fetchGameBans(for games: [GameInfo]) async {
+        let matchId = match.id
+        await withTaskGroup(of: (String, (blue: [String], red: [String])?).self) { group in
             for game in games {
                 guard game.blueBans.isEmpty && game.redBans.isEmpty else { continue }
+                let gameId = game.gameId
+                let number = game.number
+                group.addTask {
+                    let bans = await OracleElixirService.shared.fetchDraftBans(riotMatchId: matchId, gameNumber: number)
+                    return (gameId, bans)
+                }
+            }
+            for await (gameId, bans) in group {
+                guard !Task.isCancelled else { continue }
+                if let bans {
+                    #if DEBUG
+                    navDebugLogger.debug("🔍 [NavDebug] oeBans 갱신 matchId=\(self.match.id) gameId=\(gameId)")
+                    #endif
+                    self.oeBans[gameId] = bans
+                }
+            }
+        }
+
+        let remaining = games.filter {
+            self.oeBans[$0.gameId] == nil && $0.blueBans.isEmpty && $0.redBans.isEmpty
+        }
+        guard !remaining.isEmpty else { return }
+
+        let lpService = leaguepediaService
+        await withTaskGroup(of: (String, (team1Bans: [String], team2Bans: [String])?).self) { group in
+            for game in remaining {
                 let gameId = game.gameId
                 group.addTask {
                     let bans = await lpService.fetchBans(riotGameId: gameId)

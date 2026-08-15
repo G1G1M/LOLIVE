@@ -30,8 +30,8 @@
 | API | 용도 |
 |-----|------|
 | Riot Esports API (비공식) | 경기 일정, 라이브 스코어, 팀·선수 정보 |
-| Leaguepedia MediaWiki Cargo API | 밴 데이터, 실시간 결과 보정(Riot이 결과를 안 채워주는 대회), Oracle's Elixir 미지원 리그의 시즌 스탯/챔피언픽 폴백 |
-| oe.datalisk.io (Oracle's Elixir 비공식 API) | 과거 시즌 백필(2013년~) 원본 데이터, 선수 프로필 사진, 리그 공식 출전 선수 명단, 팀/선수 시즌 스탯, 게임별 챔피언픽(챔피언풀) |
+| Leaguepedia MediaWiki Cargo API | 실시간 결과 보정(Riot이 결과를 안 채워주는 대회), Oracle's Elixir 미지원 리그의 시즌 스탯/챔피언픽/밴 폴백 |
+| oe.datalisk.io (Oracle's Elixir 비공식 API) | 과거 시즌 백필(2013년~) 원본 데이터, 선수 프로필 사진, 리그 공식 출전 선수 명단, 팀/선수 시즌 스탯, 게임별 챔피언픽(챔피언풀), 밴 데이터 |
 
 ## 주요 기능
 
@@ -88,7 +88,8 @@
 
 ### 경기 상세
 - 실시간 팀 스탯 (킬 / 골드 / 타워 / 드래곤 / 바론), 게임별 선수 KDA·골드·CS
-- 킬 타임라인, 밴 카드
+- 킬 타임라인, 밴 카드 (Riot API에 밴 정보가 없으면 Oracle's Elixir 드래프트 데이터로 보완,
+  그것도 없으면 Leaguepedia로 최종 폴백)
 - 완료 경기 상세는 서버가 영구 캐싱 — 여러 사용자가 봐도 Riot API는 최초 1회만 호출
 - 게임 상세 스탯을 못 가져온 경우 빈 화면 대신 재시도 카드 표시
 
