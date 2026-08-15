@@ -129,7 +129,7 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
     /// 있으면 Leaguepedia 결과로 보완한다. (LoL 경기는 정상 종료 시 0:0으로 끝날 수 없으므로
     /// 이 조건으로 걸러도 안전하다)
     /// 정상적으로 상태가 갱신되는 리그(대부분)는 감지되는 게 없어 API 호출 없이 그대로 반환된다.
-    private func reconcileUnreportedResults(_ matches: [Match], league: League) async -> [Match] {
+    func reconcileUnreportedResults(_ matches: [Match], league: League) async -> [Match] {
         let unstartedCutoff = Date().addingTimeInterval(-3 * 3600)
         // inProgress는 unstarted보다 훨씬 짧은 유예만 준다 — 방송 지연으로 몇 시간씩 안 시작하는 건
         // 흔하지만, 일단 시작한 경기가 90분 넘게 스코어 변화가 없는 건 Bo5를 감안해도 의심스럽다.
@@ -147,12 +147,31 @@ final class RiotEsportsService: RiotEsportsServiceProtocol {
         // }
         #endif
 
+        // Oracle's Elixir 먼저 — Riot 매치 id로 경기 하나하나 직접 조회한다(stuck 라이브 경기
+        // 감지와 동일한 `reconcileStuckLiveMatch` 재사용, 팀명 퍼지매칭 불필요). 못 찾은 것만
+        // Leaguepedia 대회 페이지 전체 조회로 폴백.
+        var oeResolved: [String: Match] = [:]
+        await withTaskGroup(of: (String, Match?).self) { group in
+            for m in staleOnes {
+                group.addTask {
+                    (m.id, await OracleElixirService.shared.reconcileStuckLiveMatch(m))
+                }
+            }
+            for await (id, updated) in group {
+                if let updated { oeResolved[id] = updated }
+            }
+        }
+        var result = matches.map { oeResolved[$0.id] ?? $0 }
+
+        let stillStale = staleOnes.filter { oeResolved[$0.id] == nil }
+        guard !stillStale.isEmpty else { return result }
+
         let lpMatches = await LeaguepediaService.shared.fetchLiveTournamentResults(for: league)
         #if DEBUG
         // reconcileLogger.debug("🔎 [Reconcile] \(league.name) Leaguepedia 응답 \(lpMatches.count)건")
         #endif
-        guard !lpMatches.isEmpty else { return matches }
-        let result = LeaguepediaService.shared.reconcileResults(riotMatches: matches, leaguepediaMatches: lpMatches)
+        guard !lpMatches.isEmpty else { return result }
+        result = LeaguepediaService.shared.reconcileResults(riotMatches: result, leaguepediaMatches: lpMatches)
         #if DEBUG
         // for m in staleOnes {
         //     if let fixed = result.first(where: { $0.id == m.id }) {

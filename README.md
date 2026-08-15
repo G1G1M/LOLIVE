@@ -30,8 +30,8 @@
 | API | 용도 |
 |-----|------|
 | Riot Esports API (비공식) | 경기 일정, 라이브 스코어, 팀·선수 정보 |
-| Leaguepedia MediaWiki Cargo API | 케스파컵처럼 Riot이 결과를 아예 안 채워주는 대회의 전체 목록 보정, Oracle's Elixir 미지원 리그의 시즌 스탯/챔피언픽/밴/stuck 경기 감지 폴백 |
-| oe.datalisk.io (Oracle's Elixir 비공식 API) | 과거 시즌 백필(2013년~) 원본 데이터, 선수 프로필 사진, 리그 공식 출전 선수 명단, 팀/선수 시즌 스탯, 게임별 챔피언픽(챔피언풀), 밴 데이터, 라이브 피드가 멈춘 경기의 stuck 감지·재보정 |
+| Leaguepedia MediaWiki Cargo API | Oracle's Elixir로도 못 찾은 경기의 최종 폴백(시즌 스탯/챔피언픽/밴/결과 보정 전부) |
+| oe.datalisk.io (Oracle's Elixir 비공식 API) | 과거 시즌 백필(2013년~) 원본 데이터, 선수 프로필 사진, 리그 공식 출전 선수 명단, 팀/선수 시즌 스탯, 게임별 챔피언픽(챔피언풀), 밴 데이터, 케스파컵처럼 Riot이 결과를 안 채워주는 경기의 스코어·상태 보정 |
 
 ## 주요 기능
 
