@@ -217,7 +217,10 @@ final class TodayViewModel {
                         guard let code = favoriteTeamCode(for: lm.match) else { continue }
                         var finalMatch = leaguepediaOverrides[lm.match.id]
                         if finalMatch == nil {
-                            finalMatch = await LeaguepediaService.shared.reconcileStuckLiveMatch(lm.match)
+                            finalMatch = await OracleElixirService.shared.reconcileStuckLiveMatch(lm.match)
+                            if finalMatch == nil {
+                                finalMatch = await LeaguepediaService.shared.reconcileStuckLiveMatch(lm.match)
+                            }
                         }
                         let resolvedMatch = finalMatch ?? lm.match
                         leaguepediaOverrides[lm.match.id] = resolvedMatch
@@ -406,9 +409,13 @@ final class TodayViewModel {
                     .map { Date().timeIntervalSince($0) > Self.staleFeedThreshold } ?? true
                 guard isFinished || isStale else { return }
 
-                guard let updated = await LeaguepediaService.shared.reconcileStuckLiveMatch(match) else { return }
+                var reconciled = await OracleElixirService.shared.reconcileStuckLiveMatch(match)
+                if reconciled == nil {
+                    reconciled = await LeaguepediaService.shared.reconcileStuckLiveMatch(match)
+                }
+                guard let updated = reconciled else { return }
                 let newScore = (updated.scoreA, updated.scoreB)
-                guard newScore != previousScore else { return }  // Leaguepedia도 아직 그대로면 조용히 재시도만
+                guard newScore != previousScore else { return }  // 둘 다 아직 그대로면 조용히 재시도만
 
                 leaguepediaOverrides[match.id] = updated
                 if updated.state == .completed {
