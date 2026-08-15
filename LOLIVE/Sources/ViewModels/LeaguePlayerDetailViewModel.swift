@@ -92,9 +92,7 @@ final class LeaguePlayerDetailViewModel {
         async let seasonStatsTask = LeaguepediaService.shared.playerSeasonStats(
             summonerName: player.summonerName, league: league
         )
-        async let picksTask = LeaguepediaService.shared.playerChampionPicks(
-            summonerName: player.summonerName, league: league
-        )
+        async let picksTask = OracleElixirService.shared.fetchPlayerGameDetails(player: player, league: league)
 
         // 스케줄은 빠른 Riot API → 완료 즉시 최근 경기 표시 (Leaguepedia 대기 없음)
         let allMatches = (try? await scheduleTask) ?? []
@@ -121,8 +119,14 @@ final class LeaguePlayerDetailViewModel {
 
         seasonStats = await seasonStatsTask
 
-        let picks = await picksTask
-        if let picks = picks, !picks.isEmpty {
+        // Oracle's Elixir가 이 리그를 지원 안 하거나 실패하면 Leaguepedia로 폴백.
+        var picks = await picksTask
+        if picks == nil || picks!.isEmpty {
+            picks = await LeaguepediaService.shared.playerChampionPicks(
+                summonerName: player.summonerName, league: league
+            )
+        }
+        if let picks, !picks.isEmpty {
             var champGames:   [String: Int] = [:]
             var champWins:    [String: Int] = [:]
             var champKills:   [String: Int] = [:]

@@ -389,6 +389,59 @@ struct OracleElixirService: Sendable {
         )
     }
 
+    // MARK: - 선수 게임별 챔피언 픽 (챔피언풀)
+
+    /// `/players/gameDetails/{player}` 원본 행 — 필요한 필드만 디코드.
+    private struct GameDetailRow: Codable {
+        let playerChampion: String
+        let kills: Int
+        let deaths: Int
+        let assists: Int
+        let result: Int
+        let gameCreation: String
+        let tournament: String
+    }
+
+    /// 선수의 게임별 챔피언 픽 기록(챔피언풀 탭). Leaguepedia의 ScoreboardPlayers+ScoreboardGames
+    /// JOIN을 대체 — 이 엔드포인트는 리그 스코프 없이 선수의 최근 게임을 통째로 주므로(실측:
+    /// 50건) 다른 리그/국제전 게임이 섞이지 않도록 `tournament` 표시명이 리그 라벨로 시작하는
+    /// 것만 남긴다(실측: "LCK 2026 Rounds 3-4"처럼 짧은 리그 라벨로 시작). 필터링 결과가 0건이면
+    /// (라벨 표기가 예상과 다른 리그) 안전하게 원본 전체로 폴백한다.
+    func fetchPlayerGameDetails(player: Player, league: League) async -> [ChampionPickEntry]? {
+        guard let encoded = player.summonerName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "\(apiBase)/players/gameDetails/\(encoded)")
+        else { return nil }
+
+        let cacheKey = "oe_player_game_details_\(player.summonerName.lowercased())"
+        let rows: [GameDetailRow]
+        if let cached: [GameDetailRow] = AppDiskCache.get(key: cacheKey, maxAge: 6 * 3600) {
+            rows = cached
+        } else {
+            var request = URLRequest(url: url)
+            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+            guard let (data, response) = try? await Self.session.data(for: request),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let decoded = try? JSONDecoder().decode([GameDetailRow].self, from: data)
+            else { return nil }
+            rows = decoded
+            AppDiskCache.set(key: cacheKey, value: rows)
+        }
+        guard !rows.isEmpty else { return nil }
+
+        let leaguePrefix = league.slug.lowercased()
+        let filtered = rows.filter { $0.tournament.lowercased().hasPrefix(leaguePrefix) }
+        let scoped = filtered.isEmpty ? rows : filtered
+
+        return scoped.map { row in
+            ChampionPickEntry(
+                champion: row.playerChampion,
+                kills: row.kills, deaths: row.deaths, assists: row.assists,
+                won: row.result == 1,
+                date: Self.oeDateFmt.date(from: row.gameCreation)
+            )
+        }
+    }
+
     /// `/tournaments/byLeague` 전체 응답(리그당 시즌 목록, 최신순). 응답 전체(~500KB)를
     /// 하루 캐싱해 리그별로 매번 다시 받지 않게 한다. `currentTournamentId`/`availableSeasons`가
     /// 공유하는 내부 헬퍼.
