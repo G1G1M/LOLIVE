@@ -67,7 +67,13 @@ struct MatchLiveActivityWidget: Widget {
                     // 위(.center)에 이미 "Game N"·리그명이 있어서 아래 줄은 상태만 —
                     // 예전엔 여기도 "LIVE · Game N · 리그명"을 그대로 반복해서 두 줄이 똑같아 보였음.
                     HStack(spacing: 4) {
-                        if context.state.isLive {
+                        if context.state.isFinished {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                            Text("경기종료")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        } else if context.state.isLive {
                             Circle().fill(Color.red).frame(width: 5, height: 5)
                             Text("LIVE")
                                 .font(.caption2).fontWeight(.bold)
@@ -84,7 +90,7 @@ struct MatchLiveActivityWidget: Widget {
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(
                         "\(context.attributes.leagueName), " +
-                        (context.state.isLive ? "라이브, \(context.state.currentGame)세트" : "시작 중")
+                        (context.state.isFinished ? "경기종료" : (context.state.isLive ? "라이브, \(context.state.currentGame)세트" : "시작 중"))
                     )
                 }
             } compactLeading: {
@@ -187,7 +193,8 @@ struct LockScreenLiveActivityView: View {
     @Environment(\.widgetRenderingMode) private var renderingMode
 
     private var statusText: String {
-        state.isLive ? "LIVE · Game \(state.currentGame)" : "시작 중"
+        if state.isFinished { return "경기종료" }
+        return state.isLive ? "LIVE · Game \(state.currentGame)" : "시작 중"
     }
 
     var body: some View {
@@ -229,7 +236,17 @@ struct LockScreenLiveActivityView: View {
                     }
                     .widgetAccentable()
                     .accessibilityHidden(true)
-                    if state.isLive {
+                    if state.isFinished {
+                        HStack(spacing: 5) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 8))
+                                .foregroundStyle(.secondary)
+                            Text("경기종료")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityHidden(true)
+                    } else if state.isLive {
                         HStack(spacing: 5) {
                             Circle().fill(Color.red).frame(width: 5, height: 5)
                             Text("LIVE")
@@ -341,6 +358,7 @@ struct LockScreenLiveActivityView: View {
 } contentStates: {
     MatchActivityAttributes.ContentState(scoreA: 1, scoreB: 0, currentGame: 2, isLive: true)
     MatchActivityAttributes.ContentState(scoreA: 2, scoreB: 1, currentGame: 3, isLive: true)
+    MatchActivityAttributes.ContentState(scoreA: 2, scoreB: 1, currentGame: 3, isLive: false, isFinished: true)
 }
 
 #Preview("Dynamic Island", as: .dynamicIsland(.expanded), using: MatchActivityAttributes(

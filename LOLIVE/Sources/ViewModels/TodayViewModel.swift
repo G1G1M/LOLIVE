@@ -265,6 +265,9 @@ final class TodayViewModel {
                     // 라이브에서 사라진 모든 경기 → 다음 전체 스케줄 리로드 전까지도
                     // 화면에서 사라지지 않도록 로컬에서 즉시 완료 상태로 승격
                     // (즐겨찾기 경기는 위에서 이미 Leaguepedia로 최종 확정한 점수가 있으면 그걸 사용)
+                    let justCompleted = prevLive
+                        .filter { !newLiveIds.contains($0.match.id) }
+                        .map { leaguepediaOverrides[$0.match.id] ?? $0.match }
                     for lm in prevLive where !newLiveIds.contains(lm.match.id) {
                         markCompleted(leaguepediaOverrides[lm.match.id] ?? lm.match)
                     }
@@ -290,7 +293,7 @@ final class TodayViewModel {
                         favoriteTeamCode(for: $0) != nil &&
                         !newLiveIds.contains($0.id)
                     }
-                    await LiveActivityService.shared.syncActivities(liveMatches, overdueMatches: overdueMatches, favoritedTeams: favoritedTeams)
+                    await LiveActivityService.shared.syncActivities(liveMatches, overdueMatches: overdueMatches, justCompletedMatches: justCompleted, favoritedTeams: favoritedTeams)
                 } catch {
                     // 폴링 중 에러는 무시 (기존 데이터 유지)
                     #if DEBUG

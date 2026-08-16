@@ -246,16 +246,45 @@ final class LiveActivityService {
 
     // MARK: - Public
 
+    /// 잠금화면에 "경기종료"를 보여준 뒤 자동으로 사라질 때까지의 유예 시간.
+    private static let finishedDismissDelay: TimeInterval = 15 * 60
+
     /// 폴링 결과로 liveMatches가 갱신될 때마다 호출
     /// — 즐겨찾기 팀의 경기 Live Activity를 시작/업데이트/종료
     /// - overdueMatches: startTime 지났으나 API 미확인 경기 (예약 시각부터 pre-live Activity 표시)
-    func syncActivities(_ liveMatches: [LiveMatch], overdueMatches: [Match] = [], favoritedTeams: Set<FavoritedTeamRef>) async {
+    /// - justCompletedMatches: 직전 폴링까지 라이브였다가 이번 폴링에서 사라진 경기(=방금 끝난 경기).
+    ///   즐겨찾기 팀이 아니거나 Activity가 없던 경기가 섞여 있어도 안전 — 실제로 존재하는 Activity만 처리한다.
+    func syncActivities(_ liveMatches: [LiveMatch], overdueMatches: [Match] = [], justCompletedMatches: [Match] = [], favoritedTeams: Set<FavoritedTeamRef>) async {
         let authInfo = ActivityAuthorizationInfo()
         guard authInfo.areActivitiesEnabled else {
             #if DEBUG
             logger.debug("⚠️ [LiveActivity] 비활성화됨 — 설정 > LOLIVE > 실시간 활동에서 켜주세요")
             #endif
             return
+        }
+
+        // 방금 끝난 경기 → 즉시 지우지 않고 "경기종료" 최종 스코어로 한 번 갱신한 뒤
+        // 유예 시간 후 자동으로 사라지게 한다. 여기서 처리한 id는 activities에서 바로 빼서
+        // 아래 keepIds 정리 루프가 중복으로 건드리지 않게 한다.
+        for match in justCompletedMatches {
+            guard let activity = activities[match.id] else { continue }
+            let attrs = activity.attributes
+            let sameOrder = attrs.teamACode == match.teamA.code
+            let finalScoreA = sameOrder ? match.scoreA : match.scoreB
+            let finalScoreB = sameOrder ? match.scoreB : match.scoreA
+            let state = MatchActivityAttributes.ContentState(
+                scoreA: finalScoreA,
+                scoreB: finalScoreB,
+                currentGame: activity.content.state.currentGame,
+                isLive: false,
+                isFinished: true
+            )
+            await activity.end(.init(state: state, staleDate: nil),
+                                dismissalPolicy: .after(Date().addingTimeInterval(Self.finishedDismissDelay)))
+            activities.removeValue(forKey: match.id)
+            #if DEBUG
+            logger.debug("🏁 [LiveActivity] 경기종료 표시: \(attrs.teamACode) \(finalScoreA)-\(finalScoreB) \(attrs.teamBCode)")
+            #endif
         }
 
         let relevant = liveMatches.filter {
@@ -274,25 +303,41 @@ final class LiveActivityService {
 
         // 진행 중인 경기 시작 또는 업데이트
         for liveMatch in relevant {
-            let state = MatchActivityAttributes.ContentState(
-                scoreA: liveMatch.match.scoreA,
-                scoreB: liveMatch.match.scoreB,
-                currentGame: liveMatch.currentSet,
-                isLive: true
-            )
-
             if let activity = activities[liveMatch.match.id] {
+                // attributes(teamA/teamB)는 Activity 생성 시 한 번 고정되고 이후 절대 못 바꾼다.
+                // 반면 스코어는 매 폴링마다 새로 받아온 Match에서 다시 읽는데, Riot API가 팀 배열
+                // 순서를 항상 같게 보장하지 않아서 그대로 넣으면 팀 라벨은 그대로인데 스코어만
+                // 반대로 들어갈 수 있다 — 매번 코드로 순서를 대조해 필요하면 교차 배정한다.
+                let attrs = activity.attributes
+                let sameOrder = attrs.teamACode == liveMatch.match.teamA.code
+                let scoreA = sameOrder ? liveMatch.match.scoreA : liveMatch.match.scoreB
+                let scoreB = sameOrder ? liveMatch.match.scoreB : liveMatch.match.scoreA
+
+                let state = MatchActivityAttributes.ContentState(
+                    scoreA: scoreA,
+                    scoreB: scoreB,
+                    currentGame: liveMatch.currentSet,
+                    isLive: true
+                )
+
                 // 세트가 바뀐 경우에만 다이나믹 아일랜드/잠금화면에 배너+알림음 표시
                 // (매 폴링마다 조용히 갱신되는 것과 구분 — 세트 종료라는 의미 있는 순간에만 알림)
                 let alert: AlertConfiguration? = activity.content.state.currentGame != state.currentGame
                     ? AlertConfiguration(
                         title: LocalizedStringResource(stringLiteral: "Game \(state.currentGame) 시작"),
-                        body: LocalizedStringResource(stringLiteral: "\(liveMatch.match.teamA.code) \(state.scoreA) - \(state.scoreB) \(liveMatch.match.teamB.code)"),
+                        body: LocalizedStringResource(stringLiteral: "\(attrs.teamACode) \(state.scoreA) - \(state.scoreB) \(attrs.teamBCode)"),
                         sound: .default
                       )
                     : nil
                 await activity.update(.init(state: state, staleDate: nil), alertConfiguration: alert)
             } else {
+                let state = MatchActivityAttributes.ContentState(
+                    scoreA: liveMatch.match.scoreA,
+                    scoreB: liveMatch.match.scoreB,
+                    currentGame: liveMatch.currentSet,
+                    isLive: true
+                )
+
                 // 두 팀 썸네일을 병렬로 fetch
                 async let thumbA = fetchThumbnail(urlString: liveMatch.match.teamA.imageURL, teamCode: liveMatch.match.teamA.code)
                 async let thumbB = fetchThumbnail(urlString: liveMatch.match.teamB.imageURL, teamCode: liveMatch.match.teamB.code)

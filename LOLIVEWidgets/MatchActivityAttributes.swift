@@ -17,6 +17,7 @@ struct MatchActivityAttributes: ActivityAttributes {
         var scoreB: Int
         var currentGame: Int
         var isLive: Bool
+        var isFinished: Bool = false   // 경기 종료 직후 "경기종료"로 잠깐 표시할 때만 true
     }
 
     // 경기 시작 시 고정되는 정적 데이터
