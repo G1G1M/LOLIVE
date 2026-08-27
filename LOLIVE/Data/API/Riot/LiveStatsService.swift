@@ -9,6 +9,8 @@ import Foundation
 
 protocol LiveStatsServiceProtocol: Sendable {
     func fetchGameWindow(gameId: String, startingTime: Date?) async throws -> GameWindow
+    /// 선수별 빌드·기여도·전투 스탯 (`+Detail` 참고). 화면에서 필요할 때만 부른다.
+    func fetchPlayerDetails(gameId: String, startingTime: Date?) async throws -> GameLiveDetail
     func fetchGameDetails(gameId: String) async throws -> Int?   // 인게임 경과 시간(초) 반환
     func fetchKillTimeline(gameId: String) async throws -> [KillEvent]
 }
@@ -30,11 +32,19 @@ final class LiveStatsService: LiveStatsServiceProtocol {
         return f
     }()
 
+    /// `startingTime`은 **10초 경계로 정렬돼 있어야 한다** — 아니면 피드가 무조건 400을 준다(실측).
+    /// 응답 프레임의 `rfc460Timestamp`(예: `16:30:09.879Z`)를 그대로 되돌려 보내면 거절당하므로,
+    /// 그 시각을 다시 요청에 쓰려면 반드시 이 함수를 거칠 것.
+    static func alignedToTenSeconds(_ date: Date) -> Date {
+        Date(timeIntervalSince1970: (date.timeIntervalSince1970 / 10).rounded(.down) * 10)
+    }
+
     func fetchGameWindow(gameId: String, startingTime: Date? = nil) async throws -> GameWindow {
         var components = URLComponents(string: "\(baseURL)/window/\(gameId)")
         if let startingTime {
             components?.queryItems = [
-                URLQueryItem(name: "startingTime", value: Self.feedTimestamp.string(from: startingTime))
+                URLQueryItem(name: "startingTime",
+                             value: Self.feedTimestamp.string(from: Self.alignedToTenSeconds(startingTime)))
             ]
         }
         guard let url = components?.url else {

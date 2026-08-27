@@ -19,7 +19,8 @@ extension LiveStatsService {
         var components = URLComponents(string: "\(detailBaseURL)/details/\(gameId)")
         if let startingTime {
             components?.queryItems = [
-                URLQueryItem(name: "startingTime", value: Self.feedTimestamp.string(from: startingTime))
+                URLQueryItem(name: "startingTime",
+                             value: Self.feedTimestamp.string(from: Self.alignedToTenSeconds(startingTime)))
             ]
         }
         guard let url = components?.url else { throw APIError.invalidURL }

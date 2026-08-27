@@ -63,6 +63,11 @@ struct PlayerLiveDetail: Identifiable, Codable, Hashable {
     let abilities: [String]
 
     var kda: String { "\(kills)/\(deaths)/\(assists)" }
+
+    /// 비교 막대 길이에만 쓰는 값. 데스가 0이면 나눗셈이 터지므로 1로 본다(관례적 "perfect" 계산).
+    var kdaScore: Double {
+        Double(kills + assists) / Double(max(deaths, 1))
+    }
 }
 
 /// 한 게임의 특정 시점 상세 스냅샷. 완료 경기는 더 이상 안 변해서 캐싱해도 안전하다.

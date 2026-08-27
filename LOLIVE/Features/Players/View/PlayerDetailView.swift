@@ -13,9 +13,20 @@ struct PlayerDetailView: View {
 
     private let service: RiotEsportsServiceProtocol = RiotEsportsService()
     @State private var isResolvingProfile = false
-    /// 라이브 스탯 피드 details — 선수 행을 탭해 들어왔을 때 1회만 채운다(+LiveDetail 참고).
-    @State var liveDetail: PlayerLiveDetail? = nil
-    @State var isLoadingLiveDetail = false
+    /// 세트별 맞라이너 대결(+LiveDetail 참고). 선택된 세트만 받아 캐싱한다.
+    @State var liveVM: PlayerLiveDetailViewModel
+    /// 빌드 섹션은 기본으로 접어둔다 — 먼저 궁금한 건 라인전 결과다.
+    @State var isBuildExpanded = false
+
+    init(summonerName: String, games: [GameInfo], gameWindows: [String: GameWindow], match: Match) {
+        self.summonerName = summonerName
+        self.games = games
+        self.gameWindows = gameWindows
+        self.match = match
+        self._liveVM = State(initialValue: PlayerLiveDetailViewModel(
+            summonerName: summonerName, games: games, gameWindows: gameWindows
+        ))
+    }
     @State private var resolvedPlayer: Player? = nil
     @State private var profileNotFound = false
 
@@ -63,7 +74,6 @@ struct PlayerDetailView: View {
                 .padding()
             }
         }
-        .task { await loadLiveDetail() }
         .navigationTitle(summonerName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -201,7 +211,7 @@ struct PlayerDetailView: View {
 
     // MARK: - Helpers
 
-    private func formatGold(_ gold: Int) -> String {
+    func formatGold(_ gold: Int) -> String {
         gold >= 1000 ? String(format: "%.1fk", Double(gold) / 1000) : "\(gold)"
     }
 }

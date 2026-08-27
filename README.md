@@ -89,8 +89,10 @@
 ### 경기 상세
 - 실시간 팀 스탯 (킬 / 골드 / 타워 / 바론), 게임별 선수 KDA·골드·CS
 - 드래곤은 개수뿐 아니라 **어떤 드래곤을 먹었는지 종류까지** 표시 (화염/바다/바람/대지/마공/화공/장로)
-- 선수를 탭하면 그 세트의 **아이템 빌드·스킬 순서·킬 관여율·딜 비중·시야·현재 전투 스탯**까지 확인
-  (라이브 스탯 피드 `details`, 화면에 띄운 스탯과 같은 시점으로 조회)
+- 선수를 탭하면 **세트별 맞라이너 대결**을 확인 — 같은 라인에서 맞붙은 상대와 나란히 놓고
+  KDA·킬 관여·딜 비중·CS·골드·방어력·마법저항을 좌우 막대로 비교, 골드 격차를 함께 표시.
+  딜 비중엔 팀 내 순위가 붙고, 아이템 빌드·스킬 마스터 순서·시야는 접어뒀다가 펼쳐 봄
+  (G1/G2/… 세트 탭으로 전환, 고른 세트만 조회하고 캐싱)
 - 밴 카드 (Riot API에 밴 정보가 없으면 Oracle's Elixir 드래프트 데이터로 보완,
   그것도 없으면 Leaguepedia로 최종 폴백)
 - 킬 타임라인은 현재 표시되지 않음 — Riot이 라이브 스탯 피드에서 킬 이벤트(`events`)를
@@ -178,7 +180,7 @@ lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 
 ## 테스트
 
-`LOLIVETests` 타겟, Swift Testing 프레임워크. 62개 케이스 (핵심 ViewModel 로직 + 순수 함수).
+`LOLIVETests` 타겟, Swift Testing 프레임워크. 73개 케이스 (핵심 ViewModel 로직 + 순수 함수).
 
 ```bash
 xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests
@@ -188,5 +190,5 @@ xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기
 
 `.github/workflows/ci.yml` — GitHub Actions, `main` push/PR마다 자동 실행.
 
-1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 62개 실행
+1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 73개 실행
 2. `LOLIVEWidgetsExtension` 별도 빌드 (컴파일 체크만)

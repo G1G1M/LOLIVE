@@ -193,3 +193,154 @@ import Foundation
         #expect(frames.allSatisfy { $0["gameTime"] == nil })
     }
 }
+
+// MARK: - startingTime 정렬
+
+@Suite("LiveStatsService.alignedToTenSeconds") struct StartingTimeAlignmentTests {
+
+    /// 피드는 startingTime이 10초 경계에 정렬돼 있지 않으면 무조건 400을 준다(실측 확인).
+    /// window 응답의 rfc460Timestamp(예: 16:30:09.879Z)를 그대로 되돌려 보내다가
+    /// 선수 상세가 항상 실패했던 적이 있다.
+    @Test func 소수점_초를_10초_경계로_내린다() {
+        let fmt = LiveStatsService.feedTimestamp
+        let messy = try! #require(fmt.date(from: "2026-08-27T16:30:09.879Z"))
+        let aligned = LiveStatsService.alignedToTenSeconds(messy)
+        #expect(fmt.string(from: aligned) == "2026-08-27T16:30:00.000Z")
+    }
+
+    @Test func 이미_정렬된_시각은_그대로_둔다() {
+        let fmt = LiveStatsService.feedTimestamp
+        let clean = try! #require(fmt.date(from: "2026-08-27T16:30:10.000Z"))
+        #expect(LiveStatsService.alignedToTenSeconds(clean) == clean)
+    }
+
+    @Test func 항상_10초의_배수가_된다() {
+        let fmt = LiveStatsService.feedTimestamp
+        for sec in ["00.000", "03.500", "09.999", "10.001", "59.999"] {
+            let d = try! #require(fmt.date(from: "2026-08-27T16:30:\(sec)Z"))
+            let aligned = LiveStatsService.alignedToTenSeconds(d)
+            #expect(aligned.timeIntervalSince1970.truncatingRemainder(dividingBy: 10) == 0)
+            #expect(aligned <= d)   // 미래로 넘어가면 아직 없는 프레임을 요청하게 된다
+        }
+    }
+}
+
+// MARK: - 맞라이너 대결
+
+@Suite("LaneMatchup") struct LaneMatchupTests {
+    let svc = LiveStatsService()
+
+    private func matchup(_ name: String) throws -> LaneMatchup? {
+        let window = try svc.decodeWindow(LiveStatsFixtures.windowData)
+        let detail = try svc.decodeDetails(LiveStatsFixtures.detailsData, gameId: window.gameId)
+        return LaneMatchup.build(gameNumber: 1, window: window, detail: detail, summonerName: name)
+    }
+
+    /// 같은 role 을 반대편에서 찾는다 — 챔피언이나 순서로 추측하지 않는다.
+    @Test func 같은_라인_상대를_짝짓는다() throws {
+        let m = try #require(try matchup("BFX Clear"))     // 블루 탑 Jayce
+        #expect(m.role == "top")
+        #expect(m.me.championId == "Jayce")
+        #expect(m.opponent?.championId == "Camille")   // 레드 탑
+        #expect(m.opponent?.summonerName == "NS Kingen")
+        #expect(m.me.isBlue == true)
+        #expect(m.opponent?.isBlue == false)
+    }
+
+    /// 봇·서포터도 같은 규칙으로 짝지어져야 한다 — 포지션별 예외를 두지 않는다.
+    @Test func 봇과_서포터도_같은_규칙으로_짝지어진다() throws {
+        let bot = try #require(try matchup("BFX Taeyoon"))
+        #expect(bot.role == "bottom")
+        #expect(bot.opponent?.summonerName == "NS Diable")
+
+        let sup = try #require(try matchup("BFX Kellin"))
+        #expect(sup.role == "support")
+        #expect(sup.opponent?.summonerName == "NS Lehends")
+    }
+
+    @Test func 레드팀_선수도_반대로_짝지어진다() throws {
+        let m = try #require(try matchup("NS Scout"))       // 레드 미드
+        #expect(m.me.isBlue == false)
+        #expect(m.opponent?.summonerName == "BFX VicLa")
+        #expect(m.opponent?.isBlue == true)
+    }
+
+    @Test func 없는_선수는_nil() throws {
+        #expect(try matchup("존재하지 않는 선수") == nil)
+    }
+
+    /// 팀 5명 중 딜 비중 순위. 맞라이너 비교만으로는 "우리 팀에서 몇 번째 딜러"가 안 보인다.
+    @Test func 팀_내_딜비중_순위를_센다() throws {
+        let ranks = try ["BFX Clear", "BFX Raptor", "BFX VicLa", "BFX Taeyoon", "BFX Kellin"]
+            .compactMap { try matchup($0) }
+            .map(\.damageShareRank)
+        #expect(ranks.count == 5)
+        #expect(Set(ranks) == Set(1...5))              // 1~5위가 중복 없이 다 나온다
+        let support = try #require(try matchup("BFX Kellin"))
+        #expect(support.damageShareRank == 5)          // 서포터가 딜 비중 꼴찌
+    }
+
+    /// 골드 격차는 맞라이너 기준으로 서로 부호만 반대여야 한다.
+    @Test func 골드_격차는_서로_부호가_반대다() throws {
+        let clear = try #require(try matchup("BFX Clear"))
+        let kingen = try #require(try matchup("NS Kingen"))
+        let a = try #require(clear.goldDifference)
+        let b = try #require(kingen.goldDifference)
+        #expect(a == -b)
+    }
+}
+
+// MARK: - 세트 시작 직후(전부 0) 처리
+
+@Suite("LaneMatchup 0값 처리") struct LaneMatchupZeroTests {
+
+    private func detail(_ pid: Int, gold: Int, cs: Int, dmg: Double) -> PlayerLiveDetail {
+        PlayerLiveDetail(participantId: pid, level: 1, kills: 0, deaths: 0, assists: 0,
+                         totalGoldEarned: gold, creepScore: cs,
+                         killParticipation: 0, championDamageShare: dmg,
+                         wardsPlaced: 0, wardsDestroyed: 0,
+                         attackDamage: 0, abilityPower: 0, armor: 0, magicResistance: 0,
+                         attackSpeed: 0, criticalChance: 0, lifeSteal: 0, tenacity: 0,
+                         items: [], perkStyleId: nil, perkSubStyleId: nil, perks: [], abilities: [])
+    }
+
+    private func player(_ pid: Int, blue: Bool) -> PlayerStats {
+        PlayerStats(participantId: pid, summonerName: blue ? "나" : "상대", championId: "Ahri",
+                    role: "mid", kills: 0, deaths: 0, assists: 0, totalGold: 0,
+                    creepScore: 0, level: 1, currentHealth: nil, maxHealth: nil)
+    }
+
+    private func makeWindow() -> GameWindow {
+        let empty = TeamGameStats(totalGold: 0, towers: 0, barons: 0, totalKills: 0,
+                                  dragons: 0, inhibitors: 0, dragonTypes: nil)
+        return GameWindow(gameId: "g", gameState: "in_game", blueTeamId: "b", redTeamId: "r",
+                          bluePlayers: [player(1, blue: true)], redPlayers: [player(6, blue: false)],
+                          blueTeamStats: empty, redTeamStats: empty,
+                          gameTime: nil, lastFrameTimestamp: nil)
+    }
+
+    private func build(mine: PlayerLiveDetail, theirs: PlayerLiveDetail) -> LaneMatchup? {
+        LaneMatchup.build(gameNumber: 1, window: makeWindow(),
+                          detail: GameLiveDetail(gameId: "g", capturedAt: nil, players: [mine, theirs]),
+                          summonerName: "나")
+    }
+
+    /// 막 시작한 세트는 양쪽 다 0이다. 이때 격차를 0으로 보여주면 "동등하다"로 읽힌다.
+    @Test func 전부_0이면_격차를_보여주지_않는다() throws {
+        let m = try #require(build(mine: detail(1, gold: 0, cs: 0, dmg: 0),
+                                   theirs: detail(6, gold: 0, cs: 0, dmg: 0)))
+        #expect(m.goldDifference == nil)
+        #expect(m.showsDamageShareRank == false)
+    }
+
+    @Test func 값이_생기면_격차를_계산한다() throws {
+        let ahead = try #require(build(mine: detail(1, gold: 5000, cs: 100, dmg: 0.3),
+                                       theirs: detail(6, gold: 4000, cs: 80, dmg: 0.2)))
+        #expect(ahead.goldDifference == 1000)
+        #expect(ahead.showsDamageShareRank == true)
+
+        let behind = try #require(build(mine: detail(1, gold: 3000, cs: 60, dmg: 0.1),
+                                        theirs: detail(6, gold: 4000, cs: 80, dmg: 0.2)))
+        #expect(behind.goldDifference == -1000)
+    }
+}
