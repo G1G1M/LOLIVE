@@ -120,19 +120,36 @@
 
 ## 앱 구조
 
+레이어(App / Core / Data / Domain)와 기능(Features)으로 나눈 구조입니다.
+기능 하나가 어디에 있는지는 `Features/<기능 이름>/` 한 곳만 보면 됩니다.
+
 ```
 LOLIVE/
-├── Sources/
-│   ├── Models/       — League, Match, Player, Team, Standing, Favorites(SwiftData) 등
-│   ├── Services/      — Riot/Leaguepedia API, 캐시, Live Activity, 알림, 프리로드
-│   ├── ViewModels/    — 화면별 상태 관리 (MVVM)
-│   └── Views/         — SwiftUI 화면
-├── ContentView.swift   — TabView 진입점 (Today/Leagues/Standings/Players + Search)
-├── AppDelegate.swift   — FirebaseApp.configure() + APNs 등록
-├── LOLIVEApp.swift     — 앱 진입점
-└── LOLIVEWidgets/      — Widget Extension (홈 화면·잠금화면 위젯, Live Activity)
+├── App/
+│   ├── Resource/       — Assets.xcassets
+│   └── Source/         — LOLIVEApp(진입점), AppDelegate(Firebase 설정 + APNs 등록)
+├── Core/               — 기능에 안 묶이는 공통 토대
+│   ├── DesignSystem/   — 테마·역할 색상, 공용 컴포넌트(Components/)
+│   ├── Local/          — 디스크 캐시(Cache/), 알림·Live Activity(Notification/), App Groups 공유
+│   └── Remote/         — 이미지 캐싱 로더
+├── Data/               — 바깥 세상과 통신하는 계층
+│   ├── API/            — Riot / Leaguepedia / OracleElixir / Firebase / DDragon
+│   └── DB/             — Favorites(SwiftData)
+├── Domain/             — 앱 안에서 쓰는 순수 모델 (Match / League / Team / Player)
+└── Features/           — 화면 단위. 각 기능이 View/ 와 ViewModel/ 을 따로 가진다
+    ├── Main/           — TabView 진입점(ContentView), 스플래시
+    ├── Today · Leagues · Standings · Players · Search
+    ├── TeamDetail · MatchDetail · Tournament · Favorites
+    └── Onboarding · Settings
 
-lolive-firebase/         — Firebase 백엔드 (Cloud Functions + Firestore)
+LOLIVEWidgets/          — Widget Extension (앱과 같은 레이어 구성)
+├── App/Source/         — 위젯 번들 진입점
+├── Core/Local/         — App Groups 공유 데이터, 고화질 로고 로더
+├── Data/API/           — 위젯 전용 네트워크
+├── Domain/Match/       — Live Activity attributes (앱 타겟과 물리적으로 복제됨)
+└── Features/           — FavoriteTeam(홈 화면 위젯) / LiveActivity(잠금화면·Dynamic Island)
+
+lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 ```
 
 ## 앱 플로우

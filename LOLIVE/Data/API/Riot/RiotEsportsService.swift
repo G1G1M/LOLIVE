@@ -1,0 +1,291 @@
+//
+//  RiotEsportsService.swift
+//  LOLIVE
+//
+
+import Foundation
+import os
+
+private let reconcileLogger = Logger(subsystem: "com.lolive", category: "Reconcile")
+// MARK: - Service
+
+final class RiotEsportsService: RiotEsportsServiceProtocol {
+
+    private let baseURL = "https://esports-api.lolesports.com/persisted/gw"
+    private let apiKey  = APIKeys.riotApiKey
+
+    private let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.keyDecodingStrategy = .convertFromSnakeCase
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }()
+
+    // MARK: - Public
+
+    func fetchLeagues() async throws -> [League] {
+        if let cached: [League] = AppDiskCache.get(.leagues) { return cached }
+        let data = try await request(path: "/getLeagues", queryItems: [])
+        let response = try decode(LeaguesResponse.self, from: data)
+        let leagues = response.data.leagues.map {
+            League(id: $0.id, slug: $0.slug ?? "", name: $0.name, region: $0.region, imageURL: https($0.image))
+        }
+        AppDiskCache.set(.leagues, value: leagues)
+        return leagues
+    }
+
+    func fetchSchedule(league: League) async throws -> [Match] {
+        let cacheKey = CacheKey.schedule(leagueId: league.id)
+        if let cached: [Match] = AppDiskCache.get(cacheKey) { return cached }
+
+        let raw = try await fetchScheduleRaw(league: league)
+        let reconciled = await reconcileUnreportedResults(raw, league: league)
+
+        AppDiskCache.set(cacheKey, value: reconciled)
+        return reconciled
+    }
+
+    func fetchScheduleRaw(league: League) async throws -> [Match] {
+        var allMatches: [Match] = []
+        var seen = Set<String>()
+
+        // 첫 페이지 (오늘 기준)
+        let query = [URLQueryItem(name: "leagueId", value: league.id)]
+        let data = try await request(path: "/getSchedule", queryItems: query)
+        let response = try decode(ScheduleResponse.self, from: data)
+        for m in response.data.schedule.events.compactMap({ mapEventToMatch($0, fallbackLeague: league) }) {
+            if seen.insert(m.id).inserted { allMatches.append(m) }
+        }
+
+        // 미래 경기 페이지 (newer) 최대 3페이지 추가
+        var newerToken = response.data.schedule.pages?.newer
+        var newerCount = 0
+        while let token = newerToken, newerCount < 3 {
+            var q = [URLQueryItem(name: "leagueId", value: league.id),
+                     URLQueryItem(name: "pageToken", value: token)]
+            if let d = try? await request(path: "/getSchedule", queryItems: q),
+               let r = try? decode(ScheduleResponse.self, from: d) {
+                for m in r.data.schedule.events.compactMap({ mapEventToMatch($0, fallbackLeague: league) }) {
+                    if seen.insert(m.id).inserted { allMatches.append(m) }
+                }
+                newerToken = r.data.schedule.pages?.newer
+            } else {
+                break
+            }
+            newerCount += 1
+        }
+
+        // 과거 완료 경기 페이지 (older) 최대 2페이지 추가
+        // "오늘 기준" 첫 페이지만으로는 며칠 전 완료 경기가 누락될 수 있음 (TodayView 날짜 스트립 -5일 대응)
+        var olderToken = response.data.schedule.pages?.older
+        var olderCount = 0
+        while let token = olderToken, olderCount < 2 {
+            var q = [URLQueryItem(name: "leagueId", value: league.id),
+                     URLQueryItem(name: "pageToken", value: token)]
+            if let d = try? await request(path: "/getSchedule", queryItems: q),
+               let r = try? decode(ScheduleResponse.self, from: d) {
+                for m in r.data.schedule.events.compactMap({ mapEventToMatch($0, fallbackLeague: league) }) {
+                    if seen.insert(m.id).inserted { allMatches.append(m) }
+                }
+                olderToken = r.data.schedule.pages?.older
+            } else {
+                break
+            }
+            olderCount += 1
+        }
+
+        return allMatches
+    }
+
+    /// 케스파컵처럼 Riot이 경기 상태/결과를 갱신해주지 않는 대회 대응.
+    /// 시작 시각이 한참 지났는데도 unstarted로 멈춰있거나, completed인데 스코어(gameWins)가
+    /// 비어 있어 0:0으로 내려오는 경기, 또는 실제로는 끝났는데 inProgress로 오래 멈춰있는 경기가
+    /// 있으면 Leaguepedia 결과로 보완한다. (LoL 경기는 정상 종료 시 0:0으로 끝날 수 없으므로
+    /// 이 조건으로 걸러도 안전하다)
+    /// 정상적으로 상태가 갱신되는 리그(대부분)는 감지되는 게 없어 API 호출 없이 그대로 반환된다.
+    func reconcileUnreportedResults(_ matches: [Match], league: League) async -> [Match] {
+        let unstartedCutoff = Date().addingTimeInterval(-3 * 3600)
+        // inProgress는 unstarted보다 훨씬 짧은 유예만 준다 — 방송 지연으로 몇 시간씩 안 시작하는 건
+        // 흔하지만, 일단 시작한 경기가 90분 넘게 스코어 변화가 없는 건 Bo5를 감안해도 의심스럽다.
+        // (실제로 Leaguepedia에 완료 기록이 없으면 아래에서 그냥 원본 그대로 반환되니 오탐 위험은 낮음)
+        let inProgressCutoff = Date().addingTimeInterval(-90 * 60)
+        let staleOnes = matches.filter {
+            ($0.state == .unstarted && $0.startTime < unstartedCutoff) ||
+            ($0.state == .completed && $0.scoreA == 0 && $0.scoreB == 0) ||
+            ($0.state == .inProgress && $0.startTime < inProgressCutoff)
+        }
+        guard !staleOnes.isEmpty else { return matches }
+        #if DEBUG
+        // for m in staleOnes {
+        //     reconcileLogger.debug("🔎 [Reconcile] \(league.name) 보정 대상: \(m.teamA.code) vs \(m.teamB.code) state=\(m.state.rawValue) score=\(m.scoreA)-\(m.scoreB)")
+        // }
+        #endif
+
+        // Oracle's Elixir 먼저 — Riot 매치 id로 경기 하나하나 직접 조회한다(stuck 라이브 경기
+        // 감지와 동일한 `reconcileStuckLiveMatch` 재사용, 팀명 퍼지매칭 불필요). 못 찾은 것만
+        // Leaguepedia 대회 페이지 전체 조회로 폴백.
+        var oeResolved: [String: Match] = [:]
+        await withTaskGroup(of: (String, Match?).self) { group in
+            for m in staleOnes {
+                group.addTask {
+                    (m.id, await OracleElixirService.shared.reconcileStuckLiveMatch(m))
+                }
+            }
+            for await (id, updated) in group {
+                if let updated { oeResolved[id] = updated }
+            }
+        }
+        var result = matches.map { oeResolved[$0.id] ?? $0 }
+
+        let stillStale = staleOnes.filter { oeResolved[$0.id] == nil }
+        guard !stillStale.isEmpty else { return result }
+
+        let lpMatches = await LeaguepediaService.shared.fetchLiveTournamentResults(for: league)
+        #if DEBUG
+        // reconcileLogger.debug("🔎 [Reconcile] \(league.name) Leaguepedia 응답 \(lpMatches.count)건")
+        #endif
+        guard !lpMatches.isEmpty else { return result }
+        result = LeaguepediaService.shared.reconcileResults(riotMatches: result, leaguepediaMatches: lpMatches)
+        #if DEBUG
+        // for m in staleOnes {
+        //     if let fixed = result.first(where: { $0.id == m.id }) {
+        //         reconcileLogger.debug("🔎 [Reconcile] \(fixed.teamA.code) vs \(fixed.teamB.code) 결과: state=\(fixed.state.rawValue) score=\(fixed.scoreA)-\(fixed.scoreB)")
+        //     }
+        // }
+        #endif
+        return result
+    }
+
+    // 국제 대회(Worlds/MSI) 전용: 모든 페이지를 순회하여 전체 경기 목록 반환
+    func fetchAllSchedule(league: League) async throws -> [Match] {
+        let cacheKey = CacheKey.allSchedule(leagueId: league.id)
+        if let cached: [Match] = AppDiskCache.get(cacheKey) { return cached }
+        var allMatches: [Match] = []
+        var pageToken: String? = nil
+        var pageCount = 0
+        let maxPages = 60
+
+        repeat {
+            var query = [URLQueryItem(name: "leagueId", value: league.id)]
+            if let token = pageToken {
+                query.append(URLQueryItem(name: "pageToken", value: token))
+            }
+
+            do {
+                let data = try await request(path: "/getSchedule", queryItems: query)
+                let response = try decode(ScheduleResponse.self, from: data)
+                let page = response.data.schedule.events
+                    .compactMap { mapEventToMatch($0, fallbackLeague: league) }
+                allMatches.append(contentsOf: page)
+                pageToken = response.data.schedule.pages?.older
+            } catch {
+                // 특정 페이지 오류는 건너뛰고 수집된 데이터 반환
+                break
+            }
+
+            pageCount += 1
+        } while pageToken != nil && pageCount < maxPages
+
+        // 중복 제거 (match ID 기준)
+        var seen = Set<String>()
+        var result = allMatches.filter { seen.insert($0.id).inserted }
+        result = await reconcileUnreportedResults(result, league: league)
+        if !result.isEmpty { AppDiskCache.set(cacheKey, value: result) }
+        return result
+    }
+
+    func fetchLive() async throws -> [LiveMatch] {
+        do {
+            let data = try await request(path: "/getLive", queryItems: [])
+            let response = try decode(LiveResponse.self, from: data)
+            let live = response.data.schedule.events.compactMap { event -> LiveMatch? in
+                guard let match = mapEventToMatch(event) else { return nil }
+                let currentSet = (event.match?.games?.filter { $0.state == "completed" }.count ?? 0) + 1
+                let currentGameId = event.match?.games?.first { $0.state == "inProgress" }?.id
+                return LiveMatch(match: match, currentSet: currentSet, lastUpdated: Date(), currentGameId: currentGameId)
+            }
+            AppDiskCache.set(.live, value: live)
+            return live
+        } catch {
+            // 네트워크 순간 장애 대응: 5분 이내 캐시가 있으면 폴백, 없으면(오래 끊겼으면) 에러 그대로 전달
+            // (30초 폴링 주기 특성상 5분이면 이미 여러 번 재시도할 시간이라 낡은 데이터를 오래 우려먹진 않음)
+            if let cached: [LiveMatch] = AppDiskCache.get(.live) {
+                return cached
+            }
+            throw error
+        }
+    }
+
+    // MARK: - Private
+
+    private func mapEventToMatch(_ event: EventDTO, fallbackLeague: League? = nil) -> Match? {
+        guard let matchDTO = event.match, matchDTO.teams.count >= 2 else { return nil }
+        let league = League(
+            id: fallbackLeague?.id ?? event.league.id ?? event.league.slug,
+            slug: event.league.slug,
+            name: event.league.name,
+            region: fallbackLeague?.region ?? "",
+            imageURL: fallbackLeague?.imageURL
+        )
+        let teamA = Team(
+            id: matchDTO.teams[0].id ?? matchDTO.teams[0].code,
+            name: matchDTO.teams[0].name,
+            code: matchDTO.teams[0].code,
+            imageURL: https(matchDTO.teams[0].image)
+        )
+        let teamB = Team(
+            id: matchDTO.teams[1].id ?? matchDTO.teams[1].code,
+            name: matchDTO.teams[1].name,
+            code: matchDTO.teams[1].code,
+            imageURL: https(matchDTO.teams[1].image)
+        )
+        let state = MatchState(rawValue: event.state) ?? .unstarted
+        return Match(
+            id: matchDTO.id,
+            league: league,
+            teamA: teamA,
+            teamB: teamB,
+            scoreA: matchDTO.teams[0].result?.gameWins ?? 0,
+            scoreB: matchDTO.teams[1].result?.gameWins ?? 0,
+            startTime: event.startTime,
+            state: state,
+            blockName: event.blockName
+        )
+    }
+
+    func request(path: String, queryItems: [URLQueryItem]) async throws -> Data {
+        var components = URLComponents(string: baseURL + path)
+        var items = [URLQueryItem(name: "hl", value: "ko-KR")]
+        items.append(contentsOf: queryItems)
+        components?.queryItems = items
+
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.unknown(URLError(.badServerResponse))
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw APIError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+
+        return data
+    }
+
+
+    func https(_ url: String?) -> String? {
+        url?.replacingOccurrences(of: "http://", with: "https://")
+    }
+
+    func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        do {
+            return try decoder.decode(type, from: data)
+        } catch {
+            throw APIError.decodingFailed(error)
+        }
+    }
+}
