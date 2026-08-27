@@ -168,8 +168,4 @@ struct LeaguePlayerDetailView: View {
             }
         }
     }
-
-
-    // MARK: - Helpers
-
 }
