@@ -18,15 +18,24 @@ protocol LiveStatsServiceProtocol: Sendable {
 final class LiveStatsService: LiveStatsServiceProtocol {
 
     private let baseURL = "https://feed.lolesports.com/livestats/v1"
+    /// `+Detail` extension 이 같은 호스트를 쓴다.
+    var detailBaseURL: String { baseURL }
 
     private let decoder = JSONDecoder()
+
+    /// 피드가 쓰는 타임스탬프 형식(소수점 초 포함). 요청/응답 양쪽에 같은 걸 쓴다.
+    static let feedTimestamp: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 
     func fetchGameWindow(gameId: String, startingTime: Date? = nil) async throws -> GameWindow {
         var components = URLComponents(string: "\(baseURL)/window/\(gameId)")
         if let startingTime {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            components?.queryItems = [URLQueryItem(name: "startingTime", value: formatter.string(from: startingTime))]
+            components?.queryItems = [
+                URLQueryItem(name: "startingTime", value: Self.feedTimestamp.string(from: startingTime))
+            ]
         }
         guard let url = components?.url else {
             throw APIError.invalidURL
@@ -41,9 +50,14 @@ final class LiveStatsService: LiveStatsServiceProtocol {
             throw APIError.requestFailed(statusCode: httpResponse.statusCode)
         }
 
+        return try decodeWindow(data)
+    }
+
+    /// 네트워크와 분리된 디코딩 — 실측 응답 픽스처로 테스트에서 직접 호출한다.
+    /// (Riot이 필드를 조용히 빼도 테스트가 먼저 알아채게 하려는 목적)
+    func decodeWindow(_ data: Data) throws -> GameWindow {
         do {
-            let windowResponse = try decoder.decode(WindowResponse.self, from: data)
-            return map(windowResponse)
+            return map(try decoder.decode(WindowResponse.self, from: data))
         } catch {
             throw APIError.decodingFailed(error)
         }
@@ -162,6 +176,8 @@ final class LiveStatsService: LiveStatsServiceProtocol {
         let deaths: Int
         let assists: Int
         let creepScore: Int
+        let currentHealth: Int?
+        let maxHealth: Int?
     }
 
     // MARK: - Details DTOs
@@ -191,9 +207,7 @@ final class LiveStatsService: LiveStatsServiceProtocol {
 
         // window 프레임에 gameTime이 있으면 초로 변환, 없으면 nil (details API fallback 사용)
         let gameTimeSec = latestFrame?.gameTime.map { $0 / 1000 }
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let lastFrameTimestamp = latestFrame.flatMap { isoFormatter.date(from: $0.rfc460Timestamp) }
+        let lastFrameTimestamp = latestFrame.flatMap { Self.feedTimestamp.date(from: $0.rfc460Timestamp) }
 
         return GameWindow(
             gameId: response.esportsGameId,
@@ -226,7 +240,9 @@ final class LiveStatsService: LiveStatsServiceProtocol {
                 assists: frame?.assists ?? 0,
                 totalGold: frame?.totalGold ?? 0,
                 creepScore: frame?.creepScore ?? 0,
-                level: frame?.level ?? 1
+                level: frame?.level ?? 1,
+                currentHealth: frame?.currentHealth,
+                maxHealth: frame?.maxHealth
             )
         }
     }
@@ -238,7 +254,8 @@ final class LiveStatsService: LiveStatsServiceProtocol {
             barons: frame?.barons ?? 0,
             totalKills: frame?.totalKills ?? 0,
             dragons: frame?.dragons.count ?? 0,
-            inhibitors: frame?.inhibitors ?? 0
+            inhibitors: frame?.inhibitors ?? 0,
+            dragonTypes: frame?.dragons
         )
     }
 }

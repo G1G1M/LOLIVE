@@ -50,15 +50,53 @@ extension MatchDetailView {
             statRow(label: "타워",
                     left: "\(window.blueTeamStats.towers)",
                     right: "\(window.redTeamStats.towers)")
-            statRow(label: "드래곤",
-                    left: "\(window.blueTeamStats.dragons)",
-                    right: "\(window.redTeamStats.dragons)")
+            dragonRow(blue: window.blueTeamStats, red: window.redTeamStats)
             statRow(label: "바론",
                     left: "\(window.blueTeamStats.barons)",
                     right: "\(window.redTeamStats.barons)")
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// 드래곤은 개수보다 "무엇을 먹었는지"가 승부에 직결돼서 종류까지 보여준다.
+    /// 종류 정보가 없으면(예전 캐시·백필 데이터) 기존처럼 개수만 표시한다.
+    @ViewBuilder
+    private func dragonRow(blue: TeamGameStats, red: TeamGameStats) -> some View {
+        let blueTypes = blue.recognizedDragons
+        let redTypes  = red.recognizedDragons
+
+        if blueTypes.isEmpty && redTypes.isEmpty {
+            statRow(label: "드래곤", left: "\(blue.dragons)", right: "\(red.dragons)")
+        } else {
+            HStack {
+                dragonBadges(blueTypes, count: blue.dragons)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("드래곤")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 64)
+                dragonBadges(redTypes, count: red.dragons)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 7)
+        }
+    }
+
+    private func dragonBadges(_ types: [DragonType], count: Int) -> some View {
+        HStack(spacing: 4) {
+            if types.isEmpty {
+                Text("\(count)")
+                    .font(.subheadline).fontWeight(.medium)
+            } else {
+                ForEach(Array(types.enumerated()), id: \.offset) { _, dragon in
+                    Image(systemName: dragon.symbolName)
+                        .font(.caption2)
+                        .foregroundStyle(dragon.color)
+                        .accessibilityLabel(dragon.shortLabel)
+                }
+            }
+        }
     }
 
     private func statRow(label: String, left: String, right: String) -> some View {

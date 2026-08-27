@@ -70,10 +70,15 @@ struct PlayerStats: Identifiable, Hashable, Codable {
     let totalGold: Int
     let creepScore: Int
     let level: Int
+    // 아래 둘은 나중에 추가된 필드라 반드시 옵셔널로 둘 것 — GameWindowCache가 만료 없는
+    // 영구 캐시라, 논옵셔널로 넣으면 예전에 저장된 파일이 통째로 디코딩 실패한다.
+    let currentHealth: Int?
+    let maxHealth: Int?
 
     enum CodingKeys: String, CodingKey {
         case participantId, summonerName, championId, role
         case kills, deaths, assists, totalGold, creepScore, level
+        case currentHealth, maxHealth
     }
 }
 
@@ -82,8 +87,12 @@ struct TeamGameStats: Codable, Hashable {
     let towers: Int
     let barons: Int
     let totalKills: Int
+    /// 획득한 드래곤 수. 종류까지 필요하면 `dragonTypes`를 쓸 것.
     let dragons: Int
     let inhibitors: Int
+    /// 획득 순서대로의 드래곤 종류(예: `["infernal", "cloud", "cloud"]`).
+    /// 위와 같은 이유로 옵셔널 — 예전 캐시엔 이 키가 없다.
+    let dragonTypes: [String]?
 }
 
 extension GameWindow {

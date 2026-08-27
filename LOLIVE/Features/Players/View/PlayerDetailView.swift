@@ -13,6 +13,9 @@ struct PlayerDetailView: View {
 
     private let service: RiotEsportsServiceProtocol = RiotEsportsService()
     @State private var isResolvingProfile = false
+    /// 라이브 스탯 피드 details — 선수 행을 탭해 들어왔을 때 1회만 채운다(+LiveDetail 참고).
+    @State var liveDetail: PlayerLiveDetail? = nil
+    @State var isLoadingLiveDetail = false
     @State private var resolvedPlayer: Player? = nil
     @State private var profileNotFound = false
 
@@ -55,10 +58,12 @@ struct PlayerDetailView: View {
                     } else {
                         noDataCard
                     }
+                    liveDetailCard
                 }
                 .padding()
             }
         }
+        .task { await loadLiveDetail() }
         .navigationTitle(summonerName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
