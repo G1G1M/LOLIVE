@@ -43,28 +43,34 @@ struct SearchView: View {
     // X(취소) 버튼을 누르면 isPresented가 true→false로 바뀌는 걸 감지해 Today 탭으로 이동시킨다.
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                if isSearchPresented {
-                    categoryFilterBar
-                }
-                ZStack {
-                    Color(.systemGroupedBackground).ignoresSafeArea()
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
 
-                    if viewModel.isLoading {
-                        LoadingView()
-                    } else if viewModel.loadFailed && searchText.isEmpty {
-                        ErrorRetryView("검색 데이터를 불러올 수 없습니다") { Task { await viewModel.load() } }
-                    } else if searchText.isEmpty {
-                        emptyPrompt
-                    } else if results.isEmpty {
-                        noResults
-                    } else {
-                        resultList
-                    }
+                if viewModel.isLoading {
+                    LoadingView()
+                } else if viewModel.loadFailed && searchText.isEmpty {
+                    ErrorRetryView("검색 데이터를 불러올 수 없습니다") { Task { await viewModel.load() } }
+                } else if searchText.isEmpty {
+                    emptyPrompt
+                } else if results.isEmpty {
+                    noResults
+                } else {
+                    resultList
                 }
             }
             .navigationTitle("검색")
             .navigationBarTitleDisplayMode(.inline)
+            // 카테고리 칩을 네비게이션 바의 principal 슬롯에 둔다.
+            // inline 타이틀 모드에서 .searchable의 검색창은 네비게이션 바 "아래 줄"에 그려지므로,
+            // 여기 올리면 검색창 위에 놓이게 된다. 콘텐츠 영역에 두면(예전 방식) 항상 검색창
+            // 아래로 밀려서 원하는 배치가 안 나온다.
+            // 검색 탭에 들어온 순간부터 보여야 해서 isSearchPresented로 감싸지 않는다 —
+            // 예전엔 검색창을 직접 탭해서 활성화해야만 칩이 나타났다.
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    categoryFilterBar
+                }
+            }
             // Match.self/League.self는 탭 루트에서 한 번씩만 등록(LeagueDetailView.swift 주석 참고).
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(match: match)
@@ -86,6 +92,8 @@ struct SearchView: View {
 
     // MARK: - Category Filter (애플뮤직 스타일)
 
+    /// 네비게이션 바 안에 들어가므로 자체 배경·좌우 여백을 두지 않는다
+    /// (바깥 여백과 재질은 네비게이션 바가 제공).
     private var categoryFilterBar: some View {
         HStack(spacing: 8) {
             ForEach(SearchCategory.allCases, id: \.self) { category in
@@ -98,11 +106,7 @@ struct SearchView: View {
                         .foregroundStyle(selectedCategory == category ? .white : .primary)
                 }
             }
-            Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
         .animation(.easeInOut(duration: 0.15), value: selectedCategory)
     }
 
