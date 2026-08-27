@@ -43,11 +43,7 @@ struct AppMenuView: View {
             .listStyle(.insetGrouped)
             .navigationTitle("메뉴")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
-                }
-            }
+            .sheetCloseButton()
             .onChange(of: notificationMinutes) { _, _ in
                 Task { await MatchNotificationService.shared.reschedule(for: favoriteTeams) }
             }

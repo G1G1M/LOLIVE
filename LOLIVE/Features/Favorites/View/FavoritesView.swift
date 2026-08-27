@@ -115,12 +115,11 @@ struct FavoritesView: View {
         }
         .navigationTitle("즐겨찾기")
         .navigationBarTitleDisplayMode(.inline)
+        .sheetCloseButton()
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("닫기") { dismiss() }
-            }
+            // 닫기가 오른쪽 위로 고정됐으므로 부가 액션은 왼쪽으로 보낸다.
             if hasFavorites {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
                         showingTeamSearch = true
                     } label: {
@@ -131,6 +130,7 @@ struct FavoritesView: View {
         }
         .sheet(isPresented: $showingTeamSearch) {
             TeamSearchView()
+                .sheetGrabber()
         }
     }
 

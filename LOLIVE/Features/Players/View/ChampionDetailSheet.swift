@@ -56,10 +56,8 @@ struct ChampionDetailSheet: View {
                 ToolbarItem(placement: .topBarLeading) {
                     ChampionImageView(championId: stat.championId, size: 28)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
-                }
             }
+            .sheetCloseButton()
         }
     }
 

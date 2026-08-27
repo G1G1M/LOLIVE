@@ -66,10 +66,12 @@ struct LeaguePlayerDetailView: View {
         }
         .sheet(item: $selectedChampion) { stat in
             ChampionDetailSheet(stat: stat)
+                .sheetGrabber()
         }
         .sheet(isPresented: $showStatsDetail) {
             if let oeStats = viewModel.playerOEStats {
                 PlayerStatsDetailSheet(playerName: player.summonerName, stats: oeStats)
+                    .sheetGrabber()
             }
         }
     }

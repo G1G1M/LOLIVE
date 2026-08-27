@@ -85,6 +85,7 @@ struct TeamDetailView: View {
         .sheet(isPresented: $showStatsDetail) {
             if let stats = viewModel.teamStats {
                 TeamStatsDetailSheet(teamName: team.name, stats: stats)
+                    .sheetGrabber()
             }
         }
     }

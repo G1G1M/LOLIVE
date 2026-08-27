@@ -37,11 +37,7 @@ struct TeamStatsDetailSheet: View {
             }
             .navigationTitle(teamName)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
-                }
-            }
+            .sheetCloseButton()
         }
     }
 

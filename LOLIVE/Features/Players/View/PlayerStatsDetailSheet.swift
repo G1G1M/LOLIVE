@@ -35,11 +35,7 @@ struct PlayerStatsDetailSheet: View {
             }
             .navigationTitle(playerName)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
-                }
-            }
+            .sheetCloseButton()
         }
     }
 

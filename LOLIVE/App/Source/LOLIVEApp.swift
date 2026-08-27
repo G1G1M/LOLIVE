@@ -105,6 +105,7 @@ struct LOLIVEApp: App {
                         .sheet(item: $deepLinkTeam) { item in
                             WidgetMatchDeepLinkSheet(teamCode: item.id)
                                 .environment(todayViewModel)
+                                .sheetGrabber()
                         }
                         .sheet(item: $deepLinkMatch) { info in
                             NavigationStack {
@@ -120,6 +121,7 @@ struct LOLIVEApp: App {
                                         }
                                     }
                             }
+                            .sheetGrabber()
                         }
                         .onReceive(
                             NotificationCenter.default.publisher(for: .loliveMatchDeepLink)

@@ -46,7 +46,7 @@ struct TodayView: View {
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showMenu) { AppMenuView() }
+            .sheet(isPresented: $showMenu) { AppMenuView().sheetGrabber() }
             .sheet(isPresented: $showFavorites) {
                 NavigationStack {
                     FavoritesView()
@@ -61,6 +61,7 @@ struct TodayView: View {
                             }
                         }
                 }
+                .sheetGrabber()
             }
             // Match.self/League.self는 탭 루트에서 한 번씩만 등록 — 이 화면 안에서 중첩된
             // LeagueDetailView/TeamDetailView 등이 각자 또 등록하면 중복돼서 뒤로가기 시 화면이

@@ -54,11 +54,7 @@ struct TeamSearchView: View {
             }
             .navigationTitle("팀 검색")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("닫기") { dismiss() }
-                }
-            }
+            .sheetCloseButton()
         }
         .task { await viewModel.load() }
     }
