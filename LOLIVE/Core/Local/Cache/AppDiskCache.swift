@@ -93,6 +93,8 @@ enum CacheKey {
     case oracleElixirPlayerImage(summonerName: String)
     /// 완료 경기 상세 — 여러 곳에서 같은 리터럴을 복사해 쓰던 걸 여기로 모았다.
     case eventDetail(matchId: String)
+    /// Leaguepedia 밴 데이터 — 완료 경기는 변하지 않아 길게 잡는다.
+    case leaguepediaBans(riotGameId: String)
 
     // Oracle's Elixir — 예전엔 OracleElixirService 안에 문자열 리터럴로 흩어져 있었다.
     // 키 문자열은 그때 쓰던 값 그대로라 기존에 쌓인 캐시가 그대로 유효하다.
@@ -115,6 +117,7 @@ enum CacheKey {
         case .live: return "live"
         case .oracleElixirPlayerImage(let name): return "oe_playerimg_\(name)"
         case .eventDetail(let id): return "event_detail_v2_\(id)"
+        case .leaguepediaBans(let id): return "lp_bans_\(id)"
         case .oeTournamentsByLeague: return "oe_tournaments_by_league"
         case .oeTournamentPlayers(let id): return "oe_tournament_players_\(id)"
         case .oeTeamStats(let id): return "oe_team_stats_\(id)"
@@ -136,6 +139,7 @@ enum CacheKey {
         case .live: return 5 * 60
         case .oracleElixirPlayerImage: return 7 * 24 * 3600
         case .eventDetail: return 30 * 24 * 3600
+        case .leaguepediaBans: return 30 * 24 * 3600
         case .oeTournamentsByLeague: return 24 * 3600
         case .oeTournamentPlayers: return 24 * 3600
         case .oeTeamStats: return 24 * 3600

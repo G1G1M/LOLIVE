@@ -38,7 +38,7 @@ actor LeaguepediaCache {
     // MARK: 디스크 캐시 디렉토리
 
     /// ~/Library/Caches/LeaguepediaStats/ — 앱 재실행 후에도 캐시 유지
-    private static let cacheDir: URL = {
+    static let cacheDir: URL = {
         let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("LeaguepediaStats", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -225,85 +225,4 @@ actor LeaguepediaCache {
         }
     }
 
-    // MARK: - 디스크 파일 경로 헬퍼
-
-    private static let overviewPagesDiskFile =
-        cacheDir.appendingPathComponent("overview_pages.json")
-
-    private static func cacheFile(for page: String) -> URL {
-        let safe = page.replacingOccurrences(of: "/", with: "_")
-        return cacheDir.appendingPathComponent("\(safe).json")
-    }
-
-    private static func champCacheFile(for key: String) -> URL {
-        let safe = key
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: " ", with: "_")
-        return cacheDir.appendingPathComponent("champs_\(safe).json")
-    }
-
-    private static func champBatchFile(for page: String) -> URL {
-        let safe = page
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: " ", with: "_")
-        return cacheDir.appendingPathComponent("champ_batch_\(safe).json")
-    }
-
-    private static func playerNamesFile(for leagueName: String) -> URL {
-        let safe = leagueName
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: " ", with: "_")
-        return cacheDir.appendingPathComponent("playernames_\(safe).json")
-    }
-
-    private static func historicalFile(for key: String) -> URL {
-        let safe = key
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: " ", with: "_")
-        return cacheDir.appendingPathComponent("\(safe).json")
-    }
-
-    private static func tournamentPagesFile(for key: String) -> URL {
-        let safe = key
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: " ", with: "_")
-        return cacheDir.appendingPathComponent("ovpages_\(safe).json")
-    }
-
-    // MARK: - 디스크 래퍼 타입 (Codable 직렬화용)
-
-    private struct DiskWrapper: Codable {
-        let savedAt: Date
-        let stats: [String: PlayerSeasonStats]
-    }
-
-    private struct ChampPicksDiskWrapper: Codable {
-        let savedAt: Date
-        let picks: [ChampionPickEntry]
-    }
-
-    private struct ChampBatchDiskWrapper: Codable {
-        let savedAt: Date
-        let picks: [String: [ChampionPickEntry]]
-    }
-
-    private struct HistMatchesWrapper: Codable {
-        let savedAt: Date
-        let matches: [Match]
-    }
-
-    private struct TournamentPagesWrapper: Codable {
-        let savedAt: Date
-        let entries: [LPTournamentEntry]
-    }
-
-    private struct PlayerNamesDiskWrapper: Codable {
-        let savedAt: Date
-        let names: Set<String>
-    }
-
-    private struct OverviewPagesDiskWrapper: Codable {
-        let savedAt: Date
-        let pages: [String: String]
-    }
 }

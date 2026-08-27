@@ -7,7 +7,6 @@ import Foundation
 import Observation
 import os
 
-private let teamDetailLogger = Logger(subsystem: "com.lolive", category: "TeamDetail")
 
 struct H2HRecord: Identifiable {
     var id: String { opponent.id.isEmpty ? opponent.code : opponent.id }
@@ -38,11 +37,14 @@ final class TeamDetailViewModel {
     /// 역산한다. 못 구하면 빈 Set — 이 경우 화면은 구분 없이 기존처럼 전체 로스터를 보여준다.
     var currentStarterNames: Set<String> = []
 
-    private let team: Team
-    private var league: League
-    private let service: RiotEsportsServiceProtocol
-    private let liveStatsService: LiveStatsServiceProtocol
-    private var crossLeagueMatches: [Match] = []
+    /// 분리된 extension 파일에서도 쓰도록 타입 소속으로 둔다.
+    nonisolated static let teamDetailLogger = Logger(subsystem: "com.lolive", category: "TeamDetail")
+
+    let team: Team
+    var league: League
+    let service: RiotEsportsServiceProtocol
+    let liveStatsService: LiveStatsServiceProtocol
+    var crossLeagueMatches: [Match] = []
 
     init(team: Team, league: League,
          service: RiotEsportsServiceProtocol = RiotEsportsService(),
@@ -87,7 +89,7 @@ final class TeamDetailViewModel {
         defer { isLoading = false }
 
         #if DEBUG
-        teamDetailLogger.debug("[TeamDetail] load() 시작 — team.id=\(self.team.id) code=\(self.team.code) league.id=\(self.league.id) name=\(self.league.name) hadCache=\(hadCache)")
+        Self.teamDetailLogger.debug("[TeamDetail] load() 시작 — team.id=\(self.team.id) code=\(self.team.code) league.id=\(self.league.id) name=\(self.league.name) hadCache=\(hadCache)")
         #endif
 
         async let rosterTask = service.fetchTeamRoster(teamId: team.id)
@@ -103,7 +105,7 @@ final class TeamDetailViewModel {
         do { matchResult = try await scheduleTask } catch { matchResult = nil; scheduleError = "\(error)" }
 
         #if DEBUG
-        teamDetailLogger.debug("[TeamDetail] roster=\(rosterResult?.count ?? -1)명(err=\(rosterError ?? "없음")) schedule=\(matchResult?.count ?? -1)건(err=\(scheduleError ?? "없음"))")
+        Self.teamDetailLogger.debug("[TeamDetail] roster=\(rosterResult?.count ?? -1)명(err=\(rosterError ?? "없음")) schedule=\(matchResult?.count ?? -1)건(err=\(scheduleError ?? "없음"))")
         #endif
 
         if !hadCache && rosterResult == nil && matchResult == nil {
@@ -112,12 +114,12 @@ final class TeamDetailViewModel {
         }
 
         let roster = rosterResult ?? []
-        players = roster.sorted { roleOrder($0.role) < roleOrder($1.role) }
+        players = roster.sorted { Self.roleOrder($0.role) < Self.roleOrder($1.role) }
         applyMatches(matchResult ?? [])
         await loadCurrentStarters()
 
         #if DEBUG
-        teamDetailLogger.debug("[TeamDetail] 최종 players=\(self.players.count) recentMatches=\(self.recentMatches.count) h2h=\(self.h2hRecords.count) starters=\(self.currentStarterNames.count)")
+        Self.teamDetailLogger.debug("[TeamDetail] 최종 players=\(self.players.count) recentMatches=\(self.recentMatches.count) h2h=\(self.h2hRecords.count) starters=\(self.currentStarterNames.count)")
         #endif
 
         // 로스터/최근경기와 무관한 별도 소스(Oracle's Elixir)라 fire-and-forget으로 뒤에서
@@ -126,181 +128,10 @@ final class TeamDetailViewModel {
         Task { await loadTeamStats() }
     }
 
-    /// 팀 단위 시즌 스탯(Oracle's Elixir) — 선수단/최근경기와 별도 소스라 실패해도 그쪽엔
-    /// 영향 없음. "스탯" 탭에서만 쓰이므로 실패하면 그 탭만 빈 상태로 보임.
-    /// tournamentId를 안 주면(최초 로드) 현재 시즌 목록도 같이 채우고 최신 시즌을 쓴다.
-    private func loadTeamStats(tournamentId: String? = nil) async {
-        isLoadingTeamStats = true
-        defer { isLoadingTeamStats = false }
-        if availableSeasons.isEmpty {
-            availableSeasons = await OracleElixirService.shared.availableSeasons(league: league)
-        }
-        teamStats = await OracleElixirService.shared.fetchTeamStats(team: team, league: league, tournamentId: tournamentId)
-        selectedSeasonId = tournamentId ?? availableSeasons.first?.id
-    }
-
-    /// 스탯 탭의 시즌 칩을 탭했을 때 호출 — 해당 시즌 데이터로 다시 불러온다.
-    func selectSeason(_ tournamentId: String) {
-        guard tournamentId != selectedSeasonId else { return }
-        Task { await loadTeamStats(tournamentId: tournamentId) }
-    }
-
-    /// 백필된 팀/리그 컨텍스트 전용 로딩 경로. `historicalMatches`(서버, getHistoricalYears/
-    /// getHistoricalMatches Callable — LeagueDetailView+History와 동일한 데이터)에서 이 팀이
-    /// 나온 과거 경기를 찾아 최근경기/상대전적을 채우고, 가장 최근 경기의 게임별 실제 출전
-    /// 명단(Match.games, 백필 시점에 이미 저장돼 있음)에서 선수단을 뽑는다 — Riot 실시간 API는
-    /// 이 합성 ID를 모르니 호출하지 않는다.
-    private func loadFromHistoricalData() async {
-        let hadCache = preloadFromCache()
-        isLoading = !hadCache
-        loadFailed = false
-        defer { isLoading = false }
-
-        func isThisTeam(_ m: Match) -> Bool {
-            m.teamA.id == team.id || m.teamA.code == team.code ||
-            m.teamB.id == team.id || m.teamB.code == team.code
-        }
-
-        let years = await FirebaseHistoricalService.fetchYears(leagueName: league.name)
-        var teamMatches: [Match] = []
-        for year in years.sorted(by: >).prefix(3) {
-            let matches = await FirebaseHistoricalService.fetchMatches(leagueName: league.name, year: year)
-            teamMatches = matches.filter(isThisTeam)
-            if !teamMatches.isEmpty { break }
-        }
-
-        #if DEBUG
-        teamDetailLogger.debug("[TeamDetail] 백필 경로 — league.name=\(self.league.name) years=\(years) 매칭된 경기=\(teamMatches.count)")
-        #endif
-
-        guard !teamMatches.isEmpty else {
-            if !hadCache { loadFailed = true }
-            return
-        }
-
-        applyMatches(teamMatches)
-        await loadRosterFromHistoricalMatch()
-        Task { await loadTeamStats() }
-    }
-
-    /// 가장 최근(연도 내 마지막 게임 번호) 백필 경기의 실제 출전 명단으로 선수단을 채운다.
-    /// 백필 데이터는 "그 경기에 실제로 뛴 5명"이 확정값이라 현재 라이브 로스터처럼 주전/후보를
-    /// 역산할 필요가 없다. 백필 소스(Match.games)엔 선수 이미지 URL이 없어서, Leaguepedia에서
-    /// 별도로 조회한다 — 로스터가 그 경기 시점 이후로 안 바뀌는 한 이미지도 그대로라 7일 디스크
-    /// 캐시가 재진입마다 그대로 재사용됨(선수당 최초 1회만 실제 네트워크 요청).
-    private func loadRosterFromHistoricalMatch() async {
-        guard let lastMatch = recentMatches.first,
-              let games = lastMatch.games,
-              let lastGame = games.max(by: { $0.number < $1.number })
-        else { return }
-
-        let myPlayers = lastGame.blueTeamId == team.id ? lastGame.bluePlayers : lastGame.redPlayers
-        guard !myPlayers.isEmpty else { return }
-
-        let basePlayers = myPlayers.map {
-            Player(id: "\($0.participantId)", summonerName: $0.summonerName, firstName: nil, lastName: nil,
-                   role: $0.role, imageURL: nil, teamId: team.id, teamCode: team.code)
-        }
-
-        let oracleElixir = OracleElixirService.shared
-        let imageURLs: [Int: URL] = await withTaskGroup(of: (Int, URL?).self) { group in
-            for (idx, player) in basePlayers.enumerated() {
-                group.addTask { (idx, await oracleElixir.fetchPlayerImageURL(summonerName: player.summonerName)) }
-            }
-            var results: [Int: URL] = [:]
-            for await (idx, url) in group where url != nil {
-                results[idx] = url
-            }
-            return results
-        }
-
-        players = basePlayers.enumerated().map { idx, player in
-            Player(id: player.id, summonerName: player.summonerName, firstName: player.firstName,
-                   lastName: player.lastName, role: player.role,
-                   imageURL: imageURLs[idx]?.absoluteString, teamId: player.teamId, teamCode: player.teamCode)
-        }.sorted { roleOrder($0.role) < roleOrder($1.role) }
-    }
-
-    /// 최근 완료 경기의 마지막 게임 참가자 명단으로 "현재 주전"을 역산한다. 방금 끝난 경기는
-    /// 시리즈 상태(`match.state`)만 completed로 먼저 반영되고 게임별 상세(`getEventDetails`의
-    /// `games[].state`)는 Riot이 뒤늦게 채워주는 지연이 실제로 있어서(실측: LPL AL 팀에서
-    /// 최신 경기가 games 전부 unstarted로 남아있는 채로 발견함), 가장 최근 경기 하나만 보면
-    /// 주전 판별이 종종 실패한다. 성공할 때까지 최근 5경기까지 순서대로 시도한다.
-    private func loadCurrentStarters() async {
-        for match in recentMatches.prefix(5) {
-            #if DEBUG
-            teamDetailLogger.debug("[Starters] \(self.team.code) 시도: \(match.startTime) vs \(match.teamA.code == self.team.code ? match.teamB.code : match.teamA.code) matchId=\(match.id)")
-            #endif
-            guard let detail = try? await service.fetchEventDetails(matchId: match.id),
-                  let lastGame = detail.games.last(where: { $0.state == .completed })
-            else {
-                #if DEBUG
-                teamDetailLogger.debug("[Starters] \(self.team.code) eventDetails/lastGame 실패")
-                #endif
-                continue
-            }
-
-            let isTeamA = match.teamA.id == team.id || match.teamA.code == team.code
-            let myEsportsId = isTeamA ? detail.teamAEsportsId : detail.teamBEsportsId
-            guard let window = try? await liveStatsService.fetchGameWindow(gameId: lastGame.gameId, startingTime: nil)
-            else {
-                #if DEBUG
-                teamDetailLogger.debug("[Starters] \(self.team.code) gameId=\(lastGame.gameId) window 실패")
-                #endif
-                continue
-            }
-
-            // blue/red 배정은 반드시 window 자기 자신의 blueTeamId/redTeamId로 판단해야 한다 —
-            // getEventDetails(lastGame)와 LiveStats(window)가 같은 게임인데도 서로 다른 blue/red
-            // 배정을 준 사례를 실측으로 확인함(LPL JDG: lastGame은 LGD=blue/JDG=red라는데 window는
-            // JDG=blue/LGD=red). lastGame 기준으로 판단하면 window에서 상대팀 선수를 골라오게 된다.
-            let myPlayers = window.blueTeamId == myEsportsId ? window.bluePlayers : window.redPlayers
-            guard !myPlayers.isEmpty else {
-                #if DEBUG
-                teamDetailLogger.debug("[Starters] \(self.team.code) myEsportsId=\(myEsportsId) blueId=\(window.blueTeamId) redId=\(window.redTeamId) — 양쪽 다 매칭 안 됨")
-                #endif
-                continue
-            }
-
-            let matched = matchAgainstRoster(myPlayers)
-            #if DEBUG
-            teamDetailLogger.debug("[Starters] \(self.team.code) window선수=\(myPlayers.map(\.summonerName)) 로스터매칭=\(matched.count)명 \(Array(matched))")
-            #endif
-            // 매칭이 0명이면 blue/red 판정이 실제로 틀렸거나(다른 팀 명단을 받아온 경우) 게임
-            // 상세가 아직 안 채워진 것 — 다음 최근 경기로 재시도(이 for 루프가 이미 그 역할).
-            guard !matched.isEmpty else { continue }
-            currentStarterNames = matched
-            return
-        }
-        #if DEBUG
-        teamDetailLogger.debug("[Starters] \(self.team.code) 5경기 전부 실패 — currentStarterNames 비어있음")
-        #endif
-    }
-
-    /// LiveStats API의 소환사명 표기가 리그마다 다르다(실측 확인) — LCK는 "T1 Oner"처럼 팀 코드
-    /// 뒤에 공백을 두지만, LPL은 "BLGKnight"처럼 공백 없이 그대로 붙인다. 특정 구분자를 가정하고
-    /// 접두사를 "제거"하려 하면 리그마다 깨지므로, 대신 이미 알고 있는 로스터 소환사명이 window
-    /// 이름의 **접미사**로 포함되는지를 직접 검사한다 — 구분자 형식과 무관하게 안전하다.
-    private func matchAgainstRoster(_ windowPlayers: [PlayerStats]) -> Set<String> {
-        let windowNames = windowPlayers.map {
-            $0.summonerName.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: " ", with: "")
-        }
-        var result: Set<String> = []
-        for player in players {
-            let rosterName = player.summonerName.trimmingCharacters(in: .whitespaces).lowercased()
-            let rosterNameNoSpace = rosterName.replacingOccurrences(of: " ", with: "")
-            guard !rosterNameNoSpace.isEmpty else { continue }
-            if windowNames.contains(where: { $0 == rosterNameNoSpace || $0.hasSuffix(rosterNameNoSpace) }) {
-                result.insert(rosterName)
-            }
-        }
-        return result
-    }
-
-    private func preloadFromCache() -> Bool {
+    func preloadFromCache() -> Bool {
         var hadAny = false
         if let roster: [Player] = AppDiskCache.get(.roster(teamId: team.id)) {
-            players = roster.sorted { roleOrder($0.role) < roleOrder($1.role) }
+            players = roster.sorted { Self.roleOrder($0.role) < Self.roleOrder($1.role) }
             hadAny = true
         }
         if let allMatches: [Match] = AppDiskCache.get(.allSchedule(leagueId: league.id)) {
@@ -357,13 +188,17 @@ final class TeamDetailViewModel {
     }
 }
 
-private func roleOrder(_ role: String) -> Int {
-    switch role.lowercased() {
-    case "top":              return 0
-    case "jungle":           return 1
-    case "mid":              return 2
-    case "bottom", "bot":    return 3
-    case "support":          return 4
-    default:                 return 5
+extension TeamDetailViewModel {
+
+    /// 선수단 정렬 순서 — 탑/정글/미드/원딜/서폿.
+    static func roleOrder(_ role: String) -> Int {
+        switch role.lowercased() {
+        case "top":              return 0
+        case "jungle":           return 1
+        case "mid":              return 2
+        case "bottom", "bot":    return 3
+        case "support":          return 4
+        default:                 return 5
+        }
     }
 }
