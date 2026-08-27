@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 앱은 읽기만 — 쓰기는 Cloud Functions만
+    match /matches/{matchId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /gameWindows/{matchId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /playerImages/{name} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /playerStats/{key} {
+      allow read: if true;
+      allow write: if false;
+    }
+    // 앱은 registerDeviceToken 콜러블(Admin SDK, 규칙 우회)로만 쓴다 — 직접 읽기/쓰기 모두 금지
+    match /deviceTokens/{token} {
+      allow read: if false;
+      allow write: if false;
+    }
+    // 완료 경기 상세(밴픽 등) — 앱은 getMatchDetail 콜러블로만 읽는다(다른 캐시 Callable과 동일 패턴)
+    match /matchDetails/{matchId} {
+      allow read: if false;
+      allow write: if false;
+    }
+    // syncLive 내부 재시도 큐 — 서버만 사용, 앱은 볼 필요 없음
+    match /pendingMatchDetails/{matchId} {
+      allow read: if false;
+      allow write: if false;
+    }
+    // 과거 시즌(2013~) 백필 데이터 — 앱은 getHistoricalYears/getHistoricalMatches 콜러블로만 읽음
+    match /historicalTournaments/{leagueName} {
+      allow read: if false;
+      allow write: if false;
+    }
+    match /historicalMatches/{matchId} {
+      allow read: if false;
+      allow write: if false;
+    }
+  }
+}
