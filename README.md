@@ -190,7 +190,7 @@ lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 
 ## 테스트
 
-`LOLIVETests` 타겟, Swift Testing 프레임워크. 84개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩).
+`LOLIVETests` 타겟, Swift Testing 프레임워크. 88개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩 + 검색).
 
 ```bash
 xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests
@@ -200,5 +200,5 @@ xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기
 
 `.github/workflows/ci.yml` — GitHub Actions, `main` push/PR마다 자동 실행.
 
-1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 84개 실행
+1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 88개 실행
 2. `LOLIVEWidgetsExtension` 별도 빌드 (컴파일 체크만)

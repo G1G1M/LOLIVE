@@ -144,3 +144,71 @@ struct TeamDetailCachePreloadTests {
         #expect(result?.allMatches?.count == 1)
     }
 }
+
+// MARK: - SearchViewModel.results
+
+@MainActor
+@Suite("SearchViewModel.results")
+struct SearchResultsTests {
+
+    private static func player(_ name: String, id: String) -> Player {
+        Player(id: id, summonerName: name, firstName: nil, lastName: nil,
+               role: "mid", imageURL: nil, teamId: "t", teamCode: "T")
+    }
+
+    private static func makeVM(players: Int) -> SearchViewModel {
+        let vm = SearchViewModel()
+        let league = League(id: "L", slug: "l", name: "Alpha League", region: "한국", imageURL: nil)
+        vm.allLeagues = [league]
+        vm.allTeams = (0..<20).map {
+            (team: Team(id: "team\($0)", name: "Alpha Team \($0)", code: "AT\($0)", imageURL: nil),
+             league: league)
+        }
+        vm.allPlayers = (0..<players).map {
+            (player: player("Alpha\($0)", id: "p\($0)"), league: league)
+        }
+        return vm
+    }
+
+    @Test("빈 검색어는 결과가 없다")
+    func emptyQueryReturnsNothing() {
+        #expect(Self.makeVM(players: 10).results(for: "   ").isEmpty)
+    }
+
+    @Test("종류별 개수 상한(리그 3·팀 10·선수 10)을 지킨다")
+    func respectsPerCategoryLimits() {
+        // lazy + prefix 로 바꾼 뒤에도 상한과 순서가 그대로여야 한다.
+        let results = Self.makeVM(players: 500).results(for: "alpha")
+        var leagues = 0, teams = 0, players = 0
+        for r in results {
+            switch r {
+            case .league: leagues += 1
+            case .team: teams += 1
+            case .player: players += 1
+            }
+        }
+        #expect(leagues == 1)   // 리그는 1개뿐
+        #expect(teams == 10)
+        #expect(players == 10)
+    }
+
+    @Test("결과는 리그 → 팀 → 선수 순서로 나온다")
+    func keepsCategoryOrder() {
+        let results = Self.makeVM(players: 50).results(for: "alpha")
+        let kinds: [String] = results.map {
+            switch $0 {
+            case .league: return "league"
+            case .team: return "team"
+            case .player: return "player"
+            }
+        }
+        #expect(kinds == Array(repeating: "league", count: 1)
+                       + Array(repeating: "team", count: 10)
+                       + Array(repeating: "player", count: 10))
+    }
+
+    @Test("매칭 안 되는 검색어는 빈 결과")
+    func noMatch() {
+        #expect(Self.makeVM(players: 50).results(for: "zzzz").isEmpty)
+    }
+}
