@@ -66,7 +66,7 @@ final class PlayersViewModel {
         isLoading = true
         loadFailed = false
         defer { isLoading = false }
-        if preloadFromCache() { return }
+        if await preloadFromCache() { return }
 
         let svc = service
 
@@ -150,13 +150,23 @@ final class PlayersViewModel {
         }
     }
 
-    private func preloadFromCache() -> Bool {
+    /// 선수 전체 목록 캐시는 실측 660KB 남짓이라(디코딩만 맥에서 10ms대) 메인 액터에서 그대로
+    /// 읽으면 선수 탭 첫 진입이 눈에 띄게 끊긴다 — 파일 읽기·디코딩을 백그라운드로 뺀다.
+    private nonisolated static func readDiskPreload() -> (players: [PlayerEntry], leagues: [League])? {
         guard let cached: [PlayerEntry] = AppDiskCache.get(key: "players_all", maxAge: 12 * 3600),
               let cachedLeagues: [League] = AppDiskCache.get(.leagues),
               !cached.isEmpty
-        else { return false }
-        allPlayers = cached
-        leagues = cachedLeagues
+        else { return nil }
+        return (cached, cachedLeagues)
+    }
+
+    private func preloadFromCache() async -> Bool {
+        let preload = await Task.detached(priority: .userInitiated) {
+            Self.readDiskPreload()
+        }.value
+        guard let result = preload else { return false }
+        allPlayers = result.players
+        leagues = result.leagues
             .filter { !excludedRegions.contains($0.region) && isPrimary($0) }
             .sorted { regionOrder($0.region) < regionOrder($1.region) }
         let primaryLeagues = leagues

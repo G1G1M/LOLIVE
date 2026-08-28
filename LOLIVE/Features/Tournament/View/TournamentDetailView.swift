@@ -176,20 +176,28 @@ struct TournamentDetailView: View {
 
     // MARK: - Helpers
 
-    private func fullDateStr(_ date: Date) -> String {
+    // 뷰 갱신마다 DateFormatter 를 새로 만들지 않도록 타입 프로퍼티로 공유한다.
+    private static let fullDateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "ko_KR")
         f.dateFormat = "yyyy년 M월 d일 (EEE)"
-        return f.string(from: date)
+        return f
+    }()
+
+    private static let dayLabelFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "yyyy년 M월 d일"
+        return f
+    }()
+
+    private func fullDateStr(_ date: Date) -> String {
+        Self.fullDateFormatter.string(from: date)
     }
 
     private func formatDate(_ dateStr: String) -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        guard let date = fmt.date(from: dateStr) else { return dateStr }
-        fmt.locale = Locale(identifier: "ko_KR")
-        fmt.dateFormat = "yyyy년 M월 d일"
-        return fmt.string(from: date)
+        guard let date = tournamentDayFormatter.date(from: dateStr) else { return dateStr }
+        return Self.dayLabelFormatter.string(from: date)
     }
 
 }

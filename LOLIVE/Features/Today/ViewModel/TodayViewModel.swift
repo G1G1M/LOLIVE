@@ -75,8 +75,13 @@ final class TodayViewModel {
             for league in cachedLeagues {
                 AppDiskCache.clear(.schedule(leagueId: league.id))
             }
-        } else if !preloadFromCache() {
-            isLoading = true
+        } else {
+            // 캐시 읽기가 비동기라, 읽는 동안 로딩 표시를 먼저 켜둔다.
+            // 안 그러면 그 사이 한 프레임이 "경기 없음" 빈 상태로 그려질 수 있다.
+            if todayMatches.isEmpty && completedMatches.isEmpty && upcomingMatches.isEmpty {
+                isLoading = true
+            }
+            if await preloadFromCache() { isLoading = false }
         }
         errorMessage = nil
 
@@ -123,7 +128,7 @@ final class TodayViewModel {
             // 화면에 데이터가 전혀 없을 때만 에러 표시
             // 캐시 데이터가 이미 있으면 에러 알림 없이 유지
             let hasData = !todayMatches.isEmpty || !completedMatches.isEmpty || !upcomingMatches.isEmpty
-            if !hasData && !loadFromStaleCache() {
+            if !hasData, !(await loadFromStaleCache()) {
                 errorMessage = errorDescription(error)
             }
         }

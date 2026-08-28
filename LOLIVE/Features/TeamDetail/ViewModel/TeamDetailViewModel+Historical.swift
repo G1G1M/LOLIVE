@@ -17,10 +17,12 @@ extension TeamDetailViewModel {
     /// 명단(Match.games, 백필 시점에 이미 저장돼 있음)에서 선수단을 뽑는다 — Riot 실시간 API는
     /// 이 합성 ID를 모르니 호출하지 않는다.
     func loadFromHistoricalData() async {
-        let hadCache = preloadFromCache()
-        isLoading = !hadCache
+        // 캐시 읽기가 비동기라 로딩 표시를 먼저 켜둔다(빈 상태가 한 프레임 스치는 것 방지).
+        isLoading = players.isEmpty
         loadFailed = false
         defer { isLoading = false }
+        let hadCache = await preloadFromCache()
+        if hadCache { isLoading = false }
 
         func isThisTeam(_ m: Match) -> Bool {
             m.teamA.id == team.id || m.teamA.code == team.code ||

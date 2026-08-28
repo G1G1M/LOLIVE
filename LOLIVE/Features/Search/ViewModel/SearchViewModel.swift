@@ -70,10 +70,11 @@ final class SearchViewModel {
 
     func load() async {
         guard allLeagues.isEmpty else { return }
-        if preloadFromCache() { return }
+        // 캐시 읽기가 비동기라 로딩 표시를 먼저 켜둔다(빈 상태가 한 프레임 스치는 것 방지).
         isLoading = true
         loadFailed = false
         defer { isLoading = false }
+        if await preloadFromCache() { return }
 
         guard let leagues = try? await service.fetchLeagues() else {
             loadFailed = true
@@ -112,8 +113,8 @@ final class SearchViewModel {
             }
 
         // 국제 대회(MSI, Worlds 등)보다 지역 리그 우선 정렬 후 중복 제거
-        var allTeamPairs:   [(Team, League)]   = pairs.flatMap { $0.teams }
-        var allPlayerPairs: [(Player, League)] = pairs.flatMap { $0.players }
+        let allTeamPairs:   [(Team, League)]   = pairs.flatMap { $0.teams }
+        let allPlayerPairs: [(Player, League)] = pairs.flatMap { $0.players }
 
         var seenTeams = Set<String>()
         for (team, league) in allTeamPairs.sorted(by: { !isInternational($0.1) && isInternational($1.1) }) {
@@ -147,12 +148,26 @@ final class SearchViewModel {
         }
     }
 
-    private func preloadFromCache() -> Bool {
+    /// 검색 탭은 리그·팀·선수 캐시 세 덩어리를 한 번에 읽는다. 메인 액터에서 그대로 돌리면
+    /// 탭 전환 애니메이션 도중 메인 스레드가 막히므로 읽기만 백그라운드로 뺀다.
+    private nonisolated static func readDiskPreload()
+        -> (leagues: [League], teams: [SearchTeamEntry], players: [SearchPlayerEntry])? {
         guard let cachedLeagues: [League] = AppDiskCache.get(.leagues),
               let teams: [SearchTeamEntry] = AppDiskCache.get(key: "search_teams", maxAge: 12 * 3600),
               let players: [SearchPlayerEntry] = AppDiskCache.get(key: "search_players", maxAge: 12 * 3600),
               !cachedLeagues.isEmpty
-        else { return false }
+        else { return nil }
+        return (cachedLeagues, teams, players)
+    }
+
+    private func preloadFromCache() async -> Bool {
+        let preload = await Task.detached(priority: .userInitiated) {
+            Self.readDiskPreload()
+        }.value
+        guard let result = preload else { return false }
+        let cachedLeagues = result.leagues
+        let teams = result.teams
+        let players = result.players
         allLeagues = cachedLeagues
         allTeams = teams.map { (team: $0.team, league: $0.league) }
         allPlayers = players.map { (player: $0.player, league: $0.league) }

@@ -14,7 +14,10 @@ struct Tournament: Codable, Identifiable {
 
 // MARK: - Shared Utility
 
-private let tournamentDateFormat: DateFormatter = {
+/// Tournament.startDate/endDate("2025-01-15") 전용 공유 포매터.
+/// DateFormatter 생성은 비싸서, 이 형식을 쓰는 곳은 전부 이 인스턴스를 재사용한다
+/// (읽기 전용 사용은 스레드 세이프 — 백그라운드 캐시 선로딩 경로에서도 그대로 쓴다).
+let tournamentDayFormatter: DateFormatter = {
     let fmt = DateFormatter()
     fmt.dateFormat = "yyyy-MM-dd"
     return fmt
@@ -30,7 +33,7 @@ private func isSpecialTournament(_ t: Tournament) -> Bool {
 /// 토너먼트 목록에서 현재 진행 중인 가장 적합한 토너먼트를 반환.
 /// 1순위: 진행 중인 정규시즌 / 2순위: 진행 중인 플레이오프 / 3순위: 가장 최근 완료된 정규시즌 / 4순위: 가장 최근 토너먼트
 func activeTournament(from tournaments: [Tournament]) -> Tournament? {
-    let fmt = tournamentDateFormat
+    let fmt = tournamentDayFormatter
     let now = Date()
     let sorted = tournaments.sorted {
         (fmt.date(from: $0.startDate) ?? .distantPast) >
@@ -60,7 +63,7 @@ func activeTournament(from tournaments: [Tournament]) -> Tournament? {
 /// 잘 맞아서, 같은 해 첫 스플릿이 아니라 활성 스플릿 바로 이전(시작일 기준) 정규 스플릿의 시작일을
 /// 쓴다. 이전 스플릿이 없으면(그 해 첫 스플릿이 곧 활성 스플릿) 활성 스플릿 자체의 시작일로 폴백.
 func seasonStartDate(from tournaments: [Tournament], active: Tournament) -> Date {
-    let fmt = tournamentDateFormat
+    let fmt = tournamentDayFormatter
     guard let activeStart = fmt.date(from: active.startDate) else { return .distantPast }
 
     let previousStarts = tournaments.compactMap { t -> Date? in

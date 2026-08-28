@@ -83,10 +83,12 @@ final class TeamDetailViewModel {
             return
         }
 
-        let hadCache = preloadFromCache()
-        isLoading = !hadCache
+        // 캐시 읽기가 비동기라 로딩 표시를 먼저 켜둔다(빈 상태가 한 프레임 스치는 것 방지).
+        isLoading = players.isEmpty
         loadFailed = false
         defer { isLoading = false }
+        let hadCache = await preloadFromCache()
+        if hadCache { isLoading = false }
 
         #if DEBUG
         Self.teamDetailLogger.debug("[TeamDetail] load() 시작 — team.id=\(self.team.id) code=\(self.team.code) league.id=\(self.league.id) name=\(self.league.name) hadCache=\(hadCache)")
@@ -128,17 +130,34 @@ final class TeamDetailViewModel {
         Task { await loadTeamStats() }
     }
 
-    func preloadFromCache() -> Bool {
-        var hadAny = false
-        if let roster: [Player] = AppDiskCache.get(.roster(teamId: team.id)) {
+    /// 캐시 프리로드 결과 — 백그라운드에서 읽은 값을 메인 액터로 옮길 때 쓰는 그릇.
+    struct DiskPreload {
+        let roster: [Player]?
+        let allMatches: [Match]?
+    }
+
+    /// 로스터 + 리그 전체 스케줄 캐시를 읽는다(동기 디스크 I/O + JSON 디코딩).
+    /// 전체 스케줄은 리그에 따라 300KB를 넘어서, 메인 액터에서 그대로 돌리면 팀 상세로 들어가는
+    /// NavigationStack push 애니메이션이 시작되는 그 순간 메인 스레드가 막힌다 — `nonisolated`인 이유.
+    /// (LeagueDetailViewModel+Cache가 같은 이유로 먼저 옮겨져 있다.)
+    nonisolated static func readDiskPreload(teamId: String, leagueId: String) -> DiskPreload? {
+        let roster: [Player]? = AppDiskCache.get(.roster(teamId: teamId))
+        let allMatches: [Match]? = AppDiskCache.get(.allSchedule(leagueId: leagueId))
+        guard roster != nil || allMatches != nil else { return nil }
+        return DiskPreload(roster: roster, allMatches: allMatches)
+    }
+
+    func preloadFromCache() async -> Bool {
+        guard let result = await Task.detached(priority: .userInitiated) { [teamId = team.id, leagueId = league.id] in
+            Self.readDiskPreload(teamId: teamId, leagueId: leagueId)
+        }.value else { return false }
+        if let roster = result.roster {
             players = roster.sorted { Self.roleOrder($0.role) < Self.roleOrder($1.role) }
-            hadAny = true
         }
-        if let allMatches: [Match] = AppDiskCache.get(.allSchedule(leagueId: league.id)) {
+        if let allMatches = result.allMatches {
             applyMatches(allMatches)
-            hadAny = true
         }
-        return hadAny
+        return true
     }
 
     /// 현재 리그 전체 스케줄 + 교차 리그(국제 대회 등) 경기를 합쳐

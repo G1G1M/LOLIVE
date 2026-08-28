@@ -41,8 +41,7 @@ final class TournamentDetailViewModel {
         guard let t = selectedTournament else { return false }
         // synthetic_ 엔트리는 항상 시작된 것으로 취급
         if t.id.hasPrefix("synthetic_") { return true }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = tournamentDayFormatter
         guard let start = fmt.date(from: t.startDate) else { return true }
         return Date() >= start
     }
@@ -60,8 +59,7 @@ final class TournamentDetailViewModel {
             }
         }
 
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = tournamentDayFormatter
         guard let start = fmt.date(from: t.startDate) else { return [] }
         if t.endDate.isEmpty {
             // endDate 없음 = 진행 중 토너먼트 → 시작일 이후 경기 전체 포함
@@ -90,8 +88,7 @@ final class TournamentDetailViewModel {
         }
         let cal = Calendar.current
         let byDay = Dictionary(grouping: matches) { cal.startOfDay(for: $0.startTime) }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = tournamentDayFormatter
         return byDay.map { date, dayMatches in
             DateGroup(
                 id: fmt.string(from: date),
@@ -234,8 +231,7 @@ final class TournamentDetailViewModel {
                        startDate: "\(year)-01-01", endDate: "\(year)-12-31")
         }
 
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = tournamentDayFormatter
         let now = Date()
 
         return (apiTournaments + synthetic)
@@ -257,8 +253,7 @@ final class TournamentDetailViewModel {
                 String(Calendar.current.component(.year, from: $0.startTime)) == year
             }
         }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = tournamentDayFormatter
         guard let start = fmt.date(from: tournament.startDate) else { return [] }
         if tournament.endDate.isEmpty {
             return matches.filter { $0.startTime >= start }

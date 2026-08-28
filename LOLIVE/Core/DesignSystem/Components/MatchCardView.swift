@@ -112,17 +112,28 @@ struct MatchCardView: View {
 
     // MARK: - Helpers
 
-    private func fullDateStr(_ date: Date) -> String {
+    // DateFormatter 생성은 비싸다. 이 카드는 Today·즐겨찾기·리그 일정·팀 상세 등 목록마다
+    // 수십 개가 동시에 그려지고 스크롤·폴링 때마다 다시 그려지므로, 호출할 때마다 새로 만들면
+    // 그 비용이 그대로 프레임 시간에 얹힌다. 타입 프로퍼티로 한 번만 만들어 공유한다.
+    private static let fullDateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "ko_KR")
         f.dateFormat = "yyyy.MM.dd(EEE)"
-        return f.string(from: date)
+        return f
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    private func fullDateStr(_ date: Date) -> String {
+        Self.fullDateFormatter.string(from: date)
     }
 
     private func timeStr(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f.string(from: date)
+        Self.timeFormatter.string(from: date)
     }
 
     @ViewBuilder

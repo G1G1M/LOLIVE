@@ -159,6 +159,16 @@ LOLIVEWidgets/          — Widget Extension (앱과 같은 레이어 구성)
 lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 ```
 
+### 캐시 선로딩
+
+네트워크 응답을 기다리는 동안 화면이 비어 보이지 않도록, 각 ViewModel은 디스크 캐시를 먼저 읽어
+화면을 채우고 나서 네트워크 결과로 덮어씁니다.
+
+이 읽기는 동기 파일 I/O + JSON 디코딩이라 **전부 메인 스레드 밖(`nonisolated` + `Task.detached`)에서**
+수행합니다. Today 화면 하나만 해도 추적 중인 리그 45개의 스케줄 파일(합계 약 4MB)을 앱 시작과 동시에
+읽기 때문에, 메인 액터에서 그대로 돌리면 첫 화면이 그려지는 시점 자체가 밀립니다.
+캐시를 읽는 동안에는 로딩 표시를 켜 두어 빈 상태가 한 프레임 스치지 않게 합니다.
+
 ## 앱 플로우
 
 ```
@@ -180,7 +190,7 @@ lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 
 ## 테스트
 
-`LOLIVETests` 타겟, Swift Testing 프레임워크. 77개 케이스 (핵심 ViewModel 로직 + 순수 함수).
+`LOLIVETests` 타겟, Swift Testing 프레임워크. 84개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩).
 
 ```bash
 xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests
@@ -190,5 +200,5 @@ xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기
 
 `.github/workflows/ci.yml` — GitHub Actions, `main` push/PR마다 자동 실행.
 
-1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 77개 실행
+1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 84개 실행
 2. `LOLIVEWidgetsExtension` 별도 빌드 (컴파일 체크만)
