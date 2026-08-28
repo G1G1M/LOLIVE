@@ -316,7 +316,7 @@ import Foundation
         return GameWindow(gameId: "g", gameState: "in_game", blueTeamId: "b", redTeamId: "r",
                           bluePlayers: [player(1, blue: true)], redPlayers: [player(6, blue: false)],
                           blueTeamStats: empty, redTeamStats: empty,
-                          gameTime: nil, lastFrameTimestamp: nil)
+                          gameTime: nil, lastFrameTimestamp: nil, patchVersion: nil)
     }
 
     private func build(mine: PlayerLiveDetail, theirs: PlayerLiveDetail) -> LaneMatchup? {
@@ -343,4 +343,60 @@ import Foundation
                                         theirs: detail(6, gold: 4000, cs: 80, dmg: 0.2)))
         #expect(behind.goldDifference == -1000)
     }
+}
+
+
+// MARK: - 라이브 최신 시점
+
+@Suite("LiveStatsService.liveEdge") struct LiveEdgeTests {
+
+    /// startingTime 을 비우면 게임 "시작" 프레임이 온다. 진행 중인 경기에서 그렇게 부르면
+    /// 폴링을 아무리 돌려도 골드 0·킬 0 만 돌아온다 — 실제로 그 상태로 배포돼 있었다.
+    @Test func 지금보다_충분히_과거여야_한다() {
+        let now = Date()
+        let edge = LiveStatsService.liveEdge(now: now)
+        let behind = now.timeIntervalSince(edge)
+        // 피드는 약 3분 25초 이내를 400으로 거절한다. 여유가 있어야 한다.
+        let farEnough = behind > 205
+        let notTooFar = behind < 600
+        #expect(farEnough)
+        #expect(notTooFar)
+    }
+
+    @Test func 라이브_시점도_10초_경계에_정렬된다() {
+        let edge = LiveStatsService.liveEdge(now: Date())
+        let remainder = edge.timeIntervalSince1970.truncatingRemainder(dividingBy: 10)
+        #expect(remainder == 0)
+    }
+}
+
+// MARK: - 패치 버전
+
+@Suite("GameWindow.shortPatch") struct PatchVersionTests {
+
+    @Test func 실측_응답에서_패치를_읽는다() throws {
+        let window = try LiveStatsService().decodeWindow(LiveStatsFixtures.windowData)
+        let full = window.patchVersion
+        let short = window.shortPatch
+        #expect(full == "16.16.809.3269")
+        #expect(short == "16.16")
+    }
+
+    @Test func 패치가_없는_옛_캐시는_nil() throws {
+        let legacy = LegacyWindowJSON.noPatch
+        let window = try JSONDecoder().decode(GameWindow.self, from: Data(legacy.utf8))
+        let full = window.patchVersion
+        let short = window.shortPatch
+        #expect(full == nil)
+        #expect(short == nil)
+    }
+}
+
+enum LegacyWindowJSON {
+    static let noPatch = """
+    {"gameId":"g","gameState":"finished","blueTeamId":"b","redTeamId":"r",
+     "bluePlayers":[],"redPlayers":[],
+     "blueTeamStats":{"totalGold":0,"towers":0,"barons":0,"totalKills":0,"dragons":0,"inhibitors":0},
+     "redTeamStats":{"totalGold":0,"towers":0,"barons":0,"totalKills":0,"dragons":0,"inhibitors":0}}
+    """
 }

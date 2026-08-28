@@ -11,7 +11,6 @@ struct FavoritesView: View {
     @Query(sort: \FavoritePlayer.addedAt, order: .reverse) private var favoritePlayers: [FavoritePlayer]
     @Environment(\.modelContext) private var modelContext
     @Environment(TodayViewModel.self) private var todayViewModel
-    @Environment(\.dismiss) private var dismiss
     // App Group 저장소 — ContentView.swift와 동일한 이유(위젯 Small이 읽을 수 있게)
     @AppStorage("primaryTeamCode", store: UserDefaults(suiteName: SharedDataService.appGroupId))
     private var primaryTeamCode: String = ""

@@ -35,6 +35,12 @@ final class LiveStatsService: LiveStatsServiceProtocol {
     /// `startingTime`은 **10초 경계로 정렬돼 있어야 한다** — 아니면 피드가 무조건 400을 준다(실측).
     /// 응답 프레임의 `rfc460Timestamp`(예: `16:30:09.879Z`)를 그대로 되돌려 보내면 거절당하므로,
     /// 그 시각을 다시 요청에 쓰려면 반드시 이 함수를 거칠 것.
+    /// 피드가 내주는 가장 최신 시점. "지금"보다 약 3분 25초 이내를 요청하면 400이라
+    /// (스포일러 방지로 보인다) 여유를 두고 4분 전을 쓴다.
+    static func liveEdge(now: Date = Date()) -> Date {
+        alignedToTenSeconds(now.addingTimeInterval(-240))
+    }
+
     static func alignedToTenSeconds(_ date: Date) -> Date {
         Date(timeIntervalSince1970: (date.timeIntervalSince1970 / 10).rounded(.down) * 10)
     }
@@ -144,6 +150,9 @@ final class LiveStatsService: LiveStatsServiceProtocol {
     }
 
     private struct WindowGameMetadata: Decodable {
+        /// 그 경기가 돌아간 패치(예: "16.16.809.3269"). 시즌이 바뀌면 스탯 해석이 달라져서
+        /// 과거 경기를 볼 때 기준이 된다.
+        let patchVersion: String?
         let blueTeamMetadata: WindowTeamMetadata
         let redTeamMetadata: WindowTeamMetadata
     }
@@ -229,7 +238,8 @@ final class LiveStatsService: LiveStatsServiceProtocol {
             blueTeamStats: buildTeamStats(latestFrame?.blueTeam),
             redTeamStats: buildTeamStats(latestFrame?.redTeam),
             gameTime: gameTimeSec,
-            lastFrameTimestamp: lastFrameTimestamp
+            lastFrameTimestamp: lastFrameTimestamp,
+            patchVersion: meta.patchVersion
         )
     }
 

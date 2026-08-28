@@ -55,14 +55,14 @@ extension MatchDetailViewModel {
 
                 // 인게임 스탯: inProgress 게임만 window 요청
                 guard let game = eventDetail?.games.first(where: { $0.state == .inProgress }) else { continue }
-                if let window = try? await liveStats.fetchGameWindow(gameId: game.gameId, startingTime: nil) {
+                // startingTime 을 비우면 게임 "시작" 프레임이 온다 — 진행 중인 경기에서 그러면
+                // 5초마다 폴링해도 골드 0·킬 0 이 계속 돌아온다(실측으로 확인한 버그).
+                // 피드가 내주는 가장 최신 시점을 명시해야 실제 라이브 값이 온다.
+                if let window = try? await liveStats.fetchGameWindow(gameId: game.gameId,
+                                                                     startingTime: LiveStatsService.liveEdge()) {
                     guard !Task.isCancelled else { break }
                     gameWindows[game.gameId] = window
-                    if let t = window.gameTime {
-                        currentGameTime = t
-                    } else {
-                        currentGameTime = try? await liveStats.fetchGameDetails(gameId: game.gameId)
-                    }
+                    currentGameTime = await elapsedSeconds(for: game.gameId, window: window)
                 }
             }
         }

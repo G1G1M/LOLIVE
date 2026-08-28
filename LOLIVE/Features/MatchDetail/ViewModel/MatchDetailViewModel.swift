@@ -24,6 +24,8 @@ final class MatchDetailViewModel {
     var currentGameTime: Int? = nil   // 인게임 경과 시간 (초)
     var lastPolledAt: Date? = nil     // 마지막 폴링 시각
     var killTimelines: [String: [KillEvent]] = [:]
+    /// 게임별 시작 시각 — 경과 시간을 재는 기준점. 게임당 한 번만 받는다.
+    var gameStartTimes: [String: Date] = [:]
 
     // MARK: - Computed
 
@@ -233,11 +235,25 @@ final class MatchDetailViewModel {
                 blueTeamId: g.blueTeamId, redTeamId: g.redTeamId,
                 bluePlayers: g.bluePlayers, redPlayers: g.redPlayers,
                 blueTeamStats: g.blueTeamStats, redTeamStats: g.redTeamStats,
-                gameTime: nil, lastFrameTimestamp: nil
+                gameTime: nil, lastFrameTimestamp: nil, patchVersion: nil
             )
         }
 
         selectedGameId = games.last?.gameId
+    }
+
+    /// 인게임 경과 시간(초). 피드가 `gameTime` 필드를 빼버려서(실측) 프레임 시각 차이로 직접 잰다.
+    /// 시작 시각은 `startingTime` 없이 부르면 오는 초반 프레임에서 얻는다 — 그 호출의
+    /// 원래 용도는 아니지만, 게임 시작 시점을 알려주는 유일한 경로다.
+    func elapsedSeconds(for gameId: String, window: GameWindow) async -> Int? {
+        guard let latest = window.lastFrameTimestamp else { return nil }
+        if gameStartTimes[gameId] == nil {
+            gameStartTimes[gameId] = (try? await liveStatsService.fetchGameWindow(gameId: gameId, startingTime: nil))?
+                .lastFrameTimestamp
+        }
+        guard let start = gameStartTimes[gameId] else { return nil }
+        let elapsed = Int(latest.timeIntervalSince(start))
+        return elapsed > 0 ? elapsed : nil
     }
 
     // MARK: - Static Preload

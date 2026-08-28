@@ -13,7 +13,6 @@ import Charts
 
 struct ChampionDetailSheet: View {
     let stat: LeaguePlayerDetailViewModel.ChampionStat
-    @Environment(\.dismiss) private var dismiss
 
     /// 승률 추이 차트용 누적 승률 데이터 포인트.
     /// n번째 게임까지의 누적 승률을 미리 계산해 차트를 그린다.

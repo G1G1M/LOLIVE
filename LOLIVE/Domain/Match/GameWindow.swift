@@ -51,10 +51,21 @@ struct GameWindow: Identifiable, Codable {
     let redTeamStats: TeamGameStats
     let gameTime: Int?   // 인게임 경과 시간 (초), window/details API에서 수신
     let lastFrameTimestamp: Date?   // 최신 프레임 시각 — 라이브 피드가 멈췄는지 판단하는 용도
+    /// 그 경기가 돌아간 패치. 위와 같은 이유로 옵셔널(예전 캐시엔 없다).
+    let patchVersion: String?
 
     enum CodingKeys: String, CodingKey {
         case gameId, gameState, blueTeamId, redTeamId
         case bluePlayers, redPlayers, blueTeamStats, redTeamStats, gameTime, lastFrameTimestamp
+        case patchVersion
+    }
+
+    /// 화면에 쓰는 짧은 표기 — "16.16.809.3269" → "16.16"
+    var shortPatch: String? {
+        guard let patchVersion else { return nil }
+        let parts = patchVersion.split(separator: ".")
+        guard parts.count >= 2 else { return patchVersion }
+        return "\(parts[0]).\(parts[1])"
     }
 }
 

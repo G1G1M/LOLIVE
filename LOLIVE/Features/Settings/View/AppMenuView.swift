@@ -10,7 +10,6 @@ struct AppMenuView: View {
     @Query(sort: \FavoriteTeam.addedAt, order: .reverse) private var favoriteTeams: [FavoriteTeam]
     @AppStorage("notificationMinutesBefore") private var notificationMinutes: Int = 60
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {

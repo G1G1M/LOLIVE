@@ -14,7 +14,6 @@ import SwiftUI
 struct TeamStatsDetailSheet: View {
     let teamName: String
     let stats: TeamSeasonStats
-    @Environment(\.dismiss) private var dismiss
 
     private var winColor: Color {
         stats.winRate >= 0.6 ? .blue : stats.winRate >= 0.5 ? .green : .orange

@@ -9,7 +9,6 @@ import SwiftData
 struct TeamSearchView: View {
     @Query private var favoriteTeams: [FavoriteTeam]
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
 
     @State private var viewModel = TeamSearchViewModel()
     @State private var searchText = ""
