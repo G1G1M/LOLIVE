@@ -169,6 +169,13 @@ lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 읽기 때문에, 메인 액터에서 그대로 돌리면 첫 화면이 그려지는 시점 자체가 밀립니다.
 캐시를 읽는 동안에는 로딩 표시를 켜 두어 빈 상태가 한 프레임 스치지 않게 합니다.
 
+### 이미지 캐시
+
+팀 로고·챔피언 아이콘은 메모리(`NSCache`) → 디스크 → 네트워크 순으로 찾습니다.
+원본이 수천 픽셀짜리인 경우가 많아(실측 최대 8334×8334) **ImageIO 썸네일로 256px 이하로 줄여서
+디코딩**합니다. 앱에서 이 이미지를 가장 크게 쓰는 곳이 72pt라 3배 화면에서도 충분합니다.
+축소 없이 원본을 그대로 올리면 로고 한 장이 수십~수백 MB를 차지합니다.
+
 ## 앱 플로우
 
 ```
@@ -190,7 +197,7 @@ lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 
 ## 테스트
 
-`LOLIVETests` 타겟, Swift Testing 프레임워크. 88개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩 + 검색).
+`LOLIVETests` 타겟, Swift Testing 프레임워크. 93개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩 + 검색 + 이미지 다운샘플링).
 
 ```bash
 xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests
@@ -200,5 +207,5 @@ xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기
 
 `.github/workflows/ci.yml` — GitHub Actions, `main` push/PR마다 자동 실행.
 
-1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 88개 실행
+1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 93개 실행
 2. `LOLIVEWidgetsExtension` 별도 빌드 (컴파일 체크만)
