@@ -100,12 +100,14 @@ struct TodayView: View {
                     .foregroundStyle(Color(.label))
                     .frame(width: 36, height: 36)
             }
+            .accessibilityLabel("즐겨찾기")
             Button { showMenu = true } label: {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(Color(.label))
                     .frame(width: 36, height: 36)
             }
+            .accessibilityLabel("메뉴")
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)

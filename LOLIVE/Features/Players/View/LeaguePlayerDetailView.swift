@@ -58,6 +58,7 @@ struct LeaguePlayerDetailView: View {
                     Image(systemName: isFavorited ? "star.fill" : "star")
                         .foregroundStyle(isFavorited ? .yellow : .secondary)
                 }
+                .accessibilityLabel(isFavorited ? "즐겨찾기 해제" : "즐겨찾기 추가")
             }
         }
         .task {

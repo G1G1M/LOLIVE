@@ -22,6 +22,10 @@ struct LeagueSectionHeader: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(Color(.systemGroupedBackground))
+        // 헤더로 표시해야 VoiceOver 로터의 "머리말"로 리그 단위 건너뛰기가 된다.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(league.name)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 

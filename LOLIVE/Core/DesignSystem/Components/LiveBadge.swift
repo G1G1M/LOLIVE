@@ -33,5 +33,8 @@ struct LiveBadge: View {
         .padding(.vertical, animated ? 4 : 0)
         .background(animated ? Color.red.opacity(0.15) : Color.clear)
         .clipShape(Capsule())
+        // 깜빡이는 점과 "LIVE" 글자가 따로 읽히지 않도록 한 덩어리로 묶는다.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("진행 중")
     }
 }

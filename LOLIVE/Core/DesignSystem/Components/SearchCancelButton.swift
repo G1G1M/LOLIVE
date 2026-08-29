@@ -26,5 +26,6 @@ struct SearchCancelButton: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("검색 취소")
     }
 }

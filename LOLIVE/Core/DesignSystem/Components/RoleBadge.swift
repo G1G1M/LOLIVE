@@ -18,5 +18,6 @@ struct RoleBadge: View {
             .background(RoleStyle.color(role).opacity(0.2))
             .foregroundStyle(RoleStyle.color(role))
             .clipShape(Capsule())
+            .accessibilityLabel(RoleStyle.accessibilityLabel(role))
     }
 }

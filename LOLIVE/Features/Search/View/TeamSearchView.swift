@@ -81,6 +81,7 @@ struct TeamSearchView: View {
                     .foregroundStyle(isFav ? Color.yellow : Color.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(isFav ? "즐겨찾기 해제" : "즐겨찾기 추가")
         }
         .padding(.vertical, 4)
     }

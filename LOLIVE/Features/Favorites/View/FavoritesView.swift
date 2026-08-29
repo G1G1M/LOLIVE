@@ -124,6 +124,7 @@ struct FavoritesView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("팀 추가")
                 }
             }
         }

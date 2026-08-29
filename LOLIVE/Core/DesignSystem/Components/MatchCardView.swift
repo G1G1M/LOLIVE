@@ -24,7 +24,51 @@ struct MatchCardView: View {
         .padding(.vertical, 16)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        // 카드 하나를 한 덩어리로 읽게 한다. 안 그러면 팀 코드·배지·스코어 숫자가 따로따로
+        // 읽혀서("T1", "LIVE", "2", "3", "GEN") 어느 팀이 몇 점인지 알 수 없다.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.accessibilityLabel(
+            match: match, isEffectivelyLive: isEffectivelyLive, showDate: showDate))
     }
+
+    // MARK: - Accessibility
+
+    /// VoiceOver로 읽을 한 문장.
+    /// 화면에 실제로 보이는 것만 담는다 — 시작 전 경기의 0 대 0 스코어처럼 의미 없는 값은 넣지 않는다.
+    static func accessibilityLabel(match: Match, isEffectivelyLive: Bool, showDate: Bool) -> String {
+        func name(_ team: Team) -> String { team.name.isEmpty ? team.code : team.name }
+
+        var parts = ["\(name(match.teamA)) 대 \(name(match.teamB))"]
+        if showDate {
+            parts.append(spokenDateFormatter.string(from: match.startTime))
+        }
+
+        if isEffectivelyLive {
+            parts.append("진행 중")
+            parts.append("\(match.scoreA) 대 \(match.scoreB)")
+        } else if match.state == .completed {
+            parts.append("경기 종료")
+            parts.append("\(match.scoreA) 대 \(match.scoreB)")
+        } else {
+            parts.append("\(spokenTimeFormatter.string(from: match.startTime)) 예정")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    /// 음성으로 들었을 때 자연스러운 형태 — 화면 표기("2026.08.30(토)")를 그대로 읽히면 어색하다.
+    private static let spokenDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "M월 d일 EEEE"
+        return f
+    }()
+
+    private static let spokenTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "a h시 mm분"
+        return f
+    }()
 
     // MARK: - Team Side
 

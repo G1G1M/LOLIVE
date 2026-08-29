@@ -17,6 +17,18 @@ enum RoleStyle {
         }
     }
 
+    /// VoiceOver가 읽을 이름. 화면엔 "JGL" 같은 약어를 쓰지만 음성으로는 뜻이 안 통한다.
+    static func accessibilityLabel(_ role: String) -> String {
+        switch role.lowercased() {
+        case "top":              return "탑"
+        case "jungle":           return "정글"
+        case "mid":              return "미드"
+        case "bottom", "bot":    return "바텀"
+        case "support":          return "서포터"
+        default:                 return role
+        }
+    }
+
     static func color(_ role: String) -> Color {
         switch role.lowercased() {
         case "top":              return .orange

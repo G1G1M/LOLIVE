@@ -206,6 +206,19 @@ iOS가 하루 리로드 횟수를 제한하기 때문에 폴링마다 부르면 
            └─ 온보딩 완료  → ContentView
 ```
 
+## 접근성
+
+VoiceOver로 쓸 수 있게 공용 컴포넌트 단위로 라벨을 답니다 — 하나를 고치면 그걸 쓰는 화면
+전체에 적용됩니다.
+
+- 경기 카드는 한 덩어리로 읽습니다: "T1 대 Gen.G, 진행 중, 2 대 1".
+  나눠두면 팀 코드·배지·스코어 숫자가 따로 읽혀서 어느 팀이 몇 점인지 알 수 없습니다.
+- 팀·리그 로고는 장식으로 숨깁니다 — 쓰이는 곳마다 이름 텍스트가 나란히 있어 중복입니다.
+- 포지션 배지는 화면엔 약어(JGL), 음성으론 한글 이름(정글)로 읽습니다.
+- 아이콘만 있는 버튼에는 전부 라벨을 답니다. 즐겨찾기 별은 상태에 따라
+  "즐겨찾기 추가"/"즐겨찾기 해제"로 바뀝니다.
+- 리그 섹션 헤더는 머리말로 표시해 로터로 리그 단위 건너뛰기가 됩니다.
+
 ## 개인정보 보호 매니페스트
 
 App Store 제출에 필요한 `PrivacyInfo.xcprivacy`를 앱·위젯 두 타겟 최상단에 둡니다
@@ -230,7 +243,7 @@ App Store 제출에 필요한 `PrivacyInfo.xcprivacy`를 앱·위젯 두 타겟 
 
 ## 테스트
 
-`LOLIVETests` 타겟, Swift Testing 프레임워크. 117개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩 + 검색 + 이미지 다운샘플링 + 폴링 주기 + 위젯 스냅샷 + 라이브 경기 동일성).
+`LOLIVETests` 타겟, Swift Testing 프레임워크. 126개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩 + 검색 + 이미지 다운샘플링 + 폴링 주기 + 위젯 스냅샷 + 라이브 경기 동일성 + 접근성 라벨).
 
 ```bash
 xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests
@@ -240,5 +253,5 @@ xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기
 
 `.github/workflows/ci.yml` — GitHub Actions, `main` push/PR마다 자동 실행.
 
-1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 117개 실행
+1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 126개 실행
 2. `LOLIVEWidgetsExtension` 별도 빌드 (컴파일 체크만)

@@ -24,6 +24,9 @@ struct LogoBadgeView: View {
             .frame(width: size, height: size)
             .shadow(color: .black.opacity(0.35), radius: shadowRadius, x: shadowOffset, y: shadowOffset)
             .shadow(color: .white.opacity(0.35), radius: shadowRadius, x: -shadowOffset, y: -shadowOffset)
+            // 장식용. 이 컴포넌트는 쓰이는 23곳 전부 팀명이나 코드 텍스트와 나란히 놓이므로
+            // VoiceOver가 따로 읽으면 같은 정보를 두 번 말하게 된다.
+            .accessibilityHidden(true)
     }
 }
 
