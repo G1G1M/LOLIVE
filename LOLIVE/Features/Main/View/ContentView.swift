@@ -17,6 +17,8 @@ struct ContentView: View {
     @AppStorage("primaryTeamCode", store: UserDefaults(suiteName: SharedDataService.appGroupId))
     private var primaryTeamCode: String = ""
     @State private var selectedTab = 0
+    /// 위젯에 마지막으로 반영한 스냅샷. 타임라인 리로드를 실제 변경이 있을 때만 부르려고 들고 있다.
+    @State private var lastWidgetSnapshot: [String: SharedNextMatch] = [:]
 
     private var themeColor: Color {
         primaryTeamCode.isEmpty ? Color.accentColor : TeamTheme.color(for: primaryTeamCode)
@@ -162,7 +164,18 @@ struct ContentView: View {
             }
         }
 
+        // 저장 자체는 매번 한다 — 위젯이 `savedAt`으로 스냅샷 신선도를 판정하기 때문에
+        // (90초 이내면 자체 네트워크 호출을 건너뛰고, 1시간이 지나면 아예 버린다) 이 시각이
+        // 계속 갱신돼야 한다. App Group UserDefaults 쓰기라 비용도 작다.
         SharedDataService.saveNextMatches(nextMatchMap)
+
+        // 반면 타임라인 리로드는 iOS가 하루 할당량을 두고 배분하는 자원이라, 예산을 태우면
+        // 그 뒤 요청이 조용히 무시돼 위젯이 갱신을 멈춘다. 그런데 이 함수는 라이브 폴링마다
+        // 불린다 — `LiveMatch.lastUpdated`가 폴링할 때마다 새로 찍혀서 내용이 그대로여도
+        // `onChange(of: liveMatches)`가 매번 발동하기 때문이다.
+        // 그래서 화면에 보이는 값이 실제로 달라졌을 때만 리로드한다.
+        guard !SharedNextMatch.sameDisplayContent(nextMatchMap, lastWidgetSnapshot) else { return }
+        lastWidgetSnapshot = nextMatchMap
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

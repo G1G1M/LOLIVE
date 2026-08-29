@@ -182,6 +182,10 @@ lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 앱이 백그라운드로 가면 폴링을 멈추고, 포그라운드로 돌아오면 즉시 다시 조회합니다.
 제어센터를 내린 것 같은 일시적인 `.inactive` 상태에서는 멈추지 않습니다.
 
+폴링 결과는 매번 App Group에 저장하지만(위젯이 이 저장 시각으로 스냅샷 신선도를 판정합니다),
+위젯 타임라인 리로드는 **화면에 보이는 값이 실제로 달라졌을 때만** 요청합니다 —
+iOS가 하루 리로드 횟수를 제한하기 때문에 폴링마다 부르면 예산을 태우고 위젯이 갱신을 멈춥니다.
+
 ### 이미지 캐시
 
 팀 로고·챔피언 아이콘은 메모리(`NSCache`) → 디스크 → 네트워크 순으로 찾습니다.
@@ -210,7 +214,7 @@ lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 
 ## 테스트
 
-`LOLIVETests` 타겟, Swift Testing 프레임워크. 102개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩 + 검색 + 이미지 다운샘플링 + 폴링 주기).
+`LOLIVETests` 타겟, Swift Testing 프레임워크. 112개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩 + 검색 + 이미지 다운샘플링 + 폴링 주기 + 위젯 스냅샷).
 
 ```bash
 xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests
@@ -220,5 +224,5 @@ xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기
 
 `.github/workflows/ci.yml` — GitHub Actions, `main` push/PR마다 자동 실행.
 
-1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 102개 실행
+1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 112개 실행
 2. `LOLIVEWidgetsExtension` 별도 빌드 (컴파일 체크만)
