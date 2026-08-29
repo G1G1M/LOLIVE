@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 광고 추적을 하지 않습니다. 추적 도메인도 없습니다. -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!--
+      서버로 나가는 데이터는 푸시 알림 등록(registerDeviceToken Cloud Function) 한 곳뿐입니다.
+      계정 개념이 없어서 어떤 것도 신원에 연결되지 않고, 추적에도 쓰지 않습니다.
+    -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <dict>
+            <!-- FCM 푸시 토큰 -->
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeDeviceID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- 즐겨찾기한 팀 코드 — 어느 경기 알림을 보낼지 정하는 데만 씁니다. -->
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+    </array>
+
+    <!--
+      "필수 사유 API" 중 이 앱이 직접 쓰는 건 UserDefaults 하나뿐입니다.
+      - CA92.1: 앱 자신만 읽고 쓰는 설정 (@AppStorage — 온보딩 완료 여부, 화면 모드, 알림 시각)
+      - 1C8F.1: 같은 App Group 안의 위젯과 공유하는 설정 (대표 팀, 즐겨찾기, 다음 경기 스냅샷)
+      Firebase SDK(Core/Functions/Messaging)는 각자 자기 매니페스트를 갖고 있어 여기 적지 않습니다.
+    -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+                <string>1C8F.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
