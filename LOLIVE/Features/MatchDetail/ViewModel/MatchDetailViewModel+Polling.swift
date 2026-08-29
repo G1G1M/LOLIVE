@@ -9,6 +9,22 @@ import Foundation
 
 extension MatchDetailViewModel {
 
+    // MARK: - 폴링 주기
+
+    /// 게임이 실제로 진행 중일 때 — 골드·킬이 초 단위로 바뀌는 구간.
+    nonisolated static let livePollInterval: Duration = .seconds(5)
+    /// 아직 시작 전일 때. 여기서 볼 건 "드래프트가 열렸는지 / 게임이 시작됐는지"뿐이라
+    /// 5초까지 촘촘할 이유가 없다.
+    ///
+    /// [왜 필요한가] 예전엔 완료 경기만 제외하고 전부 5초였다. 내일 경기 상세를 열어두면
+    /// 바뀔 수 있는 값이 하나도 없는데도 `getEventDetails`를 5분에 60번 부른다
+    /// (이 엔드포인트는 캐시도 안 탄다).
+    nonisolated static let waitingPollInterval: Duration = .seconds(30)
+
+    nonisolated static func pollInterval(hasLiveGame: Bool) -> Duration {
+        hasLiveGame ? livePollInterval : waitingPollInterval
+    }
+
     func startPolling() {
         // 경기가 예정/진행 중일 때만 폴링 (완료 경기는 폴링 불필요)
         guard match.state != .completed else { return }
@@ -18,7 +34,8 @@ extension MatchDetailViewModel {
         let matchId = match.id
         pollingTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
+                let hasLiveGame = eventDetail?.games.contains { $0.state == .inProgress } ?? false
+                try? await Task.sleep(for: Self.pollInterval(hasLiveGame: hasLiveGame))
                 guard !Task.isCancelled else { break }
 
                 lastPolledAt = Date()

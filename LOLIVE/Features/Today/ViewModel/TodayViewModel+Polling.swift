@@ -10,6 +10,41 @@ import Foundation
 
 extension TodayViewModel {
 
+    // MARK: - 폴링 주기
+
+    /// 라이브 경기가 진행 중일 때. 스코어·세트가 실제로 바뀌는 구간이라 가장 짧게 잡는다.
+    nonisolated static let livePollInterval: Duration = .seconds(30)
+    /// 곧 시작할 경기가 있을 때. 시작을 늦게 감지해도 이 간격만큼만 밀린다.
+    nonisolated static let upcomingPollInterval: Duration = .seconds(60)
+    /// 라이브도 없고 임박한 경기도 없을 때.
+    nonisolated static let idlePollInterval: Duration = .seconds(300)
+
+    /// 이 시간 안에 시작하는 경기가 있으면 "임박"으로 본다.
+    private nonisolated static let upcomingWindow: TimeInterval = 30 * 60
+
+    /// 다음 폴링까지 기다릴 시간.
+    ///
+    /// [왜 필요한가] 예전엔 상황과 무관하게 항상 30초였다. 라이브 경기가 하나도 없는
+    /// 시간대(대부분의 시간)에도 하루 2,880번을 두드리는데, 그때 `getLive` 응답은 35바이트다
+    /// (실측) — 받을 게 없는데 통신만 일어난다. 응답이 작아도 매번 무선 통신을 깨우는 비용은
+    /// 그대로라 배터리에 그대로 얹힌다.
+    ///
+    /// 늘리더라도 **경기 시작을 놓치면 안 되므로**, 예정 시각이 임박했거나 이미 지났는데
+    /// 아직 시작 보고가 안 된 경기가 있으면 다시 촘촘하게 돌아온다.
+    nonisolated static func pollInterval(liveCount: Int, scheduled: [Match], now: Date = Date()) -> Duration {
+        if liveCount > 0 { return livePollInterval }
+
+        var hasUpcoming = false
+        for match in scheduled where match.state == .unstarted {
+            let untilStart = match.startTime.timeIntervalSince(now)
+            // 시작 시각이 지났는데 아직 unstarted — 조기 시작이거나 Riot API가 안 따라잡은 상태.
+            // 지금이 바로 시작을 감지해야 하는 순간이라 가장 짧은 주기로 돌아간다.
+            if untilStart <= 0 { return livePollInterval }
+            if untilStart < upcomingWindow { hasUpcoming = true }
+        }
+        return hasUpcoming ? upcomingPollInterval : idlePollInterval
+    }
+
     func startLivePolling() {
         stopPolling()
         pollingTask = Task {
@@ -125,7 +160,12 @@ extension TodayViewModel {
                     // livePollLogger.debug("⚠️ [LivePoll] fetchLive 실패: \(error.localizedDescription) — 30초 뒤 재시도")
                     #endif
                 }
-                try? await Task.sleep(for: .seconds(30))
+                // 다음 주기는 지금 상황(라이브 유무 + 임박한 경기)에 맞춰 정한다.
+                let interval = Self.pollInterval(
+                    liveCount: liveMatches.count,
+                    scheduled: todayMatches + upcomingMatches
+                )
+                try? await Task.sleep(for: interval)
             }
         }
     }

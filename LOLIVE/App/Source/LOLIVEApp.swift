@@ -139,9 +139,20 @@ struct LOLIVEApp: App {
             .animation(nil, value: appTheme)
         }
         .onChange(of: scenePhase) { _, newPhase in
-            // 포그라운드 복귀 시 즉시 폴링 재시작 → 백그라운드 중 시작된 경기도 즉각 감지
-            guard phase == .main, newPhase == .active else { return }
-            todayViewModel.startLivePolling()
+            guard phase == .main else { return }
+            if newPhase == .active {
+                // 포그라운드 복귀 시 즉시 폴링 재시작 → 백그라운드 중 시작된 경기도 즉각 감지
+                // (폴링 루프는 대기가 아니라 조회부터 하므로 재시작 = 즉시 새로고침)
+                todayViewModel.startLivePolling()
+            } else if newPhase == .background {
+                // 앱이 안 보이는 동안엔 멈춘다 — 예전엔 중지가 아예 없어서 백그라운드로
+                // 넘어간 뒤에도 계속 두드렸다.
+                //
+                // `.inactive`에서는 멈추지 않는다. 제어센터를 내렸거나 앱 전환기를 띄운 것처럼
+                // 잠깐 스쳐가는 상태에도 걸리고, 시스템 권한 팝업처럼 `.inactive`가 계속
+                // 유지되는 경우엔 폴링이 아예 안 도는 상태로 남아버린다(실측으로 확인).
+                todayViewModel.stopPolling()
+            }
         }
         .modelContainer(for: [FavoriteTeam.self, FavoritePlayer.self])
     }

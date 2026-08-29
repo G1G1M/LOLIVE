@@ -169,6 +169,19 @@ lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 읽기 때문에, 메인 액터에서 그대로 돌리면 첫 화면이 그려지는 시점 자체가 밀립니다.
 캐시를 읽는 동안에는 로딩 표시를 켜 두어 빈 상태가 한 프레임 스치지 않게 합니다.
 
+### 라이브 폴링
+
+라이브 경기 정보는 폴링으로 갱신합니다. 주기는 고정이 아니라 상황에 따라 바뀝니다.
+
+| 상황 | Today 화면 | 경기 상세 |
+|---|---|---|
+| 게임이 진행 중 | 30초 | 5초 |
+| 곧(30분 내) 시작 / 시작 시각이 지났는데 아직 미시작 | 60초 / 30초 | 30초 |
+| 라이브도 없고 임박한 경기도 없음 | 5분 | — |
+
+앱이 백그라운드로 가면 폴링을 멈추고, 포그라운드로 돌아오면 즉시 다시 조회합니다.
+제어센터를 내린 것 같은 일시적인 `.inactive` 상태에서는 멈추지 않습니다.
+
 ### 이미지 캐시
 
 팀 로고·챔피언 아이콘은 메모리(`NSCache`) → 디스크 → 네트워크 순으로 찾습니다.
@@ -197,7 +210,7 @@ lolive-firebase/        — Firebase 백엔드 (Cloud Functions + Firestore)
 
 ## 테스트
 
-`LOLIVETests` 타겟, Swift Testing 프레임워크. 93개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩 + 검색 + 이미지 다운샘플링).
+`LOLIVETests` 타겟, Swift Testing 프레임워크. 102개 케이스 (핵심 ViewModel 로직 + 순수 함수 + 캐시 선로딩 + 검색 + 이미지 다운샘플링 + 폴링 주기).
 
 ```bash
 xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기명>' -only-testing:LOLIVETests
@@ -207,5 +220,5 @@ xcodebuild test -scheme LOLIVE -destination 'platform=iOS Simulator,name=<기기
 
 `.github/workflows/ci.yml` — GitHub Actions, `main` push/PR마다 자동 실행.
 
-1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 93개 실행
+1. `LOLIVE` 스킴 빌드 + `LOLIVETests` 102개 실행
 2. `LOLIVEWidgetsExtension` 별도 빌드 (컴파일 체크만)

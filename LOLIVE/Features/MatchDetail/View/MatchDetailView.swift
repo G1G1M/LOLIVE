@@ -17,6 +17,10 @@ struct MatchDetailView: View {
 
     @State var viewModel: MatchDetailViewModel
     @State var isPulsing = false
+    @Environment(\.scenePhase) private var scenePhase
+    /// 이 화면이 지금 실제로 보이는 중인지. 포그라운드로 돌아왔을 때 "가려진 화면"까지
+    /// 같이 폴링을 되살리지 않으려고 둔다(다른 화면을 그 위에 밀어 올린 상태 등).
+    @State private var isVisible = false
 
     init(match: Match, liveMatch: LiveMatch? = nil) {
         self.match = match
@@ -91,15 +95,29 @@ struct MatchDetailView: View {
             viewModel.startPolling()
         }
         .onAppear {
+            isVisible = true
             #if DEBUG
             navDebugLogger.debug("🔍 [NavDebug] MatchDetailView onAppear matchId=\(match.id)")
             #endif
         }
         .onDisappear {
+            isVisible = false
             #if DEBUG
             navDebugLogger.debug("🔍 [NavDebug] MatchDetailView onDisappear matchId=\(match.id)")
             #endif
             viewModel.stopPolling()
+        }
+        // onDisappear는 앱이 백그라운드로 갈 땐 불리지 않는다 — 화면을 열어둔 채
+        // 앱을 내리면 폴링이 계속 돌고 있었다.
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                guard isVisible else { return }
+                viewModel.startPolling()
+            } else if newPhase == .background {
+                // `.inactive`는 제외 — 잠깐 스쳐가는 상태라 매번 껐다 켜면 복귀할 때마다
+                // 불필요한 재조회만 늘어난다(LOLIVEApp의 같은 처리 참고).
+                viewModel.stopPolling()
+            }
         }
     }
 
