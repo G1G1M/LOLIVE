@@ -138,12 +138,16 @@ extension TodayViewModel {
 
                     // Leaguepedia 보정 적용: 시리즈 완료 확정은 목록에서 제외(이미 markCompleted 처리됨),
                     // 세트 단위 보정은 스코어만 교체해 계속 라이브로 표시
-                    liveMatches = enrich(live).compactMap { lm -> LiveMatch? in
+                    // 대부분의 폴링은 직전과 완전히 같은 결과를 받는다. `liveMatches`는
+                    // @Observable 프로퍼티라 같은 값이라도 대입하는 순간 이걸 읽는 뷰가 전부
+                    // 무효화되므로(Today 화면 전체 재계산), 실제로 달라졌을 때만 대입한다.
+                    let updatedLive = enrich(live).compactMap { lm -> LiveMatch? in
                         guard let override = leaguepediaOverrides[lm.match.id] else { return lm }
                         guard override.state != .completed else { return nil }
                         return LiveMatch(match: override, currentSet: lm.currentSet,
-                                         lastUpdated: lm.lastUpdated, currentGameId: lm.currentGameId)
+                                         currentGameId: lm.currentGameId)
                     }
+                    if updatedLive != liveMatches { liveMatches = updatedLive }
                     checkStuckLiveMatches(newFavoriteLive)
 
                     // 예약 시각이 지났으나 API 미확인 즐겨찾기 경기 (조기 시작 대응 + API 딜레이 브릿징)
@@ -154,6 +158,7 @@ extension TodayViewModel {
                         !newLiveIds.contains($0.id)
                     }
                     await LiveActivityService.shared.syncActivities(liveMatches, overdueMatches: overdueMatches, justCompletedMatches: justCompleted, favoritedTeams: favoritedTeams)
+                    lastPollCompletedAt = Date()
                 } catch {
                     // 폴링 중 에러는 무시 (기존 데이터 유지)
                     #if DEBUG
@@ -183,7 +188,7 @@ extension TodayViewModel {
         syncTask = Task {
             if let fresh = try? await svc.fetchLive() {
                 let enriched = enrich(fresh)
-                liveMatches = enriched
+                if enriched != liveMatches { liveMatches = enriched }
                 let liveIds = Set(enriched.map { $0.match.id })
                 let overdueMatches = todayMatches.filter {
                     $0.startTime <= Date() &&
@@ -271,7 +276,7 @@ extension TodayViewModel {
                 startTime: lm.match.startTime, state: lm.match.state,
                 blockName: lm.match.blockName
             )
-            return LiveMatch(match: enrichedMatch, currentSet: lm.currentSet, lastUpdated: lm.lastUpdated, currentGameId: lm.currentGameId)
+            return LiveMatch(match: enrichedMatch, currentSet: lm.currentSet, currentGameId: lm.currentGameId)
         }
     }
 }

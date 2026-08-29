@@ -28,6 +28,13 @@ final class TodayViewModel {
     /// 즐겨찾기 팀 목록(ID+코드+리그) — ContentView에서 SwiftData 쿼리 결과로 설정
     var favoritedTeams: Set<FavoritedTeamRef> = []
 
+    /// 라이브 폴링이 한 바퀴 끝난 시각. 결과가 직전과 같아도 매번 갱신된다.
+    ///
+    /// `liveMatches`는 내용이 달라졌을 때만 대입하므로(그래야 Today 화면이 30초마다 통째로
+    /// 다시 그려지지 않는다) "폴링이 돌았다"는 신호를 따로 둔다 — 위젯이 App Group 스냅샷의
+    /// 저장 시각으로 신선도를 판정하기 때문에 그 저장만은 매 폴링마다 이뤄져야 한다.
+    var lastPollCompletedAt: Date = .distantPast
+
 
     // MARK: - Private
 

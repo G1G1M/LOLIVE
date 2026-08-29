@@ -50,6 +50,12 @@ struct ContentView: View {
         .onChange(of: todayViewModel.upcomingMatches) { _, _ in
             saveWidgetNextMatches()
         }
+        // 라이브 폴링이 한 바퀴 돌 때마다 — 결과가 직전과 같아도. 위젯이 App Group 스냅샷의
+        // 저장 시각으로 신선도를 판정하므로(90초 이내면 자체 네트워크 호출 생략) 그 시각은
+        // 계속 갱신돼야 한다. `liveMatches`는 실제로 달라졌을 때만 바뀌므로 이걸 트리거로 쓸 수 없다.
+        .onChange(of: todayViewModel.lastPollCompletedAt) { _, _ in
+            saveWidgetNextMatches()
+        }
         .onChange(of: todayViewModel.liveMatches) { _, _ in
             saveWidgetNextMatches()
         }
@@ -170,10 +176,8 @@ struct ContentView: View {
         SharedDataService.saveNextMatches(nextMatchMap)
 
         // 반면 타임라인 리로드는 iOS가 하루 할당량을 두고 배분하는 자원이라, 예산을 태우면
-        // 그 뒤 요청이 조용히 무시돼 위젯이 갱신을 멈춘다. 그런데 이 함수는 라이브 폴링마다
-        // 불린다 — `LiveMatch.lastUpdated`가 폴링할 때마다 새로 찍혀서 내용이 그대로여도
-        // `onChange(of: liveMatches)`가 매번 발동하기 때문이다.
-        // 그래서 화면에 보이는 값이 실제로 달라졌을 때만 리로드한다.
+        // 그 뒤 요청이 조용히 무시돼 위젯이 갱신을 멈춘다. 이 함수는 폴링마다 불리므로
+        // 화면에 보이는 값이 실제로 달라졌을 때만 리로드한다.
         guard !SharedNextMatch.sameDisplayContent(nextMatchMap, lastWidgetSnapshot) else { return }
         lastWidgetSnapshot = nextMatchMap
         WidgetCenter.shared.reloadAllTimelines()

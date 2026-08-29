@@ -67,19 +67,22 @@ extension TodayView {
     // MARK: - Match List
 
     var matchList: some View {
-        ScrollViewReader { proxy in
+        // 계산 프로퍼티는 참조할 때마다 다시 계산된다 — 아래에서 최대 네 번(빈 상태 검사 3개 +
+        // ForEach) 참조하므로, 리그 그룹핑+정렬 전체를 그만큼 반복하게 된다. 한 번만 계산해서 쓴다.
+        let groups = displayedGroups
+        return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
                     Color.clear.frame(height: 0).id("top")
 
-                    if showLiveOnly && displayedGroups.isEmpty {
+                    if showLiveOnly && groups.isEmpty {
                         EmptyStateView("현재 라이브 중인 경기가 없습니다", icon: "dot.radiowaves.left.and.right")
-                    } else if viewModel.showFavoritesOnly && displayedGroups.isEmpty {
+                    } else if viewModel.showFavoritesOnly && groups.isEmpty {
                         EmptyStateView("즐겨찾기한 팀의 경기가 없습니다", icon: "star.slash")
-                    } else if displayedGroups.isEmpty {
+                    } else if groups.isEmpty {
                         EmptyStateView("이 날짜에 경기가 없습니다", icon: "calendar.badge.exclamationmark")
                     } else {
-                        ForEach(displayedGroups) { group in
+                        ForEach(groups) { group in
                             Section {
                                 ForEach(group.matches, id: \.match.id) { (match, isLive) in
                                     NavigationLink(value: match) {
